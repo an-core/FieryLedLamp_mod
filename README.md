@@ -1,1 +1,1 @@
-# FieryLedLamp_mod
+# Модифицированная прошивка FieryLedLamp
