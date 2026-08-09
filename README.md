@@ -1,4 +1,4 @@
-# Модифицированная прошивка FieryLedLamp
+# Модифицированная прошивка FieryLedLamp (исходная версия https://github.com/MishanyaTS/FieryLedLamp)
 ![Изображение](https://raw.githubusercontent.com/an-core/FieryLedLamp_mod/main/image.jpg)
 1. Поддерживаемое оборудование: ESP32 WROOM, ESP32-S3
 2. Поддерживаемые LED чипы: APA102, WS2812B
