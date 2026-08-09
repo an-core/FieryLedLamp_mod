@@ -1,5 +1,5 @@
 # Модифицированная прошивка FieryLedLamp (исходная версия на странице [MishanyaTS](https://github.com/MishanyaTS/FieryLedLamp))
-# Обсуждение прошивки на [форуме alexgyver](https://community.alexgyver.ru/threads/wifi-lampa-budilnik-obsuzhdenie-proshivki-fieryledlamp-ot-mishanyats.7530/page-94)
+# Обсуждение прошивки на [форуме community.alexgyver.ru](https://community.alexgyver.ru/threads/wifi-lampa-budilnik-obsuzhdenie-proshivki-fieryledlamp-ot-mishanyats.7530/page-94)
 ![Изображение](https://raw.githubusercontent.com/an-core/FieryLedLamp_mod/main/image.jpg)
 1. Поддерживаемое оборудование: ESP32 WROOM, ESP32-S3
 2. Поддерживаемые LED чипы: APA102, WS2812B
