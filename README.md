@@ -1,5 +1,5 @@
 ![Изображение](https://raw.githubusercontent.com/an-core/FieryLedLamp_mod/main/image.jpg)
-# Модифицированная прошивка FieryLedLamp (исходная версия на странице [MishanyaTS](https://github.com/MishanyaTS/FieryLedLamp))
+# Модифицированная прошивка FieryLedLamp (исходная версия на странице [MishanyaTS](https://github.com/MishanyaTS/FieryLedLamp "Исходный проект FieryLedLamp"))
 
 1. Поддерживаемое оборудование:
 - [x] ESP32 WROOM
