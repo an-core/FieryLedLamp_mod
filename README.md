@@ -1,8 +1,8 @@
 # Модифицированная прошивка FieryLedLamp (исходная версия на странице [MishanyaTS](https://github.com/MishanyaTS/FieryLedLamp))
 ![Изображение](https://raw.githubusercontent.com/an-core/FieryLedLamp_mod/main/image.jpg)
 1. Поддерживаемое оборудование:
-- [x] ESP32 WROOM
-- [x] ESP32-S3
+- [x] ![Done](https://img.shields.io/badge/готово-brightgreen) ESP32 WROOM
+- [x] ![Done](https://img.shields.io/badge/готово-brightgreen) ESP32-S3
 3. Поддерживаемые LED чипы: APA102, WS2812B
 4. Wi-Fi функционал:
 - мульти-WiFi - запоминание нескольких сетей с автоматическим переключением между ними
