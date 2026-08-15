@@ -44,5 +44,5 @@
 - в браузере в адресной строке впишите 192.168.4.1 (это точка доступа)
 - откроется вэб-интерфейс для управления устройством
 - в настройках WiFi можно указать несколько сетей (устройство будет подключаться к доступной)
-  
+  ___
 # Обсуждение прошивки на форуме [community.alexgyver.ru](https://community.alexgyver.ru/threads/wifi-lampa-budilnik-obsuzhdenie-proshivki-fieryledlamp-ot-mishanyats.7530/page-94)
