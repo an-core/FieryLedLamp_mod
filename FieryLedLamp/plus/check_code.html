@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Синтаксический анализатор кода</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.1/beautify.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.1/beautify-css.min.js">
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.15.1/beautify-html.min.js">
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f1117;
+            color: #e4e6eb;
+            padding: 24px 20px 40px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app {
+            max-width: 1100px;
+            width: 100%;
+        }
+
+        .header {
+            margin-bottom: 28px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #f0b3ff, #7dd3fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header .sub {
+            color: #8b93a7;
+            font-size: 15px;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px 16px;
+            background: #1a1d27;
+            padding: 14px 20px;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            align-items: center;
+            border: 1px solid #2a2e3a;
+        }
+
+        .toolbar label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #b5bccf;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .toolbar select,
+        .toolbar button {
+            background: #262b37;
+            color: #e4e6eb;
+            border: 1px solid #363c4b;
+            border-radius: 8px;
+            padding: 3px 10px;
+            font-size: 14px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .toolbar select:hover,
+        .toolbar button:hover {
+            border-color: #5a6490;
+        }
+
+        .toolbar .btn-primary {
+            background: #345a3a;
+            border-color: #458168;
+            font-weight: 600;
+            padding: 3px 14px;
+        }
+
+        .toolbar .btn-primary:hover {
+            background: #5a6fb8;
+            border-color: #6f86d0;
+        }
+
+        .toolbar .btn-secondary {
+            background: #2a2e3a;
+            border-color: #3f4455;
+        }
+
+        .toolbar .btn-secondary:hover {
+            background: #363c4b;
+        }
+
+        .toolbar .btn-copy {
+            background: #1a3a4a;
+            border-color: #2a5a6a;
+        }
+
+        .toolbar .btn-copy:hover {
+            background: #2a5a6a;
+            border-color: #3a7a8a;
+        }
+
+        .toolbar .btn-w3c-manual {
+            background: #322e2a;
+            border-color: #5a4a3a;
+            margin-left: auto;
+        }
+
+        .toolbar .btn-w3c-manual:hover {
+            background: #4a3a2a;
+            border-color: #6a5a4a;
+        }
+
+        .toolbar .lang-badge {
+            font-size: 13px;
+            background: #2a2e3a;
+            padding: 4px 14px;
+            border-radius: 20px;
+            color: #aab3c9;
+            border: 1px solid #3f4455;
+        }
+
+        .editor-wrap {
+            background: #14171f;
+            border-radius: 14px;
+            border: 1px solid #262b37;
+            overflow: hidden;
+            transition: border-color 0.25s;
+            margin-bottom: 16px;
+        }
+
+        .editor-wrap:focus-within {
+            border-color: #4a5b9e;
+        }
+
+        .editor-container {
+            display: flex;
+            background: #14171f;
+            position: relative;
+            min-height: 320px;
+            height: 420px;
+            overflow: hidden;
+        }
+
+        .line-numbers {
+            flex: 0 0 48px;
+            background: #0f1117;
+            color: #4d546b;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            line-height: 1.7;
+            padding: 20px 0 20px 8px;
+            text-align: right;
+            user-select: none;
+            overflow: hidden;
+            border-right: 1px solid #1e222d;
+            white-space: pre;
+            box-sizing: border-box;
+            height: 100%;
+        }
+
+        .line-numbers span {
+            display: block;
+            padding-right: 10px;
+        }
+
+        .line-numbers .error-line {
+            background: rgba(255, 70, 70, 0.25);
+            color: #ff6b6b;
+            font-weight: 600;
+            border-radius: 2px;
+        }
+
+        .editor-container textarea {
+            flex: 1;
+            background: transparent;
+            color: #d4d8e6;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 15px;
+            line-height: 1.7;
+            padding: 20px 22px;
+            border: none;
+            outline: none;
+            tab-size: 2;
+            white-space: pre;
+            overflow: auto;
+            resize: none;
+            height: 100%;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .editor-container textarea::placeholder {
+            color: #4d546b;
+            font-style: italic;
+        }
+
+        .editor-wrap .status-bar {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 20px 10px;
+            font-size: 13px;
+            color: #6b748f;
+            border-top: 1px solid #1e222d;
+            background: #11141c;
+        }
+
+        .editor-wrap .status-bar .stats span {
+            margin-right: 18px;
+        }
+
+        .editor-wrap .status-bar .stats .num {
+            color: #aab3c9;
+            font-weight: 500;
+        }
+
+        .results {
+            background: #14171f;
+            border-radius: 14px;
+            border: 1px solid #262b37;
+            padding: 0;
+            min-height: 80px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 20px 12px;
+            border-bottom: 1px solid #1e222d;
+            font-size: 15px;
+            font-weight: 500;
+            color: #b5bccf;
+        }
+
+        .results-header .badge {
+            font-size: 12px;
+            font-weight: 400;
+            padding: 2px 14px;
+            border-radius: 20px;
+            background: #262b37;
+            color: #8b93a7;
+        }
+
+        .results-body {
+            padding: 16px 20px 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.7;
+            max-height: 420px;
+            overflow-y: auto;
+        }
+
+        .results-body .empty {
+            color: #5d657e;
+            font-style: italic;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        .results-body .error-item {
+            display: flex;
+            gap: 12px;
+            padding: 7px 0;
+            border-bottom: 1px solid #1a1d27;
+            align-items: baseline;
+        }
+
+        .results-body .error-item:last-child {
+            border-bottom: none;
+        }
+
+        .results-body .error-item .line {
+            color: #6b748f;
+            font-weight: 500;
+            min-width: 60px;
+            flex-shrink: 0;
+            font-size: 13px;
+        }
+
+        .results-body .error-item .msg {
+            color: #e4e6eb;
+            word-break: break-word;
+        }
+
+        .results-body .error-item .severity {
+            font-size: 16px;
+            flex-shrink: 0;
+            width: 24px;
+            text-align: center;
+        }
+
+        .results-body .error-item.sev-error .severity {
+            color: #f87171;
+        }
+
+        .results-body .error-item.sev-warning .severity {
+            color: #fbbf24;
+        }
+
+        .results-body .error-item.sev-info .severity {
+            color: #60a5fa;
+        }
+
+        .results-body .success-msg {
+            color: #6ee7b7;
+            font-weight: 500;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .results-body .success-msg .icon {
+            font-size: 22px;
+        }
+
+        .results-body::-webkit-scrollbar,
+        .editor-container textarea::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        .results-body::-webkit-scrollbar-track,
+        .editor-container textarea::-webkit-scrollbar-track {
+            background: #0f1117;
+        }
+
+        .results-body::-webkit-scrollbar-thumb,
+        .editor-container textarea::-webkit-scrollbar-thumb {
+            background: #363c4b;
+            border-radius: 8px;
+        }
+
+        @media (max-width: 700px) {
+            body {
+                padding: 16px 12px 30px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .toolbar .lang-badge {
+                margin-left: 0;
+                text-align: center;
+            }
+
+            .editor-container {
+                min-height: 220px;
+                height: 280px;
+            }
+
+            .line-numbers {
+                flex-basis: 36px;
+                padding: 14px 0 14px 4px;
+                font-size: 13px;
+                line-height: 1.6;
+            }
+
+            .editor-container textarea {
+                font-size: 14px;
+                padding: 14px 16px;
+            }
+
+            .results-body {
+                font-size: 13px;
+                padding: 12px 14px 16px;
+                max-height: 320px;
+            }
+
+            .results-body .error-item .line {
+                min-width: 44px;
+                font-size: 12px;
+            }
+        }
+
+        @media (max-width: 450px) {
+
+            .toolbar select,
+            .toolbar button {
+                font-size: 13px;
+                padding: 6px 12px;
+            }
+
+            .editor-container {
+                min-height: 160px;
+                height: 200px;
+            }
+
+            .line-numbers {
+                flex-basis: 30px;
+                padding: 12px 0 12px 2px;
+                font-size: 12px;
+                line-height: 1.5;
+            }
+
+            .editor-container textarea {
+                font-size: 13px;
+                padding: 12px 12px;
+            }
+        }
+
+        .results-body .error-item {
+            animation: fadeUp 0.2s ease-out;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(6px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app">
+
+        <header class="header">
+            <h1>✦ Синтаксический анализатор</h1>
+            <span class="sub">Проверка кода на ошибки в HTML, CSS, JavaScript, JSON, BAT и других языках</span>
+        </header>
+
+        <div class="toolbar">
+            <label>
+                Язык
+                <select id="langSelect">
+                    <option value="auto">Авто</option>
+                    <option value="html">HTML</option>
+                    <option value="htm">HTM</option>
+                    <option value="css">CSS</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="json">JSON</option>
+                    <option value="xml">XML</option>
+                    <option value="svg">SVG</option>
+                    <option value="bat">BAT</option>
+                </select>
+            </label>
+
+            <label>
+                Отступ
+                <select id="indentSizeSelect">
+                    <option value="2">2</option>
+                    <option value="4" selected>4</option>
+                    <option value="8">8</option>
+                </select>
+            </label>
+
+            <button class="btn-primary" id="checkBtn">Проверить</button>
+            <button class="btn-secondary" id="formatBtn">Форматировать</button>
+            <button class="btn-copy" id="copyBtn">Копировать</button>
+            <button class="btn-secondary" id="clearBtn">Очистить</button>
+            <button class="btn-w3c-manual" id="w3cManualBtn">Открыть W3C</button>
+
+            <span class="lang-badge" id="detectedLang">не определён</span>
+        </div>
+
+        <div class="editor-wrap">
+            <div class="editor-container" id="editorContainer">
+                <div class="line-numbers" id="lineNumbers"></div>
+                <textarea id="codeInput" placeholder="Вставьте код для проверки…&#10;Поддерживаются: HTML, CSS, JavaScript, JSON, XML, SVG, BAT" spellcheck="false"></textarea>
+            </div>
+            <div class="status-bar">
+                <div class="stats">
+                    <span>Символов: <span class="num" id="charCount">0</span></span>
+                    <span>Строк: <span class="num" id="lineCount">0</span></span>
+                </div>
+                <div id="editorStatus">готов</div>
+            </div>
+        </div>
+
+        <div class="results">
+            <div class="results-header">
+                <span>Результат проверки</span>
+                <span class="badge" id="resultBadge">ожидание</span>
+            </div>
+            <div class="results-body" id="resultsBody">
+                <span class="empty">Вставьте код в редактор и нажмите «Проверить»</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            function cleanInput(text) {
+                return text.replace(/^[\uFEFF\u200B\u2060\uFFF9-\uFFFB\u0000-\u0008\u000B-\u000C\u000E-\u001F\u007F-\u009F]+/, '').trimStart();
+            }
+
+            const codeInput = document.getElementById('codeInput');
+            const lineNumbers = document.getElementById('lineNumbers');
+            const langSelect = document.getElementById('langSelect');
+            const checkBtn = document.getElementById('checkBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const formatBtn = document.getElementById('formatBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const w3cManualBtn = document.getElementById('w3cManualBtn');
+            const resultsBody = document.getElementById('resultsBody');
+            const resultBadge = document.getElementById('resultBadge');
+            const detectedLang = document.getElementById('detectedLang');
+            const charCount = document.getElementById('charCount');
+            const lineCount = document.getElementById('lineCount');
+            const editorStatus = document.getElementById('editorStatus');
+            const indentSizeSelect = document.getElementById('indentSizeSelect');
+
+            let lastResult = [];
+            let copyTimeout = null;
+            let errorLines = [];
+
+            function pluralize(num, one, few, many) {
+                if (num % 10 === 1 && num % 100 !== 11) return one;
+                if (num % 10 >= 2 && num % 10 <= 4 && (num % 100 < 10 || num % 100 >= 20)) return few;
+                return many;
+            }
+
+            function updateLineNumbers(errorLinesArray) {
+                if (!errorLinesArray) errorLinesArray = [];
+                const text = codeInput.value;
+                const lines = text.split('\n');
+                const errorSet = new Set(errorLinesArray);
+                let html = '';
+                for (let i = 1; i <= lines.length; i++) {
+                    const cls = errorSet.has(i) ? ' error-line' : '';
+                    html += `<span class="line-num${cls}">${i}</span>`;
+                }
+                lineNumbers.innerHTML = html;
+                syncScroll();
+                charCount.textContent = text.length;
+                lineCount.textContent = lines.length;
+            }
+
+            function syncScroll() {
+                lineNumbers.scrollTop = codeInput.scrollTop;
+            }
+
+            codeInput.addEventListener('scroll', syncScroll);
+            codeInput.addEventListener('input', function() {
+                errorLines = [];
+                updateLineNumbers([]);
+                updateDetectedLang();
+            });
+
+            window.addEventListener('load', function() {
+                updateLineNumbers([]);
+                updateDetectedLang();
+                updateStats();
+            });
+
+            function updateStats() {
+                const text = codeInput.value;
+                charCount.textContent = text.length;
+                lineCount.textContent = text.split('\n').length;
+            }
+
+            function detectLanguage(text) {
+                if (!text || text.trim() === '') return 'unknown';
+                const cleaned = cleanInput(text);
+                const trimmed = cleaned.trim();
+
+                if (/<!DOCTYPE\s+html/i.test(trimmed) || /<html[\s>]/i.test(trimmed) || /<\/html>/i.test(trimmed)) {
+                    return 'html';
+                }
+
+                const batStrictPattern = /(?:^|\s)@echo\s+(?:off|on)|%~dp0|%errorlevel%|chcp\s+\d+|net\s+session|cd\s+\/d|mkdir\s+|start\s+.*\/min|timeout\s+\/t|exit\s+\/b\s+\d+|pause\s*$|\bset\s+[A-Z_][A-Z0-9_]*\s*=|if\s+(?:exist|defined|errorlevel|not)\s+/i;
+                if (batStrictPattern.test(trimmed) || /%[A-Z_][A-Z0-9_]*%/i.test(trimmed)) return 'bat';
+
+                if (/^\s*[{\[]/.test(trimmed) && /[}\]]\s*$/.test(trimmed)) {
+                    try { JSON.parse(trimmed); return 'json'; } catch (_) {}
+                }
+
+                const jsPatterns = [
+                    /\b(const|let|var)\s+[a-zA-Z_$][\w$]*\s*[=;]/,
+                    /\bfunction\s*\(/,
+                    /\bfunction\s+[a-zA-Z_$][\w$]*\s*\(/,
+                    /=>/,
+                    /\bclass\s+[a-zA-Z_$][\w$]*\s*\{/,
+                    /\bimport\s+.*\s+from\s+/,
+                    /\bexport\s+(default\s+)?/,
+                    /\btry\s*\{/,
+                    /\bcatch\s*\(/,
+                    /\breturn\s+[^;]+;/
+                ];
+
+                const hasJs = jsPatterns.some(p => p.test(trimmed));
+
+                const hasCssBlock = /[a-zA-Z_\-]+\s*\{[^}]*\}/.test(trimmed);
+                if (hasCssBlock && !hasJs) return 'css';
+
+                if (hasJs) return 'javascript';
+
+                if (/<\/?[a-zA-Z][a-zA-Z0-9:._-]*\s*\/?>/i.test(trimmed)) {
+                    if (/<svg[\s>]/i.test(trimmed) && /<\/svg>/i.test(trimmed)) return 'svg';
+                    if (/<\?xml/i.test(trimmed)) return 'xml';
+                    return 'html';
+                }
+
+                return 'unknown';
+            }
+
+            function updateDetectedLang() {
+                const text = codeInput.value;
+                const lang = detectLanguage(text);
+                const map = {
+                    html: 'HTML',
+                    htm: 'HTM',
+                    css: 'CSS',
+                    javascript: 'JavaScript',
+                    json: 'JSON',
+                    xml: 'XML',
+                    svg: 'SVG',
+                    bat: 'BAT',
+                    unknown: 'не определён'
+                };
+                detectedLang.textContent = ' ' + (map[lang] || lang);
+                return lang;
+            }
+
+            function getEffectiveLang() {
+                const manual = langSelect.value;
+                if (manual !== 'auto') return manual;
+                const text = codeInput.value;
+                const detected = detectLanguage(text);
+                if (detected === 'unknown' && text.trim() !== '') return 'html';
+                return detected;
+            }
+
+            function runCheck() {
+                const rawText = codeInput.value;
+                const cleanedText = cleanInput(rawText);
+                const lang = getEffectiveLang();
+
+                if (cleanedText.trim() === '') {
+                    resultsBody.innerHTML = `<span class="empty">⏳ Вставьте код для проверки</span>`;
+                    resultBadge.textContent = 'ожидание';
+                    resultBadge.style.color = '#8b93a7';
+                    editorStatus.textContent = 'пусто';
+                    errorLines = [];
+                    updateLineNumbers([]);
+                    return;
+                }
+
+                editorStatus.textContent = 'проверка…';
+                let errors = [];
+
+                switch (lang) {
+                    case 'html':
+                    case 'htm':
+                    case 'xml':
+                    case 'svg':
+                        errors = validateHTML(cleanedText, lang);
+                        break;
+                    case 'css':
+                        errors = validateCSS(cleanedText);
+                        break;
+                    case 'javascript':
+                        errors = validateJavaScript(cleanedText);
+                        break;
+                    case 'json':
+                        errors = validateJSON(cleanedText);
+                        break;
+                    case 'bat':
+                        errors = validateBat(cleanedText);
+                        break;
+                    default:
+                        errors = validateGeneric(cleanedText);
+                        break;
+                }
+
+                displayResults(errors, lang);
+                lastResult = errors;
+                editorStatus.textContent = errors.length === 0 ? '✓ синтаксис верен' : '✗ найдены ошибки';
+            }
+
+            function validateHTML(text, lang) {
+                const errors = [];
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(text, 'text/html');
+                    const parserError = doc.querySelector('parsererror');
+                    if (parserError) {
+                        const msg = parserError.textContent || 'Ошибка парсинга HTML';
+                        errors.push({ line: 1, column: 1, message: msg, severity: 'error' });
+                    }
+                } catch (e) {
+                    errors.push({ line: 1, column: 1, message: 'Ошибка парсера: ' + e.message, severity: 'error' });
+                }
+                if (errors.length === 0) {
+                    errors.push({ line: 0, column: 0, message: '✔️ Синтаксис корректен', severity: 'info' });
+                }
+                return errors;
+            }
+
+            function validateCSS(text) {
+                const errors = [];
+                try {
+                    const sheet = new CSSStyleSheet();
+                    sheet.replaceSync(text);
+                } catch (e) {
+                    let line = 1,
+                        col = 1;
+                    const match = e.message.match(/line\s*(\d+)/i) || e.message.match(/position\s*(\d+)/i);
+                    if (match) {
+                        const pos = parseInt(match[1]);
+                        if (!isNaN(pos)) {
+                            if (e.message.includes('line')) {
+                                line = pos;
+                            } else {
+                                const before = text.substring(0, pos);
+                                line = before.split('\n').length;
+                                col = before.split('\n').pop().length + 1;
+                            }
+                        }
+                    }
+                    errors.push({
+                        line: line,
+                        column: col,
+                        message: 'Ошибка CSS: ' + e.message.replace(/^[^:]+:\s*/, ''),
+                        severity: 'error'
+                    });
+                }
+                if (errors.length === 0) {
+                    errors.push({ line: 0, column: 0, message: '✔️ CSS-синтаксис корректен', severity: 'info' });
+                }
+                return errors;
+            }
+
+            function validateJavaScript(text) {
+                const errors = [];
+                try {
+                    new Function('"use strict";\n' + text);
+                    errors.push({ line: 0, column: 0, message: '✔️ JavaScript-синтаксис корректен', severity: 'info' });
+                } catch (e) {
+                    let line = 1,
+                        col = 1;
+                    const match = e.message.match(/line (\d+)/i);
+                    if (match) line = parseInt(match[1]);
+                    const matchCol = e.message.match(/column (\d+)/i);
+                    if (matchCol) col = parseInt(matchCol[1]);
+                    errors.push({
+                        line: line,
+                        column: col,
+                        message: 'Ошибка JavaScript: ' + e.message.replace(/^[^:]+:\s*/, ''),
+                        severity: 'error'
+                    });
+                }
+                return errors;
+            }
+
+            function validateJSON(text) {
+                const errors = [];
+                try {
+                    JSON.parse(text);
+                    errors.push({ line: 0, column: 0, message: '✔️ JSON-синтаксис корректен', severity: 'info' });
+                } catch (e) {
+                    let line = 1,
+                        col = 1;
+                    const match = e.message.match(/position (\d+)/);
+                    if (match) {
+                        const pos = parseInt(match[1]);
+                        if (!isNaN(pos) && pos < text.length) {
+                            const before = text.substring(0, pos);
+                            line = before.split('\n').length;
+                            col = before.split('\n').pop().length + 1;
+                        }
+                    }
+                    errors.push({
+                        line: line,
+                        column: col,
+                        message: 'Ошибка JSON: ' + e.message.replace(/^[^:]+:\s*/, ''),
+                        severity: 'error'
+                    });
+                }
+                return errors;
+            }
+
+            function validateBat(text) {
+                const errors = [];
+                let lineNum = 1;
+
+                let inQuotes = false;
+                let quoteLine = 1;
+                let quoteCol = 1;
+                for (let i = 0; i < text.length; i++) {
+                    const ch = text[i];
+                    if (ch === '\n') { lineNum++; continue; }
+                    if (ch === '"') {
+                        if (!inQuotes) {
+                            inQuotes = true;
+                            quoteLine = lineNum;
+                            quoteCol = i - text.lastIndexOf('\n', i) + 1;
+                        } else {
+                            inQuotes = false;
+                        }
+                    }
+                }
+                if (inQuotes) {
+                    errors.push({
+                        line: quoteLine,
+                        column: quoteCol,
+                        message: 'Незакрытая кавычка (возможно, забыли закрыть путь или аргумент)',
+                        severity: 'error'
+                    });
+                }
+
+                let parens = 0;
+                let parenLine = 1;
+                let parenCol = 1;
+                let inString = false;
+                for (let i = 0; i < text.length; i++) {
+                    const ch = text[i];
+                    if (ch === '\n') { parenLine++; continue; }
+                    if (ch === '"') { inString = !inString; continue; }
+                    if (inString) continue;
+                    if (ch === '(') {
+                        if (parens === 0) {
+                            parenLine = parenLine;
+                            parenCol = i - text.lastIndexOf('\n', i) + 1;
+                        }
+                        parens++;
+                    } else if (ch === ')') {
+                        parens--;
+                        if (parens < 0) {
+                            errors.push({
+                                line: parenLine,
+                                column: parenCol,
+                                message: 'Лишняя закрывающая скобка ) без открывающей',
+                                severity: 'error'
+                            });
+                            parens = 0;
+                        }
+                    }
+                }
+                if (parens > 0) {
+                    errors.push({
+                        line: parenLine,
+                        column: parenCol,
+                        message: `Несбалансированные круглые скобки: ${parens} не закрыто`,
+                        severity: 'error'
+                    });
+                }
+
+                if (errors.length === 0) {
+                    errors.push({ line: 0, column: 0, message: '✔️ Синтаксис BAT корректен (базовая проверка)', severity: 'info' });
+                }
+
+                return errors;
+            }
+
+            function validateGeneric(text) {
+                let allErrors = [];
+                const langs = ['html', 'css', 'javascript', 'json', 'bat'];
+                for (const l of langs) {
+                    let res;
+                    switch (l) {
+                        case 'html':
+                            res = validateHTML(text, 'html');
+                            break;
+                        case 'css':
+                            res = validateCSS(text);
+                            break;
+                        case 'javascript':
+                            res = validateJavaScript(text);
+                            break;
+                        case 'json':
+                            res = validateJSON(text);
+                            break;
+                        case 'bat':
+                            res = validateBat(text);
+                            break;
+                    }
+                    const realErrors = res.filter(e => e.severity === 'error');
+                    if (realErrors.length === 0) {
+                        allErrors = res;
+                        break;
+                    }
+                    allErrors = allErrors.concat(res);
+                }
+                if (allErrors.length === 0) {
+                    allErrors.push({ line: 0, column: 0, message: '✔️ Синтаксис корректен (автоопределение)',
+                        severity: 'info' });
+                }
+                return allErrors;
+            }
+
+            function displayResults(errors, lang) {
+                const langMap = {
+                    html: 'HTML',
+                    htm: 'HTM',
+                    css: 'CSS',
+                    javascript: 'JavaScript',
+                    json: 'JSON',
+                    xml: 'XML',
+                    svg: 'SVG',
+                    bat: 'BAT',
+                    unknown: 'неопределён'
+                };
+                const langName = langMap[lang] || lang;
+
+                if (!errors || errors.length === 0) {
+                    resultsBody.innerHTML = `<span class="empty">✔️ Ошибок не найдено (${langName})</span>`;
+                    resultBadge.textContent = '✔️ OK';
+                    resultBadge.style.color = '#6ee7b7';
+                    errorLines = [];
+                    updateLineNumbers([]);
+                    return;
+                }
+
+                const realErrors = errors.filter(e => e.severity === 'error');
+                const warnings = errors.filter(e => e.severity === 'warning');
+                const infos = errors.filter(e => e.severity === 'info');
+
+                const errorLinesArray = realErrors.map(e => e.line).filter(l => l > 0);
+                errorLines = errorLinesArray;
+                updateLineNumbers(errorLinesArray);
+
+                if (realErrors.length === 0 && warnings.length === 0) {
+                    resultsBody.innerHTML =
+                        `<div class="success-msg"><span class="icon">✔️</span> ${infos[0]?.message || 'Синтаксис корректен'}</div>`;
+                    resultBadge.textContent = '✔️ OK';
+                    resultBadge.style.color = '#6ee7b7';
+                    return;
+                }
+
+                let html = '';
+                const allItems = [...realErrors, ...warnings, ...infos];
+                for (const err of allItems) {
+                    const sevClass = err.severity === 'error' ? 'sev-error' :
+                        err.severity === 'warning' ? 'sev-warning' : 'sev-info';
+                    const icon = err.severity === 'error' ? '✗' :
+                        err.severity === 'warning' ? '⚠' : 'ℹ';
+                    const lineStr = err.line > 0 ? `стр. ${err.line}` : '—';
+                    const colStr = err.column > 0 ? `:${err.column}` : '';
+                    html += `
+                        <div class="error-item ${sevClass}">
+                            <span class="severity">${icon}</span>
+                            <span class="line">${lineStr}${colStr}</span>
+                            <span class="msg">${err.message}</span>
+                        </div>
+                    `;
+                }
+
+                resultsBody.innerHTML = html;
+
+                let parts = [];
+                if (realErrors.length > 0) {
+                    let word = pluralize(realErrors.length, 'ошибка', 'ошибки', 'ошибок');
+                    parts.push(`❌ ${realErrors.length} ${word}`);
+                }
+                if (warnings.length > 0) {
+                    let word = pluralize(warnings.length, 'предупреждение', 'предупреждения', 'предупреждений');
+                    parts.push(`⚠ ${warnings.length} ${word}`);
+                }
+                let badgeText = parts.length ? parts.join(', ') : '✔️ нет ошибок';
+                resultBadge.textContent = badgeText;
+                if (realErrors.length > 0) {
+                    resultBadge.style.color = '#f87171';
+                } else if (warnings.length > 0) {
+                    resultBadge.style.color = '#fbbf24';
+                } else {
+                    resultBadge.style.color = '#6ee7b7';
+                }
+            }
+
+            function formatCode() {
+                const rawText = codeInput.value;
+                const text = cleanInput(rawText);
+                const lang = getEffectiveLang();
+
+                if (!text.trim()) {
+                    editorStatus.textContent = 'нет кода для форматирования';
+                    return;
+                }
+
+                let errors = [];
+                switch (lang) {
+                    case 'html':
+                    case 'htm':
+                    case 'xml':
+                    case 'svg':
+                        errors = validateHTML(text, lang);
+                        break;
+                    case 'css':
+                        errors = validateCSS(text);
+                        break;
+                    case 'javascript':
+                        errors = validateJavaScript(text);
+                        break;
+                    case 'json':
+                        errors = validateJSON(text);
+                        break;
+                    case 'bat':
+                        errors = validateBat(text);
+                        break;
+                    default:
+                        errors = validateGeneric(text);
+                        break;
+                }
+
+                const hasErrors = errors.some(e => e.severity === 'error');
+                if (hasErrors) {
+                    editorStatus.textContent = '⚠️ синтаксические ошибки — форматирование отменено';
+                    return;
+                }
+
+                const indentSize = parseInt(indentSizeSelect.value, 10) || 4;
+                const indentChar = ' ';
+
+                try {
+                    let formatted = '';
+                    switch (lang) {
+                        case 'javascript':
+                            if (typeof js_beautify !== 'undefined') {
+                                formatted = js_beautify(text, {
+                                    indent_size: indentSize,
+                                    indent_char: indentChar,
+                                    space_in_empty_paren: true,
+                                    eol: '\n'
+                                });
+                            } else {
+                                throw new Error('Библиотека js-beautify не загружена');
+                            }
+                            break;
+                        case 'css':
+                            if (typeof css_beautify !== 'undefined') {
+                                formatted = css_beautify(text, {
+                                    indent_size: indentSize,
+                                    indent_char: indentChar,
+                                    selector_separator_newline: true,
+                                    newline_between_rules: true
+                                });
+                            } else {
+                                throw new Error('Библиотека css-beautify не загружена');
+                            }
+                            break;
+                        case 'html':
+                        case 'htm':
+                        case 'xml':
+                        case 'svg':
+                            if (typeof html_beautify !== 'undefined') {
+                                formatted = html_beautify(text, {
+                                    indent_size: indentSize,
+                                    indent_char: indentChar,
+                                    indent_inner_html: true,
+                                    preserve_newlines: true,
+                                    max_preserve_newlines: 2
+                                });
+                            } else {
+                                throw new Error('Библиотека html-beautify не загружена');
+                            }
+                            break;
+                        case 'json':
+                            try {
+                                const parsed = JSON.parse(text);
+                                formatted = JSON.stringify(parsed, null, indentSize);
+                            } catch (e) {
+                                throw new Error('Некорректный JSON: ' + e.message);
+                            }
+                            break;
+                        default:
+                            formatted = text;
+                            break;
+                    }
+                    codeInput.value = formatted;
+                    errorLines = [];
+                    updateLineNumbers([]);
+                    updateDetectedLang();
+                    editorStatus.textContent = '✓ отформатировано';
+                } catch (e) {
+                    editorStatus.textContent = '⚠️ ошибка форматирования: ' + e.message;
+                }
+            }
+
+            function copyCode() {
+                const text = codeInput.value;
+                if (!text) {
+                    editorStatus.textContent = 'нечего копировать';
+                    return;
+                }
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text)
+                        .then(() => showCopyStatus('скопировано'))
+                        .catch(() => fallbackCopy(text));
+                } else {
+                    fallbackCopy(text);
+                }
+            }
+
+            function fallbackCopy(text) {
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.left = '-9999px';
+                textarea.style.top = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopyStatus('скопировано');
+                } catch (e) {
+                    showCopyStatus('ошибка копирования');
+                }
+                document.body.removeChild(textarea);
+            }
+
+            function showCopyStatus(message) {
+                editorStatus.textContent = message;
+                if (copyTimeout) clearTimeout(copyTimeout);
+                copyTimeout = setTimeout(() => {
+                    if (editorStatus.textContent === message) {
+                        editorStatus.textContent = 'готов';
+                    }
+                    copyTimeout = null;
+                }, 2000);
+            }
+
+            function openW3CManual() {
+                window.open('https://validator.w3.org/nu/', '_blank');
+            }
+
+            checkBtn.addEventListener('click', runCheck);
+            codeInput.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                    e.preventDefault();
+                    runCheck();
+                }
+            });
+
+            clearBtn.addEventListener('click', () => {
+                codeInput.value = '';
+                errorLines = [];
+                updateLineNumbers([]);
+                updateDetectedLang();
+                resultsBody.innerHTML = `<span class="empty">Вставьте код в редактор и нажмите «Проверить»</span>`;
+                resultBadge.textContent = 'ожидание';
+                resultBadge.style.color = '#8b93a7';
+                editorStatus.textContent = 'очищено';
+                lastResult = [];
+            });
+
+            formatBtn.addEventListener('click', formatCode);
+            copyBtn.addEventListener('click', copyCode);
+            w3cManualBtn.addEventListener('click', openW3CManual);
+
+            langSelect.addEventListener('change', () => {
+                const manual = langSelect.value;
+                if (manual !== 'auto') {
+                    const map = {
+                        html: 'HTML',
+                        htm: 'HTM',
+                        css: 'CSS',
+                        javascript: 'JavaScript',
+                        json: 'JSON',
+                        xml: 'XML',
+                        svg: 'SVG',
+                        bat: 'BAT'
+                    };
+                    detectedLang.textContent = '🔍 ' + (map[manual] || manual);
+                } else {
+                    updateDetectedLang();
+                }
+            });
+
+            updateLineNumbers([]);
+            updateDetectedLang();
+            updateStats();
+
+            console.log('🔍 Синтаксический анализатор загружен (исправлен).');
+
+            resultsBody.addEventListener('dblclick', () => {
+                if (lastResult.length > 0) {
+                    console.log('Последние результаты:', lastResult);
+                }
+            });
+
+        })();
+    </script>
+
+</body>
+</html>
