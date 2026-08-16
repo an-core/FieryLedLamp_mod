@@ -55,5 +55,5 @@
 - откроется вэб-интерфейс для управления устройством
 - в настройках WiFi можно указать несколько сетей (устройство будет подключаться к доступной)
 #
-Исходная версия на странице [MishanyaTS](https://github.com/MishanyaTS/FieryLedLamp)
+Исходная версия на странице [MishanyaTS](https://github.com/MishanyaTS/FieryLedLamp)<br>
 Обсуждение прошивки на форуме [community.alexgyver.ru](https://community.alexgyver.ru/threads/wifi-lampa-budilnik-obsuzhdenie-proshivki-fieryledlamp.7530/)
