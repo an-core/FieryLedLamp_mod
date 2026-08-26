@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OTA Update</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #12151a 0%, #000000 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 700px;
+            margin: 10px auto;
+            background: rgb(129 121 121 / 10%);
+            border-radius: 20px;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            margin-bottom: 30px;
+        }
+        .info {
+            background: rgb(93 99 114 / 30%);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .method-card {
+            background: rgb(18 32 82 / 15%);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+            transition: transform 0.3s;
+            border: 1px solid #f1f5f32b;
+        }
+        .method-card:hover {
+            transform: translateY(-5px);
+        }
+        .method-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .method-desc {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+
+        .info-btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid #667eea;
+            color: #c8d6ff;
+            border-radius: 30px;
+            padding: 4px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 0 6px rgba(102, 126, 234, 0.2);
+            margin-left: 8px;
+            white-space: nowrap;
+        }
+        .info-btn:hover {
+            background: #667eea;
+            color: #fff;
+            transform: scale(1.03);
+            box-shadow: 0 0 16px #667eea88;
+        }
+        .info-btn::before {
+            content: "ⓘ";
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* модальное окно с инструкцией */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+        .modal-overlay.open {
+            display: flex;
+        }
+        .modal-box {
+            max-width: 560px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            background: #1a1e26;
+            border-radius: 24px;
+            padding: 30px 28px;
+            border: 1px solid #667eea55;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+            text-align: left;
+            position: relative;
+            animation: modalFade 0.3s ease;
+        }
+        .modal-box::-webkit-scrollbar {
+            width: 6px;
+        }
+        .modal-box::-webkit-scrollbar-track {
+            background: #2a2e3a;
+            border-radius: 10px;
+        }
+        .modal-box::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 10px;
+        }
+        @keyframes modalFade {
+            0% { opacity: 0; transform: scale(0.96) translateY(10px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-box h2 {
+            margin-top: 0;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #b8caff;
+            border-bottom: 1px solid #334;
+            padding-bottom: 12px;
+        }
+        .modal-box h2::before {
+            content: "";
+            font-size: 26px;
+        }
+        .modal-box .section {
+            margin: 18px 0 12px 0;
+            font-weight: 700;
+            color: #b8caff;
+            font-size: 16px;
+            border-left: 3px solid #667eea;
+            padding-left: 12px;
+        }
+        .modal-box .section-title {
+            margin: 14px 0 8px 0;
+            font-weight: 600;
+            color: #aabbdd;
+        }
+        .modal-box ul {
+            margin: 0 0 12px 0;
+            padding-left: 22px;
+        }
+        .modal-box ul li {
+            margin-bottom: 6px;
+            line-height: 1.6;
+            color: #d0d8e8;
+            font-size: 14px;
+        }
+        .modal-box ul li strong {
+            color: #b8caff;
+        }
+        .modal-box ul li code {
+            background: #2a2e3a;
+            padding: 1px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #b8caff;
+            font-family: 'Courier New', monospace;
+        }
+        .modal-box .note {
+            background: rgba(102, 126, 234, 0.12);
+            border-left: 3px solid #667eea;
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 10px 0;
+            font-size: 13px;
+            color: #c8d6ff;
+        }
+        .modal-box .note strong {
+            color: #fff;
+        }
+        .modal-box .close-modal {
+            background: #667eea;
+            border: none;
+            color: white;
+            padding: 10px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 15px;
+            cursor: pointer;
+            margin-top: 18px;
+            transition: 0.2s;
+            width: 100%;
+            text-align: center;
+        }
+        .modal-box .close-modal:hover {
+            background: #7b92ff;
+            transform: scale(1.01);
+        }
+        .modal-box .close-icon {
+            position: absolute;
+            top: 14px;
+            right: 18px;
+            font-size: 26px;
+            line-height: 1;
+            color: #8899bb;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .modal-box .close-icon:hover {
+            color: #fff;
+            transform: rotate(90deg);
+        }
+        .modal-box .link {
+            color: #7b92ff;
+            text-decoration: underline;
+            word-break: break-all;
+        }
+        .modal-box .link:hover {
+            color: #a8bbff;
+        }
+
+        .warning-text {
+            display: block;
+            margin-top: 10px;
+            padding: 12px 16px;
+            background: rgba(255, 60, 60, 0.18);
+            border-left: 5px solid #ff4444;
+            border-radius: 8px;
+            color: #ff9999;
+            font-weight: 700;
+            font-size: 15px;
+            line-height: 1.5;
+            text-shadow: 0 0 8px rgba(255, 60, 60, 0.3);
+            box-shadow: 0 0 20px rgba(255, 60, 60, 0.08);
+        }
+        .warning-text strong {
+            color: #ff6666;
+        }
+
+        button,
+        .file-label,
+        select {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 14px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+        select {
+            background: rgba(0, 0, 0, 0.5);
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover,
+        .file-label:hover,
+        select:hover {
+            transform: scale(1.02);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #a32525 0%, #f5576c 100%);
+        }
+        .file-input {
+            display: none;
+        }
+        .selected-file {
+            margin: 10px 0;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+            word-break: break-all;
+        }
+        .selected-file.active {
+            display: block;
+        }
+        .selected-file span {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            transition: width 0.3s;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            display: none;
+            font-size: 14px;
+        }
+        .status.active {
+            display: block;
+        }
+        .status.success {
+            background: rgba(0, 255, 0, 0.3);
+            border: 1px solid #0f0;
+        }
+        .status.error {
+            background: rgba(255, 0, 0, 0.3);
+            border: 1px solid #f00;
+        }
+        .status.info {
+            background: rgb(19 22 11 / 37%);
+            border: 1px solid #6b76735e;
+        }
+        hr {
+            margin: 20px 0;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        .footer {
+            font-size: 12px;
+            opacity: 0.6;
+            margin-top: 20px;
+        }
+
+        .ota-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        .ota-button.active {
+            background: linear-gradient(135deg, #00cc66 0%, #00994d 100%);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+            animation: pulse 1.5s infinite;
+        }
+        .ota-button.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .ota-button.disabled:hover {
+            transform: none;
+        }
+
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.4);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(0, 255, 0, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 255, 0, 0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OTA ОБНОВЛЕНИЕ</h1>
+
+        <div class="info">
+            <p><strong>Устройство:</strong> {LAMP_NAME}</p>
+            <p><strong>IP адрес:</strong> {IP_ADDRESS}</p>
+            <p><strong>Платформа:</strong> {PLATFORM}</p>
+        </div>
+
+        <!-- Способ 1: Загрузка .bin файла -->
+        <div class="method-card">
+            <div class="method-title">
+                <span>Способ 1: Загрузка .bin файла</span>
+                <button class="info-btn" id="showBinInstruction">Как получить bin</button>
+            </div>
+            <div class="method-desc">
+                Выберите тип обновления и загрузите соответствующий .bin файл.
+                <span class="warning-text">
+                     <strong>Важное предупреждение!</strong><br>
+                     Перед загрузкой обновления на всякий случай <strong>выключите активный эффект</strong>.
+                </span>
+            </div>
+
+            <select id="updateType">
+                <option value="sketch">Обновить прошивку</option>
+                <option value="filesystem">Обновить файловую систему</option>
+            </select>
+
+            <input type="file" id="firmwareFile" class="file-input" accept=".bin">
+            <label for="firmwareFile" class="file-label">Выбрать файл</label>
+
+            <div id="selectedFileInfo" class="selected-file">
+                Выбран файл: <span id="selectedFileName"></span><br>
+                Размер: <span id="selectedFileSize"></span>
+            </div>
+
+            <button onclick="uploadFirmware()" id="uploadBtn" disabled> Загрузить и прошить</button>
+            <div id="uploadProgress" class="progress">
+                <div class="progress-bar" id="uploadProgressBar"></div>
+            </div>
+            <div id="uploadStatus" class="status"></div>
+        </div>
+
+        <hr>
+
+        <!-- Способ 2: Встроенный OTA -->
+        <div class="method-card">
+            <div class="method-title">Способ 2: Обновление из Arduino IDE</div>
+            <div class="method-desc">
+                Активируйте OTA режим, далее в Arduino IDE выберите сетевой порт и нажмите "Загрузка"<br>
+                <strong>Внимание:</strong> Обновляется только прошивка!<br>
+            </div>
+            <button onclick="requestOta()" id="otaBtn" class="ota-button"> Активировать OTA режим</button>
+            <div id="otaStatus" class="status"></div>
+        </div>
+
+        <hr>
+
+        <button onclick="location.href='/'" class="btn-danger"> На главную</button>
+
+        <div class="footer">
+            Таймаут OTA режима: {OTA_TIMEOUT} секунд
+        </div>
+    </div>
+
+    <!-- Модальное окно с инструкцией "Как получить bin" -->
+    <div class="modal-overlay" id="binInstructionModal">
+        <div class="modal-box">
+            <span class="close-icon" id="closeModalBtn">&times;</span>
+            <h2>Как получить .bin файл</h2>
+
+            <div class="section">Бинарники прошивки (firmware)</div>
+            <ul>
+                <li>В Arduino IDE: <strong>Скетч</strong> -> <strong>Экспорт бинарного файла</strong>, ждите завершения.</li>
+                <li>Перейдите в папку <code>C:\Users\user\AppData\Local\Temp</code> (у вас вместо <strong>user</strong> - имя пользователя).</li>
+                <li>Найдите папку <code>arduino_build_739627</code> (номер будет другим).<br>
+                <em>Совет:</em> отсортируйте по типу и поставьте галочку только на "Папка с файлами".</li>
+                <li>В ней будут нужные файлы:
+                    <ul style="margin-top: 4px;">
+                        <li><code>FieryLedLamp.ino.bootloader.bin</code></li>
+                        <li><code>FieryLedLamp.ino.partitions.bin</code></li>
+                        <li><code>FieryLedLamp.ino.bin</code></li>
+                    </ul>
+                </li>
+            </ul>
+            <div class="note">
+                <strong>Примечание:</strong> если папка <code>Temp</code> не найдена - она скрыта. Включите в параметрах папок <strong>"Показывать скрытые файлы, папки"</strong>.
+            </div>
+
+            <div class="section">Бинарник файловой системы</div>
+            <ul>
+                <li>В Arduino IDE: <strong>Инструменты</strong> -> <strong>ESP32 Sketch Data Upload</strong>, нажмите <strong>OK</strong>, подождите пару секунд.</li>
+                <li><strong>Не обращайте внимание</strong> на ошибку - файл всё равно создаётся.</li>
+                <li>Перейдите в ту же папку <code>Temp/arduino_build_xxxxx</code>.</li>
+                <li>Там будет файл: <code>FieryLedLamp.littlefs.bin</code></li>
+            </ul>
+
+            <div class="section">Загрузка на ESP32</div>
+            <ul>
+                <li>Для загрузки бинарников в плату ESP32 используйте утилиту <strong>flash_download_tool</strong></li>
+                <li style="list-style: none; margin-top: 2px;">
+                    <a href="https://docs.espressif.com/projects/esp-test-tools/en/latest/esp32/production_stage/tools/flash_download_tool.html" target="_blank" class="link">🔗 Ссылка на утилиту flash_download_tool</a>
+                </li>
+            </ul>
+
+            <div class="section">Адреса для ESP32-S3</div>
+            <ul>
+                <li><code>FieryLedLamp.ino.bootloader.bin</code> - <strong>0x0</strong></li>
+                <li><code>FieryLedLamp.ino.partitions.bin</code> - <strong>0x8000</strong></li>
+                <li><code>FieryLedLamp.ino.bin</code> - <strong>0x10000</strong></li>
+                <li><code>FieryLedLamp.littlefs.bin</code> - <strong>0xc90000</strong></li>
+            </ul>
+
+            <button class="close-modal" id="closeModalBtn2">Понятно, закрыть</button>
+        </div>
+    </div>
+
+    <script>
+
+        const modal = document.getElementById('binInstructionModal');
+        const openBtn = document.getElementById('showBinInstruction');
+        const closeBtns = document.querySelectorAll('#closeModalBtn, #closeModalBtn2');
+
+        function openModal() {
+            modal.classList.add('open');
+        }
+        function closeModal() {
+            modal.classList.remove('open');
+        }
+
+        openBtn.addEventListener('click', openModal);
+        closeBtns.forEach(btn => btn.addEventListener('click', closeModal));
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.classList.contains('open')) closeModal();
+        });
+
+        const OTA_TIMEOUT = {OTA_TIMEOUT};
+        let otaActive = false;
+        let otaTimer = null;
+        let otaStartTime = null;
+
+        // Способ 1: Загрузка .bin файла
+        const fileInput = document.getElementById('firmwareFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadProgressBar = document.getElementById('uploadProgressBar');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const selectedFileInfo = document.getElementById('selectedFileInfo');
+        const selectedFileName = document.getElementById('selectedFileName');
+        const selectedFileSize = document.getElementById('selectedFileSize');
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                const file = this.files[0];
+                selectedFileName.textContent = file.name;
+                selectedFileSize.textContent = formatFileSize(file.size);
+                selectedFileInfo.classList.add('active');
+                uploadBtn.disabled = false;
+            } else {
+                selectedFileInfo.classList.remove('active');
+                uploadBtn.disabled = true;
+            }
+        });
+
+        function uploadFirmware() {
+            const file = fileInput.files[0];
+            if (!file) {
+                showUploadStatus('Выберите файл прошивки', 'error');
+                return;
+            }
+
+            if (!file.name.endsWith('.bin')) {
+                showUploadStatus('Файл должен иметь расширение .bin', 'error');
+                return;
+            }
+
+            const updateType = document.getElementById('updateType').value;
+            let url = '/update_upload';
+            let typeName = 'Прошивка';
+
+            if (updateType === 'filesystem') {
+                url = '/update_fs';
+                typeName = 'Файловая система';
+            }
+
+            const formData = new FormData();
+            formData.append('firmware', file);
+
+            uploadProgress.style.display = 'block';
+            uploadProgressBar.style.width = '0%';
+            showUploadStatus(' Загрузка ' + typeName + '...', 'info');
+            uploadBtn.disabled = true;
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = (e.loaded / e.total) * 100;
+                    uploadProgressBar.style.width = percent + '%';
+                    if (percent < 100) {
+                        showUploadStatus(' Загружено: ' + percent.toFixed(1) + '%', 'info');
+                    } else {
+                        showUploadStatus(' Загрузка завершена! Применение обновления...', 'info');
+                    }
+                }
+            };
+
+            xhr.onload = function() {
+                uploadProgress.style.display = 'none';
+                if (xhr.status === 200) {
+                    showUploadStatus(' ' + typeName + ' успешно обновлена! Устройство сейчас перезагрузится...',
+                    'success');
+                    setTimeout(() => {
+                    window.location.href = '/';
+                    }, 5000);
+                } else {
+                    showUploadStatus('Ошибка: ' + xhr.responseText, 'error');
+                    uploadBtn.disabled = false;
+                }
+            };
+
+            xhr.onerror = function() {
+                if (uploadProgressBar.style.width === '100%') {
+                    uploadProgress.style.display = 'none';
+                    showUploadStatus(' ' + typeName + ' успешно обновлена! Устройство сейчас перезагрузится...', 'success');
+                    setTimeout(() => {window.location.href = '/';}, 10000);
+                } else {
+                    uploadProgress.style.display = 'none';
+                    showUploadStatus('Ошибка сети при загрузке', 'error');
+                    uploadBtn.disabled = false;
+                }
+            };
+
+            xhr.send(formData);
+        }
+
+        function showUploadStatus(msg, type) {
+            uploadStatus.textContent = msg;
+            uploadStatus.className = 'status active ' + type;
+        }
+
+        // Способ 2: Встроенный OTA
+        const otaBtn = document.getElementById('otaBtn');
+
+        function requestOta() {
+            if (otaActive) {
+                showOtaStatus(' OTA режим уже активирован! Откройте Arduino IDE и начните прошивку.', 'info');
+                return;
+            }
+
+            otaBtn.disabled = true;
+            otaBtn.classList.add('active');
+            otaBtn.innerHTML = ' OTA активируется...';
+
+            fetch('/ota_request')
+                .then(response => response.text())
+                .then(data => {
+                    if (data === 'OK') {
+                        otaActive = true;
+                        otaStartTime = Date.now();
+                        otaBtn.innerHTML = ' OTA АКТИВЕН';
+                        otaBtn.classList.add('active');
+
+                        updateOtaTimerDisplay();
+
+                        if (otaTimer) clearInterval(otaTimer);
+                        otaTimer = setInterval(() => {
+                            if (!otaActive) return;
+
+                            const elapsed = Math.floor((Date.now() - otaStartTime) / 1000);
+                            const timeLeft = OTA_TIMEOUT - elapsed;
+
+                            if (timeLeft <= 0) {
+                                clearInterval(otaTimer);
+                                otaActive = false;
+                                otaBtn.disabled = false;
+                                otaBtn.classList.remove('active');
+                                otaBtn.innerHTML = ' Активировать OTA режим';
+                                showOtaStatus(' Время ожидания истекло (' + OTA_TIMEOUT + ' сек). Нажмите кнопку снова.', 'info');
+                            } else {
+                                const statusDiv = document.getElementById('otaStatus');
+                                statusDiv.innerHTML = ' OTA режим активен!<br><strong>Инструкция:</strong> Arduino IDE - Инструменты - Порт - Сетевой порт вашего устройства - Загрузка<br>Осталось времени: ' + timeLeft + ' сек.';
+                                statusDiv.className = 'status active success';
+                            }
+                        }, 1000);
+
+                    } else {
+                        otaBtn.disabled = false;
+                        otaBtn.classList.remove('active');
+                        otaBtn.innerHTML = ' Активировать OTA режим';
+                        showOtaStatus('Ошибка: ' + data, 'error');
+                    }
+                })
+                .catch(error => {
+                    otaBtn.disabled = false;
+                    otaBtn.classList.remove('active');
+                    otaBtn.innerHTML = ' Активировать OTA режим';
+                    showOtaStatus('Ошибка сети: ' + error, 'error');
+                });
+        }
+
+        function updateOtaTimerDisplay() {
+            const elapsed = Math.floor((Date.now() - otaStartTime) / 1000);
+            const timeLeft = OTA_TIMEOUT - elapsed;
+            const statusDiv = document.getElementById('otaStatus');
+
+            statusDiv.innerHTML = ' OTA режим активен!<br>' + 'Осталось времени: ' + Math.max(0, timeLeft) + ' сек.<br>' + '<strong>Инструкция:</strong> Arduino IDE - Инструменты - Порт - Сетевой порт вашего устройства - Загрузка';
+            statusDiv.className = 'status active success';
+        }
+
+        function showOtaStatus(msg, type) {
+            const statusDiv = document.getElementById('otaStatus');
+            statusDiv.innerHTML = msg;
+            statusDiv.className = 'status active ' + type;
+        }
+    </script>
+</body>
+</html>

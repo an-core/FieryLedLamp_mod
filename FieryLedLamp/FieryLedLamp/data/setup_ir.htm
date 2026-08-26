@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Настройки ИК пульта</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #12151a 0%, #000000 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 700px;
+            margin: 10px auto;
+            background: rgb(129 121 121 / 10%);
+            border-radius: 20px;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .method-card {
+            background: rgb(21 54 177 / 15%);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+            transition: transform 0.3s;
+            border: 1px solid #f1f5f32b;
+        }
+        .method-card:hover {
+            transform: translateY(-5px);
+        }
+        .method-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .method-desc {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        
+        /* Текущий пульт */
+        .current-remote {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+        .current-remote-name {
+            color: #36c75c;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        /* Выпадающий список */
+        .ir-select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            background: rgba(0, 0, 0, 0.5);
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            margin: 10px 0;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23667eea' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .ir-select:hover {
+            border-color: #667eea;
+        }
+        .ir-select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        .ir-select option {
+            background: #1a1e26;
+            color: #e0e0e0;
+            padding: 8px;
+        }
+
+        .btn-ir {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        .btn-ir:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+        }
+        .btn-ir:active {
+            transform: translateY(0);
+        }
+        .btn-ir:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-ir.success {
+            background: linear-gradient(135deg, #00cc66 0%, #00994d 100%);
+        }
+        .btn-ir.success:hover {
+            box-shadow: 0 4px 20px rgba(0, 204, 102, 0.4);
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px 16px;
+            border-radius: 10px;
+            display: none;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .status.active {
+            display: block;
+        }
+        .status.success {
+            background: rgba(0, 255, 0, 0.15);
+            border: 1px solid #00cc66;
+            color: #81c784;
+        }
+        .status.error {
+            background: rgba(255, 0, 0, 0.15);
+            border: 1px solid #f44336;
+            color: #ef9a9a;
+        }
+        .status.info {
+            background: rgba(102, 126, 234, 0.15);
+            border: 1px solid #667eea;
+            color: #b8caff;
+        }
+
+        .hint-box {
+            background: rgba(102, 126, 234, 0.08);
+            border-left: 3px solid #667eea;
+            padding: 12px 16px;
+            margin-top: 15px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #c8d6ff;
+            line-height: 1.6;
+        }
+        .hint-box code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1px 8px;
+            border-radius: 4px;
+            color: #00e5ff;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+        }
+        .hint-box strong {
+            color: #fff;
+        }
+
+        .warning-text {
+            background: rgba(255, 60, 60, 0.12);
+            border-left: 4px solid #ff4444;
+            padding: 10px 14px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #ff9999;
+        }
+        .warning-text strong {
+            color: #ff6666;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #a32525 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 14px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            transition: transform 0.2s;
+            display: inline-block;
+            text-decoration: none;
+        }
+        .btn-danger:hover {
+            transform: scale(1.02);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid #fff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* стили для обучения */
+        .learn-progress {
+            margin: 15px 0;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            display: none;
+        }
+        .learn-progress.active {
+            display: block;
+        }
+        .learn-button-name {
+            color: #00e5ff;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+        .learn-progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .learn-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00e5ff, #667eea);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        .learn-status {
+            color: #aaa;
+            font-size: 13px;
+            margin-top: 5px;
+        }
+        .learn-codes {
+            margin-top: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-size: 12px;
+            color: #888;
+            font-family: monospace;
+            text-align: left;
+            background: rgba(0,0,0,0.2);
+            padding: 8px 12px;
+            border-radius: 6px;
+        }
+        .learn-codes::-webkit-scrollbar {
+            width: 4px;
+        }
+        .learn-codes::-webkit-scrollbar-thumb {
+            background: #667eea;
+            border-radius: 2px;
+        }
+        .learn-codes .code-line {
+            padding: 2px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .learn-codes .code-line .key {
+            color: #00e5ff;
+        }
+        .learn-codes .code-line .value {
+            color: #ffd93d;
+        }
+        .btn-learn {
+            background: linear-gradient(135deg, #a75ba7 0%, #420fbf 100%);
+        }
+        .btn-learn:hover {
+            box-shadow: 0 4px 20px rgba(245, 87, 108, 0.4);
+        }
+        .btn-learn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-stop {
+            background: linear-gradient(135deg, #4a4a4a 0%, #2d2d2d 100%);
+        }
+        .btn-stop:hover {
+            box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+        }
+
+        @media (max-width: 480px) {
+            .current-remote {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            .method-title {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Настройки ИК пульта</h1>
+
+        <!-- текущий пульт -->
+        <div class="method-card">
+            <div class="method-title">Текущий пульт</div>
+            <div class="current-remote" id="currentRemoteInfo">
+                <div>
+                    <div class="current-remote-name" id="currentRemoteName">Загрузка...</div>
+                </div>
+                <div class="remote-icon-big"></div>
+            </div>
+        </div>
+
+        <!-- выбор пульта -->
+        <div class="method-card">
+            <div class="method-title">Выбор пульта</div>
+            <div class="method-desc">
+                Выберите тип пульта, который вы используете для управления лампой.
+                После смены пульта все кнопки начнут работать с новыми кодами.
+            </div>
+
+            <label style="color: #aaa; font-size: 14px; display: block; margin-bottom: 6px;">Доступные пульты:</label>
+            <select id="remoteSelect" class="ir-select">
+                <option value="">Загрузка списка...</option>
+            </select>
+
+            <button class="btn-ir" id="applyBtn" onclick="setRemote()">
+                Применить выбранный пульт
+            </button>
+
+            <div id="message" class="status"></div>
+
+            <div class="hint-box">
+                <strong>Подсказка:</strong> После смены пульта перезагрузка не требуется. Сохранение происходит автоматически.
+            </div>
+        </div>
+
+        <!-- Обучение новому пульту -->
+        <div class="method-card" style="border-color: rgba(245, 87, 108, 0.3);">
+            <div class="method-title" style="font-size: 20px;">
+                <span></span> Добавить новый пульт
+            </div>
+            <div class="method-desc">
+                Нажмите "Начать обучение", затем по очереди нажимайте кнопки на новом пульте.
+                Для каждой кнопки нужно нажать её один раз.
+            </div>
+
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn-ir btn-learn" id="learnBtn" onclick="startLearning()" style="flex: 1; min-width: 150px;">
+                    Начать обучение
+                </button>
+                <button class="btn-ir btn-stop" id="stopBtn" onclick="stopLearning()" style="flex: 0 1 auto; min-width: 100px; display: none;">
+                    Остановить
+                </button>
+            </div>
+
+            <div id="learningStatus" class="status"></div>
+
+            <div id="learnProgress" class="learn-progress">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <span style="color: #aaa; font-size: 13px;">Нажмите кнопку:</span>
+                        <div class="learn-button-name" id="currentLearnKey">IR_ON_OFF</div>
+                    </div>
+                    <div>
+                        <span style="color: #aaa; font-size: 13px;">Прогресс:</span>
+                        <div style="font-size: 18px; font-weight: bold; color: #00e5ff;" id="learnProgressText">0 / 21</div>
+                    </div>
+                </div>
+                <div class="learn-progress-bar">
+                    <div class="learn-progress-fill" id="learnProgressFill"></div>
+                </div>
+                <div class="learn-status" id="learnStatus">Ожидание нажатия кнопки...</div>
+                <div class="learn-codes" id="learnCodes"></div>
+            </div>
+        </div>
+
+          <!-- информационное сообщение -->
+        <div class="method-card" style="border-color: rgba(102, 126, 234, 0.2);">
+            <div class="method-title" style="font-size: 20px;">Информация</div>
+            <ul style="color: #aaa; font-size: 14px; padding-left: 20px; margin: 8px 0; line-height: 1.8;">
+                <li>Поддерживается несколько типов пультов</li>
+                <li>Коды кнопок загружаются из файла <code style="color: #00e5ff; background: rgba(0,0,0,0.3); padding: 1px 6px; border-radius: 3px;">ir_codes.json</code></li>
+                <li>Для добавления нового пульта используйте функцию "Добавить новый пульт"</li>
+            </ul>
+        </div>
+
+        <hr style="margin: 20px 0; border: none; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+
+        <button onclick="location.href='/'" class="btn-danger">На главную</button>
+    </div>
+    <script>
+        let isLoading = false;
+        let isLearning = false;
+        let learnedCodes = {};
+        let learnKeys = [];
+        let currentKeyIndex = 0;
+
+        // список всех кнопок
+        const ALL_KEYS = [
+            "IR_ON_OFF", "IR_MUTE", "IR_PREV", "IR_NEXT", "IR_WEATHER", "IR_TIME", "IR_VOL_DOWN", "IR_VOL_UP", "IR_BR_DOWN", "IR_BR_UP", "IR_IP", "IR_1", "IR_2", "IR_3", "IR_4", "IR_5", "IR_6", "IR_7", "IR_8", "IR_9", "IR_0" ];
+
+        // список пультов
+        async function loadRemotes() {
+            const select = document.getElementById('remoteSelect');
+            select.innerHTML = '<option value="">Загрузка...</option>';
+            
+            try {
+                const response = await fetch('/api/ir/remotes?t=' + Date.now());
+                if (!response.ok) throw new Error('Ошибка загрузки');
+                
+                const remotes = await response.json();
+                
+                select.innerHTML = '<option value="">Выберите пульт...</option>';
+                
+                if (!remotes || remotes.length === 0) {
+                    select.innerHTML = '<option value="">Нет доступных пультов</option>';
+                    showMessage('Файл с пультами не найден или пуст', 'error');
+                    return;
+                }
+                
+                remotes.forEach(remote => {
+                    const option = document.createElement('option');
+                    option.value = remote.id;
+                    option.textContent = remote.name;
+                    select.appendChild(option);
+                });
+                
+                // текущий пульт
+                await loadCurrentRemote();
+                
+            } catch (error) {
+                console.error('Ошибка загрузки списка пультов:', error);
+                select.innerHTML = '<option value="">Ошибка загрузки</option>';
+                showMessage('Не удалось загрузить список пультов: ' + error.message, 'error');
+            }
+        }
+
+        async function loadCurrentRemote() {
+            try {
+                const response = await fetch('/api/ir/current?t=' + Date.now());
+                if (!response.ok) throw new Error('Ошибка загрузки');
+                
+                const data = await response.json();
+                document.getElementById('currentRemoteName').textContent = data.name || 'Не выбран';
+                
+                // выбор
+                const select = document.getElementById('remoteSelect');
+                if (data.id) {
+                    for (let i = 0; i < select.options.length; i++) {
+                        if (select.options[i].value === data.id) {
+                            select.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Ошибка загрузки текущего пульта:', error);
+                document.getElementById('currentRemoteName').textContent = 'Ошибка';
+            }
+        }
+
+        // установка
+        async function setRemote() {
+            if (isLoading) return;
+            
+            const remoteId = document.getElementById('remoteSelect').value;
+            if (!remoteId) {
+                showMessage('Выберите пульт из списка', 'info');
+                return;
+            }
+            
+            isLoading = true;
+            const btn = document.getElementById('applyBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Применение...';
+            btn.classList.remove('success');
+            
+            try {
+                const response = await fetch('/api/ir/set', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({remote_id: remoteId})
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('currentRemoteName').textContent = result.name;
+                    showMessage('Пульт успешно изменён на: <strong>' + result.name + '</strong>', 'success');
+                    
+                    btn.innerHTML = 'Применено';
+                    btn.classList.add('success');
+                    
+                    setTimeout(() => {
+                        btn.innerHTML = 'Применить выбранный пульт';
+                        btn.classList.remove('success');
+                    }, 3000);
+                    
+                } else {
+                    showMessage('Ошибка: ' + (result.message || 'Неизвестная ошибка'), 'error');
+                }
+                
+            } catch (error) {
+                showMessage('Ошибка соединения: ' + error.message, 'error');
+            }
+            
+            isLoading = false;
+            btn.disabled = false;
+            if (!btn.classList.contains('success')) {
+                btn.innerHTML = 'Применить выбранный пульт';
+            }
+        }
+
+        // сообщение
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = text;
+            msg.className = 'status active ' + type;
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    msg.classList.remove('active');
+                }, 6000);
+            }
+        }
+
+        // обучение
+        function startLearning() {
+            if (isLearning) return;
+            
+            isLearning = true;
+            learnedCodes = {};
+            currentKeyIndex = 0;
+            
+            document.getElementById('learnProgress').classList.add('active');
+            document.getElementById('learnBtn').disabled = true;
+            document.getElementById('learnBtn').innerHTML = 'Обучение...';
+            document.getElementById('stopBtn').style.display = 'inline-block';
+            
+            const status = document.getElementById('learningStatus');
+            status.innerHTML = 'Обучение начато! Нажимайте кнопки на пульте.';
+            status.className = 'status active info';
+            
+            updateLearnUI();
+        }
+
+        function stopLearning() {
+            if (!isLearning) return;
+            
+            isLearning = false;
+            document.getElementById('learnBtn').disabled = false;
+            document.getElementById('learnBtn').innerHTML = 'Начать обучение';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('learnProgress').classList.remove('active');
+            
+            const status = document.getElementById('learningStatus');
+            status.innerHTML = 'Обучение остановлено';
+            status.className = 'status active info';
+            
+            setTimeout(() => {
+                status.classList.remove('active');
+            }, 3000);
+        }
+
+        function updateLearnUI() {
+            if (currentKeyIndex >= ALL_KEYS.length) {
+                finishLearning();
+                return;
+            }
+            
+            const key = ALL_KEYS[currentKeyIndex];
+            document.getElementById('currentLearnKey').textContent = key;
+            document.getElementById('learnProgressText').textContent = currentKeyIndex + ' / ' + ALL_KEYS.length;
+            document.getElementById('learnProgressFill').style.width = ((currentKeyIndex / ALL_KEYS.length) * 100) + '%';
+            document.getElementById('learnStatus').textContent = 'Ожидание нажатия кнопки: ' + key;
+            
+            updateLearnedCodesList();
+        }
+
+        function updateLearnedCodesList() {
+            const container = document.getElementById('learnCodes');
+            let html = '';
+            for (const key of ALL_KEYS) {
+                if (learnedCodes[key]) {
+                    html += '<div class="code-line"><span class="key">' + key + '</span> → <span class="value">' + learnedCodes[key] + '</span></div>';
+                }
+            }
+            if (html === '') {
+                html = '<div style="color: #666; text-align: center; padding: 5px;">Нет изученных кодов</div>';
+            }
+            container.innerHTML = html;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function finishLearning() {
+            isLearning = false;
+            
+            // сохранение пульта
+            try {
+                const remoteName = prompt('Введите название для нового пульта:', 'Мой пульт');
+                if (!remoteName) {
+                    showMessage('Отменено', 'info');
+                    document.getElementById('learnBtn').disabled = false;
+                    document.getElementById('learnBtn').innerHTML = 'Начать обучение';
+                    document.getElementById('stopBtn').style.display = 'none';
+                    document.getElementById('learnProgress').classList.remove('active');
+                    return;
+                }
+                
+                const response = await fetch('/api/ir/learn/save', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        name: remoteName,
+                        codes: learnedCodes
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showMessage('Пульт "' + remoteName + '" успешно добавлен!', 'success');
+                    document.getElementById('learnBtn').innerHTML = 'Начать обучение';
+                    document.getElementById('learnBtn').disabled = false;
+                    document.getElementById('stopBtn').style.display = 'none';
+                    document.getElementById('learnProgress').classList.remove('active');
+                    
+                    await loadRemotes();
+                    // выбор нового пульта
+                    if (result.id) {
+                        const select = document.getElementById('remoteSelect');
+                        for (let i = 0; i < select.options.length; i++) {
+                            if (select.options[i].value === result.id) {
+                                select.selectedIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    showMessage('Ошибка сохранения: ' + (result.message || 'Неизвестная ошибка'), 'error');
+                }
+            } catch (error) {
+                showMessage('Ошибка соединения: ' + error.message, 'error');
+            }
+            
+            document.getElementById('learnBtn').disabled = false;
+            document.getElementById('learnBtn').innerHTML = 'Начать обучение';
+            document.getElementById('stopBtn').style.display = 'none';
+            document.getElementById('learnProgress').classList.remove('active');
+        }
+
+        function onIRCodeReceived(code) {
+            if (!isLearning) return;
+            
+            if (currentKeyIndex >= ALL_KEYS.length) return;
+            
+            const key = ALL_KEYS[currentKeyIndex];
+            
+            if (code === '0' || code === '0x0' || code === '0x00000000') {
+                document.getElementById('learnStatus').textContent = 'Неверный код, попробуйте ещё раз для: ' + key;
+                return;
+            }
+            
+            learnedCodes[key] = code;
+            document.getElementById('learnStatus').textContent = 'Получен код для ' + key + ': ' + code;
+            
+            currentKeyIndex++;
+            updateLearnUI();
+        }
+
+        function initIRListener() {
+            setInterval(async () => {
+                if (!isLearning) return;
+                
+                try {
+                    const response = await fetch('/api/ir/last_code?t=' + Date.now());
+                    if (response.ok) {
+                        const data = await response.json();
+                        if (data.code && data.code !== '0' && data.code !== '0x0') {
+                            onIRCodeReceived(data.code);
+                        }
+                    }
+                } catch (error) {
+              }
+            }, 300);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadRemotes();
+            initIRListener();
+            
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) {
+                    loadCurrentRemote();
+                }
+            });
+        });
+    </script>
+</body>
+</html>

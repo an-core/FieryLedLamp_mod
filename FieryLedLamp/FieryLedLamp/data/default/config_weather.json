@@ -1,0 +1,9 @@
+{
+	"openweather_key": "",
+	"yandex_geo": "213",
+	"custom_yandex_geo": "",
+	"city": "Moscow",
+	"custom_city": "",
+	"show_weather": 1,
+	"weather_source": 0
+}

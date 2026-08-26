@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Резервное копирование</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #12151a 0%, #000000 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 700px;
+            margin: 10px auto;
+            background: rgb(129 121 121 / 10%);
+            border-radius: 20px;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+        }
+        h1 { margin-bottom: 30px; }
+        .info {
+            background: rgb(93 99 114 / 30%);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .method-card {
+            background: rgb(21 54 177 / 15%);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: left;
+            transition: transform 0.3s;
+            border: 1px solid #f1f5f32b;
+        }
+        .method-card:hover { 
+            transform: translateY(-5px);
+        }
+        .method-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .method-desc {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+        button, .file-label, select {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 14px;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 5px;
+            transition: transform 0.2s;
+            display: inline-block;
+        }
+        .btn-success {
+            background: linear-gradient(135deg, #00cc66 0%, #00994d 100%);
+        }
+        .btn-warning {
+            background: linear-gradient(135deg, #21a98b 0%, #001ef5 100%);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #a32525 0%, #f5576c 100%);
+        }
+        select {
+            background: rgba(0,0,0,0.5);
+            cursor: pointer;
+            width: 100%;
+        }
+        button:hover, .file-label:hover, select:hover { transform: scale(1.02); }
+        .file-input { display: none; }
+        .selected-file {
+            margin: 10px 0;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+            word-break: break-all;
+        }
+        .selected-file.active {
+            display: block;
+        }
+        .selected-file span {
+            color: #00ff00;
+            font-weight: bold;
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
+            display: none;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #00ff00, #00cc00);
+            transition: width 0.3s;
+        }
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 10px;
+            display: none;
+            font-size: 14px;
+        }
+        .status.active { display: block; }
+        .status.success { background: rgba(0,255,0,0.3); border: 1px solid #0f0; }
+        .status.error { background: rgba(255,0,0,0.3); border: 1px solid #f00; }
+        .status.info { background: rgb(19 22 11 / 37%); border: 1px solid #6b76735e; }
+        hr { margin: 20px 0; border-color: rgba(255,255,255,0.2); }
+        .footer { font-size: 12px; opacity: 0.6; margin-top: 20px; }
+        .backup-icon {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            vertical-align: middle;
+            margin-right: 10px;
+        }
+        .warning-text {
+            background: rgb(199 0 0 / 56%);
+            border-left: 3px solid #325451;
+            padding: 10px 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #d5d5d5e6;
+        }
+        .warning-text strong {
+           color: #ff8844;
+       }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Резервное копирование</h1>
+        
+        <div class="info">
+            <p><strong>Устройство:</strong> {LAMP_NAME}</p>
+            <p><strong>IP адрес:</strong> {IP_ADDRESS}</p>
+            <p><strong>Платформа:</strong> {PLATFORM}</p>
+            <p><strong>Файлов в бэкапе:</strong> {FILES_COUNT}</p>
+        </div>
+        
+        <!-- Сохранение настроек -->
+        <div class="method-card">
+            <div class="method-title">
+                Сохранение настроек
+            </div>
+            <div class="method-desc">
+                Создать архив всех конфигурационных файлов лампы (config.json, effect.ini и др.)
+            </div>
+            
+            <button onclick="downloadBackup()" id="downloadBtn" class="btn-success">
+                Скачать архив настроек
+            </button>
+			
+			<div class="warning-text" style="background: rgb(205 147 109 / 20%); border-left: 3px solid #ff6600; padding: 10px; margin: 10px 0; border-radius: 5px;">
+        <strong>ВНИМАНИЕ!</strong> Настройки матрицы (размер, тип чипа, ориентация, порядок цветов) 
+        <strong>НЕ ВХОДЯТ</strong> в бэкап, чтобы избежать несовместимости.
+    </div>
+            
+            <div id="downloadStatus" class="status"></div>
+        </div>
+		       
+        <hr>
+
+<!-- Восстановление настроек -->
+<div class="method-card">
+    <div class="method-title">
+        Восстановление настроек
+    </div>
+    <div class="method-desc">
+        Загрузить ранее сохранённый ZIP-архив с настройками лампы
+    </div>
+    
+    <input type="file" id="backupFile" class="file-input" accept=".zip">
+    <label for="backupFile" class="file-label">Выбрать ZIP-архив</label>
+    
+    <div id="selectedFileInfo" class="selected-file">
+        Выбран файл: <span id="selectedFileName"></span><br>
+        Размер: <span id="selectedFileSize"></span>
+    </div>
+    
+    <button onclick="uploadBackup()" id="uploadBtn" disabled class="btn-warning">
+        Загрузить и восстановить
+    </button>
+    
+    <div id="uploadProgress" class="progress">
+        <div class="progress-bar" id="uploadProgressBar"></div>
+    </div>
+    <div id="uploadStatus" class="status"></div>
+</div>
+        
+        <hr>
+        
+        <button onclick="location.href='/'" class="btn-danger">На главную</button>
+        
+    </div>
+    
+    <script>
+        // Скачивание бэкапа
+        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadStatus = document.getElementById('downloadStatus');
+        
+        function downloadBackup() {
+            downloadBtn.disabled = true;
+            downloadBtn.innerHTML = 'Создание архива...';
+            showDownloadStatus('Создание архива настроек...', 'info');
+            
+            fetch('/backup_config')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Ошибка создания архива');
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = String(now.getMonth() + 1).padStart(2, '0');
+                    const day = String(now.getDate()).padStart(2, '0');
+                    const hours = String(now.getHours()).padStart(2, '0');
+                    const minutes = String(now.getMinutes()).padStart(2, '0');
+                    const dateStr = `${year}-${month}-${day}_${hours}-${minutes}`;
+                    a.download = `lamp_settings_${dateStr}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    showDownloadStatus('Архив успешно скачан!', 'success');
+                    downloadBtn.innerHTML = 'Скачать архив настроек';
+                    downloadBtn.disabled = false;
+                    
+                    setTimeout(() => {
+                        downloadStatus.classList.remove('active');
+                    }, 3000);
+                })
+                .catch(error => {
+                    showDownloadStatus('Ошибка: ' + error.message, 'error');
+                    downloadBtn.innerHTML = 'Скачать архив настроек';
+                    downloadBtn.disabled = false;
+                });
+        }
+        
+        function showDownloadStatus(msg, type) {
+            downloadStatus.textContent = msg;
+            downloadStatus.className = 'status active ' + type;
+        }
+        
+        // Загрузка и восстановление
+        const fileInput = document.getElementById('backupFile');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const uploadProgress = document.getElementById('uploadProgress');
+        const uploadProgressBar = document.getElementById('uploadProgressBar');
+        const uploadStatus = document.getElementById('uploadStatus');
+        const selectedFileInfo = document.getElementById('selectedFileInfo');
+        const selectedFileName = document.getElementById('selectedFileName');
+        const selectedFileSize = document.getElementById('selectedFileSize');
+        
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                const file = this.files[0];
+                selectedFileName.textContent = file.name;
+                selectedFileSize.textContent = formatFileSize(file.size);
+                selectedFileInfo.classList.add('active');
+                uploadBtn.disabled = false;
+            } else {
+                selectedFileInfo.classList.remove('active');
+                uploadBtn.disabled = true;
+            }
+        });
+        
+        function uploadBackup() {
+            const file = fileInput.files[0];
+            if (!file) {
+                showUploadStatus('Выберите ZIP-архив для восстановления', 'error');
+                return;
+            }
+            
+            if (!file.name.endsWith('.zip')) {
+                showUploadStatus('Файл должен иметь расширение .zip', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('archive', file);
+            
+            uploadProgress.style.display = 'block';
+            uploadProgressBar.style.width = '0%';
+            showUploadStatus('Загрузка архива...', 'info');
+            uploadBtn.disabled = true;
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/restore_config', true);
+            
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percent = (e.loaded / e.total) * 100;
+                    uploadProgressBar.style.width = percent + '%';
+                    if (percent < 100) {
+                        showUploadStatus('Загружено: ' + percent.toFixed(1) + '%', 'info');
+                    } else {
+                        showUploadStatus('Загрузка завершена! Восстановление настроек...', 'info');
+                    }
+                }
+            };
+            
+            xhr.onload = function() {
+                uploadProgress.style.display = 'none';
+                if (xhr.status === 200) {
+                    showUploadStatus('Настройки восстановлены! Устройство сейчас перезагрузится...', 'success');
+                    setTimeout(() => { 
+                        window.location.href = '/'; 
+                    }, 5000);
+                } else {
+                    showUploadStatus('Ошибка: ' + xhr.responseText, 'error');
+                    uploadBtn.disabled = false;
+                }
+            };
+            
+            xhr.onerror = function() {
+                uploadProgress.style.display = 'none';
+                showUploadStatus('Ошибка сети при загрузке', 'error');
+                uploadBtn.disabled = false;
+            };
+            
+            xhr.send(formData);
+        }
+        
+        function showUploadStatus(msg, type) {
+            uploadStatus.textContent = msg;
+            uploadStatus.className = 'status active ' + type;
+        }
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        const msg = urlParams.get('message');
+        const msgType = urlParams.get('type');
+        if (msg) {
+            showUploadStatus(decodeURIComponent(msg), msgType === 'success' ? 'success' : 'error');
+            setTimeout(() => {
+                uploadStatus.classList.remove('active');
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

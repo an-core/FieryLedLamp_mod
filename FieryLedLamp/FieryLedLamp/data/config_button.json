@@ -1,0 +1,11 @@
+{
+	"button_type": 1,
+	"btn_click_power": 1,
+	"btn_click_next": 2,
+	"btn_click_prev": 3,
+	"btn_click_time": 4,
+	"btn_click_weather": 5,
+	"btn_click_ip": 6,
+	"btn_click_sound": 7,
+	"btn_click_action4": 15
+}

@@ -1,0 +1,17 @@
+{
+	"interval_run_text": 1,
+	"timer_c_d_w": "0",
+	"timer_c_d": "0",
+	"timer_c_w": "0",
+	"timer_d_w": "0",
+	"timer_clock_fixed": "0",
+	"interval_c_d_w": 10,
+	"interval_c_d": 10,
+	"interval_c_w": 10,
+	"interval_d_w": 10,
+	"interval_clock_fixed": 10,
+	"show_all_three": "0",
+	"show_c_d_w": 0,
+	"print_time": 60,
+	"print_weather": 30
+}

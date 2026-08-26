@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Системные логи</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e1e2f 0%, #0a0a0f 100%);
+            color: #eee;
+            font-family: monospace;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background: #000000aa;
+            border-radius: 15px;
+            padding: 20px;
+        }
+        h1 { margin-top: 0; }
+        .controls {
+            margin-bottom: 20px;
+        }
+        button {
+            background: #2c3e66;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover { background: #1e2a4a; }
+        .log-area {
+            background: #0a0c12;
+            border: 1px solid #3a3f4e;
+            border-radius: 8px;
+            padding: 10px;
+            height: 70vh;
+            overflow-y: scroll;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .log-line {
+            border-bottom: 1px solid #2a2e3c;
+            padding: 4px 0;
+            font-family: monospace;
+        }
+        /* .auto-refresh {
+            background: #1f4f2b;
+        } */
+        .status {
+            font-size: 12px;
+            margin-left: 10px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Логи устройства</h1>
+    <div class="controls">
+        <button id="refreshBtn">Обновить</button>
+        <button id="clearBtn">Очистить буфер</button>
+        <button id="autoRefreshBtn" class="auto-refresh">Включить автообновление</button>
+        <span class="status" id="status"></span>
+    </div>
+    <div id="logArea" class="log-area">
+        Загрузка логов...
+    </div>
+</div>
+
+<script>
+    let autoRefresh = false;
+    let timer = null;
+    const logArea = document.getElementById('logArea');
+    const statusSpan = document.getElementById('status');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const autoBtn = document.getElementById('autoRefreshBtn');
+
+    function loadLogs() {
+        statusSpan.innerText = 'Загрузка...';
+        fetch('/logs')
+            .then(response => response.text())
+            .then(text => {
+                let lines = text.split('\n');
+                let html = '';
+                for (let line of lines) {
+                    if (line.trim().length === 0) continue;
+                    let escaped = line.replace(/[&<>]/g, function(m) {
+                        if (m === '&') return '&amp;';
+                        if (m === '<') return '&lt;';
+                        if (m === '>') return '&gt;';
+                        return m;
+                    });
+                    // html += '<div class="log-line">' + escaped + '</div>';
+					let timestamp = new Date().toLocaleTimeString(); // или .toLocaleString()
+                    html += '<div class="log-line">[' + timestamp + '] ' + escaped + '</div>';
+                }
+                logArea.innerHTML = html || '<i>Логи отсутствуют</i>';
+                statusSpan.innerText = 'Обновлено: ' + new Date().toLocaleTimeString();
+                logArea.scrollTop = logArea.scrollHeight;
+            })
+            .catch(err => {
+                logArea.innerHTML = 'Ошибка загрузки логов: ' + err;
+                statusSpan.innerText = 'Ошибка';
+            });
+    }
+
+    function clearLogs() {
+        fetch('/logs_clear')
+            .then(() => loadLogs())
+            .catch(e => console.error(e));
+    }
+
+    function toggleAutoRefresh() {
+        autoRefresh = !autoRefresh;
+        if (autoRefresh) {
+            if (timer) clearInterval(timer);
+            timer = setInterval(loadLogs, 3000);
+            autoBtn.innerText = 'Автообновление включено';
+            autoBtn.style.background = '#1f4f2b';
+        } else {
+            if (timer) clearInterval(timer);
+            timer = null;
+            autoBtn.innerText = 'Автообновление выключено';
+            autoBtn.style.background = '#6c2e2e';
+        }
+    }
+
+    refreshBtn.onclick = loadLogs;
+    clearBtn.onclick = clearLogs;
+    autoBtn.onclick = toggleAutoRefresh;
+
+    loadLogs();
+</script>
+</body>
+</html>
