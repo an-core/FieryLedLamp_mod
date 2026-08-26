@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <title>Иконки, смайлики</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #0f1115;
+            color: #e2e8f0;
+            font-family: 'Segoe UI', 'Segoe UI Emoji', 'Apple Color Emoji', 'Noto Color Emoji', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 2rem;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+        h1 span {
+            color: #3873f8;
+        }
+        h1 .badge {
+            font-size: 0.9rem;
+            background: #1e293b;
+            padding: 0.2rem 1rem;
+            border-radius: 40px;
+            color: #94a3b8;
+            font-weight: 400;
+        }
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 2rem;
+            border-left: 4px solid #3887f8;
+            padding-left: 1rem;
+            font-size: 1.1rem;
+        }
+        .search-box {
+            background: #1e293b;
+            border-radius: 60px;
+            padding: 0.4rem 0.4rem 0.4rem 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid #334155;
+            max-width: 500px;
+        }
+        .search-box input {
+            background: transparent;
+            border: none;
+            padding: 0.9rem 0;
+            font-size: 1.1rem;
+            color: #f1f5f9;
+            width: 100%;
+            outline: none;
+        }
+        .search-box input::placeholder {
+            color: #475569;
+        }
+        .search-box button {
+            background: #1e293b;
+            border: 1px solid #334155;
+            padding: 0.7rem 1.8rem;
+            border-radius: 40px;
+            font-weight: 600;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .search-box button:hover {
+            background: #2d3a4f;
+            color: #e2e8f0;
+        }
+        .categories {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1.5rem;
+        }
+        .categories button {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 0.4rem 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+        .categories button:hover {
+            background: #2d3a4f;
+            color: #e2e8f0;
+        }
+        .categories button.active {
+            background: #475bbd;
+            color: #ffffff;
+            border-color: #475bbd;
+        }
+        .categories button.shop-cat {
+            background: #1e3a4f;
+            border-color: #2d6a8f;
+            color: #7dd3fc;
+        }
+        .categories button.shop-cat:hover {
+            background: #1e4a6f;
+            color: #b8e2ff;
+        }
+        .categories button.shop-cat.active {
+            background: #2d7abf;
+            border-color: #3b8fd9;
+            color: #ffffff;
+        }
+        .categories button.circus-cat {
+            background: #3a1e3f;
+            border-color: #7a3f8a;
+            color: #e8b4f8;
+        }
+        .categories button.circus-cat:hover {
+            background: #4a2a5f;
+            color: #f0c8ff;
+        }
+        .categories button.circus-cat.active {
+            background: #8a3faf;
+            border-color: #a85fc8;
+            color: #ffffff;
+        }
+        .categories button.juggling-cat {
+            background: #1e3a3f;
+            border-color: #2d7a8a;
+            color: #7dd8fc;
+        }
+        .categories button.juggling-cat:hover {
+            background: #1e4a5f;
+            color: #a8e8ff;
+        }
+        .categories button.juggling-cat.active {
+            background: #2d8abf;
+            border-color: #4aa8d9;
+            color: #ffffff;
+        }
+        .categories button.fire-cat {
+            background: #3f2a1e;
+            border-color: #8a5a2a;
+            color: #f8c878;
+        }
+        .categories button.fire-cat:hover {
+            background: #5a3a2a;
+            color: #ffd890;
+        }
+        .categories button.fire-cat.active {
+            background: #bf7a2d;
+            border-color: #d99a4a;
+            color: #ffffff;
+        }
+        .categories button.internet-cat {
+            background: #1a2a3f;
+            border-color: #2d6a9f;
+            color: #7dc8fc;
+        }
+        .categories button.internet-cat:hover {
+            background: #1a3a5f;
+            color: #b0e0ff;
+        }
+        .categories button.internet-cat.active {
+            background: #2d7abf;
+            border-color: #4a9ad9;
+            color: #ffffff;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.8rem;
+            margin-bottom: 2rem;
+        }
+        .icon-card {
+            background: #1e293b;
+            padding: 0.8rem 1rem;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 0.8rem;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: 0.2s;
+            font-size: 1.1rem;
+        }
+        .icon-card:hover {
+            background: #263348;
+            border-color: #334155;
+        }
+        .icon-card .emoji {
+            font-size: 1.8rem;
+            line-height: 1;
+            min-width: 40px;
+            text-align: center;
+        }
+        .icon-card .name {
+            color: #94a3b8;
+            font-size: 0.85rem;
+            flex: 1;
+        }
+        .icon-card .code-preview {
+            color: #38bdf8;
+            font-family: monospace;
+            font-size: 0.75rem;
+            background: #0b111e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+        }
+        .icon-card.selected {
+            border-color: #3b7189;
+            background: #263348;
+        }
+        .icon-card .copy-badge {
+            font-size: 0.6rem;
+            background: #38bdf820;
+            color: #7dd3fc;
+            padding: 0.1rem 0.5rem;
+            border-radius: 30px;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .icon-card:hover .copy-badge {
+            opacity: 1;
+        }
+
+        .code-section {
+            background: #0b0f17;
+            border-radius: 16px;
+            padding: 1.5rem 2rem;
+            border: 1px solid #2d3a4f;
+        }
+        .code-section h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 1rem;
+            color: #cbd5e1;
+        }
+        .code-section h3 span {
+            color: #838b8f;
+        }
+
+        .code-tabs {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+        .code-tabs button {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: #94a3b8;
+            padding: 0.4rem 1.2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: 0.2s;
+        }
+        .code-tabs button.active {
+            background: #475bbd;
+            color: #ffffff;
+        }
+        .code-tabs button:hover:not(.active) {
+            background: #2d3a4f;
+            color: #e2e8f0;
+        }
+
+        .code-output {
+            background: #0b111e;
+            border-radius: 10px;
+            padding: 1rem 1.5rem;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            overflow-x: auto;
+            color: #e2e8f0;
+            border: 1px solid #263348;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .code-output .preview-emoji {
+            font-size: 2rem;
+        }
+        .code-output .preview-code {
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .copy-row {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        .copy-btn {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+            padding: 0.6rem 2rem;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: 0.2s;
+        }
+        .copy-btn:hover {
+            background: #2d3a4f;
+            color: #e2e8f0;
+        }
+
+        .copy-btn.secondary {
+            background: #1e293b;
+            color: #94a3b8;
+            border: 1px solid #334155;
+        }
+        .copy-btn.secondary:hover {
+            background: #2d3a4f;
+            color: #e2e8f0;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #38bdf8;
+            color: #0f172a;
+            padding: 0.8rem 2rem;
+            border-radius: 50px;
+            font-weight: 600;
+            box-shadow: 0 8px 24px rgba(56, 189, 248, 0.3);
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 1000;
+            font-size: 1.1rem;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 3rem;
+            color: #64748b;
+            grid-column: 1 / -1;
+        }
+        .empty span {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 1rem;
+        }
+
+        .stats {
+            color: #64748b;
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+        .stats span {
+            color: #38bdf8;
+            font-weight: 600;
+        }
+
+        .shop-tip {
+            display: inline-block;
+            background: #1e3a4f;
+            color: #7dd3fc;
+            padding: 0.2rem 0.8rem;
+            border-radius: 30px;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            }
+            .code-output {
+                font-size: 0.9rem;
+                flex-wrap: wrap;
+            }
+            .copy-row {
+                flex-direction: column;
+            }
+            .copy-btn {
+                width: 100%;
+                text-align: center;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            <span>🛍️</span> Иконки, смайлики для <span>вставки в текст, код</span>
+        </h1>
+
+        <div class="search-box">
+            <span style="font-size:1.2rem;">🔍</span>
+            <input type="text" id="searchInput" placeholder="Поиск по названию или описанию..." />
+            <button id="searchBtn">Найти</button>
+        </div>
+
+        <div class="categories" id="categories">
+            <button class="active" data-category="all">📌 Все</button>
+            <button class="shop-cat" data-category="shop">🛍️ Магазин</button>
+            <button data-category="status">✔️ Статусы</button>
+            <button data-category="arrows">➡️ Стрелки</button>
+            <button data-category="shapes">🔷 Формы</button>
+            <button data-category="objects">📦 Объекты</button>
+            <button data-category="symbols">🔣 Символы</button>
+            <button data-category="numbers">🔢 Цифры</button>
+            <button data-category="stars">⭐ Звёзды</button>
+            <button data-category="hand">✋ Руки</button>
+            <button data-category="faces">😊 Лица</button>
+            <button class="circus-cat" data-category="circus">🎪 Цирк</button>
+            <button class="juggling-cat" data-category="juggling">🤹 Жонглёры</button>
+            <button class="fire-cat" data-category="fire">🔥 Фаер</button>
+            <button class="internet-cat" data-category="internet">🌐 Интернет</button>
+        </div>
+
+        <div class="stats" id="stats">Всего значков: <span id="totalCount">0</span></div>
+
+        <div class="grid" id="iconGrid"></div>
+
+        <div class="code-section">
+            <h3><span>Код для вставки</span></h3>
+            <div class="code-tabs">
+                <button class="active" data-format="emoji">Эмодзи (текст)</button>
+                <button data-format="unicode">Unicode (U+XXXX)</button>
+                <button data-format="js">JavaScript / JSON</button>
+                <button data-format="cpp">C++ (raw string)</button>
+                <button data-format="html">HTML (&#xxxx;)</button>
+            </div>
+            <div class="code-output" id="codeOutput">
+                <span class="preview-emoji"></span>
+                <span class="preview-code">Кликните на значок</span>
+            </div>
+            <div class="copy-row">
+                <button class="copy-btn" id="copyBtn">Копировать</button>
+                <button class="copy-btn secondary" id="copyText">Копировать + название</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">Скопировано!</div>
+
+    <script>
+
+        const ICONS = [
+            { emoji: '🛒', name: 'cart', category: 'shop', desc: 'Тележка / Добавить в корзину' },
+            { emoji: '🛍️', name: 'shopping-bags', category: 'shop', desc: 'Сумки для покупок' },
+            { emoji: '🧺', name: 'basket', category: 'shop', desc: 'Корзина для покупок' },
+            { emoji: '🚚', name: 'delivery-truck', category: 'shop', desc: 'Доставка' },
+            { emoji: '📦', name: 'package-delivery', category: 'shop', desc: 'Посылка / Отправление' },
+            { emoji: '🏪', name: 'store', category: 'shop', desc: 'Магазин / Точка продаж' },
+            { emoji: '💳', name: 'card-payment', category: 'shop', desc: 'Оплата картой' },
+            { emoji: '💰', name: 'cash-payment', category: 'shop', desc: 'Наличная оплата' },
+            { emoji: '🏷️', name: 'price-tag', category: 'shop', desc: 'Ценник / Скидка' },
+            { emoji: '🎁', name: 'gift-box', category: 'shop', desc: 'Подарок / Бонус' },
+            { emoji: '📋', name: 'order-form', category: 'shop', desc: 'Заказ / Бланк заказа' },
+            { emoji: '🕐', name: 'delivery-time', category: 'shop', desc: 'Время доставки' },
+            { emoji: '📍', name: 'pickup-location', category: 'shop', desc: 'Самовывоз / Адрес' },
+            { emoji: '🔄', name: 'return-exchange', category: 'shop', desc: 'Возврат / Обмен' },
+            { emoji: '🛡️', name: 'warranty', category: 'shop', desc: 'Гарантия / Защита' },
+            { emoji: '🔒', name: 'secure-payment', category: 'shop', desc: 'Безопасная оплата' },
+            { emoji: '📱', name: 'mobile-shop', category: 'shop', desc: 'Мобильное приложение' },
+            { emoji: '🏠', name: 'home-page', category: 'shop', desc: 'Главная страница' },
+            { emoji: '📞', name: 'contact-phone', category: 'shop', desc: 'Контакты / Телефон' },
+            { emoji: '✉️', name: 'contact-email', category: 'shop', desc: 'Электронная почта' },
+            { emoji: '🗺️', name: 'store-map', category: 'shop', desc: 'Карта / Адрес магазина' },
+            { emoji: '👤', name: 'user-profile', category: 'shop', desc: 'Профиль пользователя' },
+            { emoji: '🛠️', name: 'service-support', category: 'shop', desc: 'Сервис / Поддержка' },
+            { emoji: '🚀', name: 'express-delivery', category: 'shop', desc: 'Экспресс-доставка' },
+            { emoji: '🏦', name: 'bank-transfer', category: 'shop', desc: 'Банковский перевод' },
+            { emoji: '❓', name: 'help-support', category: 'shop', desc: 'Помощь / Вопросы' },
+            { emoji: '📊', name: 'sales-stats', category: 'shop', desc: 'Статистика продаж' },
+            { emoji: '🎯', name: 'promotions', category: 'shop', desc: 'Акции / Скидки' },
+            { emoji: '⭐', name: 'store-rating', category: 'shop', desc: 'Рейтинг магазина' },
+            { emoji: '📝', name: 'checkout-form', category: 'shop', desc: 'Оформление заказа' },
+            { emoji: '🔔', name: 'notifications', category: 'shop', desc: 'Уведомления' },
+            { emoji: '🧾', name: 'receipt', category: 'shop', desc: 'Чек / Квитанция' },
+            { emoji: '📨', name: 'order-confirmation', category: 'shop', desc: 'Подтверждение заказа' },
+            { emoji: '📤', name: 'order-sent', category: 'shop', desc: 'Заказ отправлен' },
+            { emoji: '📥', name: 'order-received', category: 'shop', desc: 'Заказ получен' },
+            { emoji: '💬', name: 'chat-support', category: 'shop', desc: 'Чат с поддержкой' },
+            { emoji: '📱', name: 'mobile-phone', category: 'shop', desc: 'Мобильный телефон' },
+            { emoji: '📞', name: 'telephone', category: 'shop', desc: 'Телефонная трубка' },
+            { emoji: '🛵', name: 'scooter', category: 'shop', desc: 'Доставка на самокате' },
+            { emoji: '🚲', name: 'bicycle', category: 'shop', desc: 'Доставка на велосипеде' },
+            { emoji: '🚛', name: 'truck', category: 'shop', desc: 'Грузовик доставки' },
+            { emoji: '⚙️', name: 'gear', category: 'shop', desc: 'Настройки / Шестеренка' },
+            { emoji: '🔧', name: 'wrench', category: 'shop', desc: 'Настройки / Ключ' },
+            { emoji: '🛠️', name: 'tools', category: 'shop', desc: 'Инструменты / Настройки' },
+
+            { emoji: '✅', name: 'check', category: 'status', desc: 'Готово / Успешно' },
+            { emoji: '❌', name: 'error', category: 'status', desc: 'Ошибка' },
+            { emoji: '⚠️', name: 'warning', category: 'status', desc: 'Предупреждение' },
+            { emoji: 'ℹ️', name: 'info', category: 'status', desc: 'Информация' },
+            { emoji: '💡', name: 'idea', category: 'status', desc: 'Идея / Подсказка' },
+            { emoji: '🔴', name: 'red-circle', category: 'status', desc: 'Критично / Стоп' },
+            { emoji: '🟢', name: 'green-circle', category: 'status', desc: 'Готово / Работает' },
+            { emoji: '🟡', name: 'yellow-circle', category: 'status', desc: 'Внимание' },
+            { emoji: '⚪', name: 'white-circle', category: 'status', desc: 'Ожидание' },
+            { emoji: '✔️', name: 'success', category: 'status', desc: 'Успех' },
+            { emoji: '❎', name: 'cross-mark', category: 'status', desc: 'Отказ' },
+            { emoji: '✖️', name: 'heavy-cross', category: 'status', desc: 'Отклонено' },
+            { emoji: '➕', name: 'plus', category: 'status', desc: 'Добавить' },
+            { emoji: '➖', name: 'minus', category: 'status', desc: 'Удалить' },
+            { emoji: '🚫', name: 'prohibited', category: 'status', desc: 'Запрещено' },
+            { emoji: '⛔', name: 'no-entry', category: 'status', desc: 'Вход запрещён' },
+            { emoji: '🔒', name: 'locked', category: 'status', desc: 'Защищено' },
+            { emoji: '🔓', name: 'unlocked', category: 'status', desc: 'Открыто' },
+            { emoji: '🔐', name: 'secure', category: 'status', desc: 'Безопасно' },
+            { emoji: '🔑', name: 'key', category: 'status', desc: 'Ключ / Доступ' },
+
+            { emoji: '⬆️', name: 'arrow-up', category: 'arrows', desc: 'Вверх' },
+            { emoji: '⬇️', name: 'arrow-down', category: 'arrows', desc: 'Вниз' },
+            { emoji: '⬅️', name: 'arrow-left', category: 'arrows', desc: 'Влево' },
+            { emoji: '➡️', name: 'arrow-right', category: 'arrows', desc: 'Вправо' },
+            { emoji: '↗️', name: 'arrow-up-right', category: 'arrows', desc: 'Вверх-вправо' },
+            { emoji: '↘️', name: 'arrow-down-right', category: 'arrows', desc: 'Вниз-вправо' },
+            { emoji: '↙️', name: 'arrow-down-left', category: 'arrows', desc: 'Вниз-влево' },
+            { emoji: '↖️', name: 'arrow-up-left', category: 'arrows', desc: 'Вверх-влево' },
+            { emoji: '↕️', name: 'arrow-up-down', category: 'arrows', desc: 'Вверх-вниз' },
+            { emoji: '↔️', name: 'arrow-left-right', category: 'arrows', desc: 'Влево-вправо' },
+            { emoji: '➰', name: 'curly-loop', category: 'arrows', desc: 'Цикл' },
+            { emoji: '➿', name: 'double-loop', category: 'arrows', desc: 'Двойной цикл' },
+            { emoji: '🔁', name: 'repeat', category: 'arrows', desc: 'Повтор' },
+            { emoji: '🔂', name: 'repeat-once', category: 'arrows', desc: 'Повтор один раз' },
+            { emoji: '🔃', name: 'rotate', category: 'arrows', desc: 'Обновить' },
+            { emoji: '🔄', name: 'rotate-arrows', category: 'arrows', desc: 'Синхронизация' },
+
+            { emoji: '🔵', name: 'blue-circle', category: 'shapes', desc: 'Синий круг' },
+            { emoji: '🟠', name: 'orange-circle', category: 'shapes', desc: 'Оранжевый круг' },
+            { emoji: '🟣', name: 'purple-circle', category: 'shapes', desc: 'Фиолетовый круг' },
+            { emoji: '🟤', name: 'brown-circle', category: 'shapes', desc: 'Коричневый круг' },
+            { emoji: '⚫', name: 'black-circle', category: 'shapes', desc: 'Чёрный круг' },
+            { emoji: '🔴', name: 'red-circle-shape', category: 'shapes', desc: 'Красный круг' },
+            { emoji: '🟢', name: 'green-circle-shape', category: 'shapes', desc: 'Зелёный круг' },
+            { emoji: '🟡', name: 'yellow-circle-shape', category: 'shapes', desc: 'Жёлтый круг' },
+            { emoji: '🟥', name: 'red-square', category: 'shapes', desc: 'Красный квадрат' },
+            { emoji: '🟧', name: 'orange-square', category: 'shapes', desc: 'Оранжевый квадрат' },
+            { emoji: '🟨', name: 'yellow-square', category: 'shapes', desc: 'Жёлтый квадрат' },
+            { emoji: '🟩', name: 'green-square', category: 'shapes', desc: 'Зелёный квадрат' },
+            { emoji: '🟦', name: 'blue-square', category: 'shapes', desc: 'Синий квадрат' },
+            { emoji: '🟪', name: 'purple-square', category: 'shapes', desc: 'Фиолетовый квадрат' },
+            { emoji: '🟫', name: 'brown-square', category: 'shapes', desc: 'Коричневый квадрат' },
+            { emoji: '⬛', name: 'black-square', category: 'shapes', desc: 'Чёрный квадрат' },
+            { emoji: '⬜', name: 'white-square', category: 'shapes', desc: 'Белый квадрат' },
+            { emoji: '🔶', name: 'orange-diamond', category: 'shapes', desc: 'Оранжевый ромб' },
+            { emoji: '🔷', name: 'blue-diamond', category: 'shapes', desc: 'Синий ромб' },
+            { emoji: '💠', name: 'diamond-shape', category: 'shapes', desc: 'Ромб' },
+
+            { emoji: '📁', name: 'folder', category: 'objects', desc: 'Папка' },
+            { emoji: '📂', name: 'open-folder', category: 'objects', desc: 'Открытая папка' },
+            { emoji: '📄', name: 'file', category: 'objects', desc: 'Файл' },
+            { emoji: '📝', name: 'memo', category: 'objects', desc: 'Заметка' },
+            { emoji: '📋', name: 'clipboard', category: 'objects', desc: 'Буфер обмена' },
+            { emoji: '📎', name: 'paperclip', category: 'objects', desc: 'Скрепка' },
+            { emoji: '🔗', name: 'link', category: 'objects', desc: 'Ссылка' },
+            { emoji: '📌', name: 'pushpin', category: 'objects', desc: 'Кнопка' },
+            { emoji: '📍', name: 'round-pushpin', category: 'objects', desc: 'Метка' },
+            { emoji: '🔍', name: 'search', category: 'objects', desc: 'Поиск' },
+            { emoji: '🔎', name: 'search-detail', category: 'objects', desc: 'Детальный поиск' },
+            { emoji: '🔔', name: 'bell', category: 'objects', desc: 'Уведомление' },
+            { emoji: '🔕', name: 'bell-off', category: 'objects', desc: 'Без звука' },
+            { emoji: '📢', name: 'loudspeaker', category: 'objects', desc: 'Громкоговоритель' },
+            { emoji: '📣', name: 'megaphone', category: 'objects', desc: 'Мегафон' },
+            { emoji: '📯', name: 'postal-horn', category: 'objects', desc: 'Рожок' },
+            { emoji: '📨', name: 'incoming-envelope', category: 'objects', desc: 'Входящее письмо' },
+            { emoji: '📩', name: 'outgoing-envelope', category: 'objects', desc: 'Исходящее письмо' },
+            { emoji: '📤', name: 'outbox', category: 'objects', desc: 'Исходящие' },
+            { emoji: '📥', name: 'inbox', category: 'objects', desc: 'Входящие' },
+            { emoji: '📮', name: 'postbox', category: 'objects', desc: 'Почтовый ящик' },
+            { emoji: '🗑️', name: 'trash', category: 'objects', desc: 'Корзина (мусор)' },
+            { emoji: '💾', name: 'floppy-disk', category: 'objects', desc: 'Сохранить' },
+            { emoji: '💿', name: 'cd', category: 'objects', desc: 'CD' },
+            { emoji: '📀', name: 'dvd', category: 'objects', desc: 'DVD' },
+            { emoji: '🎯', name: 'target', category: 'objects', desc: 'Цель' },
+            { emoji: '🎲', name: 'dice', category: 'objects', desc: 'Игра' },
+            { emoji: '🧩', name: 'puzzle', category: 'objects', desc: 'Пазл' },
+            { emoji: '🏷️', name: 'label', category: 'objects', desc: 'Ярлык' },
+
+            { emoji: '©️', name: 'copyright', category: 'symbols', desc: 'Копирайт' },
+            { emoji: '®️', name: 'registered', category: 'symbols', desc: 'Зарегистрировано' },
+            { emoji: '™️', name: 'trademark', category: 'symbols', desc: 'Товарный знак' },
+            { emoji: 'ℹ️', name: 'info-symbol', category: 'symbols', desc: 'Информация' },
+            { emoji: '♿', name: 'wheelchair', category: 'symbols', desc: 'Доступность' },
+            { emoji: '⚜️', name: 'fleur-de-lis', category: 'symbols', desc: 'Геральдика' },
+            { emoji: '🔱', name: 'trident', category: 'symbols', desc: 'Трезубец' },
+            { emoji: '💲', name: 'dollar', category: 'symbols', desc: 'Доллар' },
+            { emoji: '€', name: 'euro', category: 'symbols', desc: 'Евро' },
+            { emoji: '£', name: 'pound', category: 'symbols', desc: 'Фунт' },
+            { emoji: '¥', name: 'yen', category: 'symbols', desc: 'Йена' },
+            { emoji: '₽', name: 'ruble', category: 'symbols', desc: 'Рубль' },
+            { emoji: '💱', name: 'currency-exchange', category: 'symbols', desc: 'Обмен валют' },
+            { emoji: '🔄', name: 'exchange', category: 'symbols', desc: 'Обмен' },
+            { emoji: '🔀', name: 'shuffle', category: 'symbols', desc: 'Перемешать' },
+            { emoji: '⏩', name: 'fast-forward', category: 'symbols', desc: 'Вперёд' },
+            { emoji: '⏪', name: 'rewind', category: 'symbols', desc: 'Назад' },
+            { emoji: '⏫', name: 'fast-up', category: 'symbols', desc: 'Быстро вверх' },
+            { emoji: '⏬', name: 'fast-down', category: 'symbols', desc: 'Быстро вниз' },
+            { emoji: '◀️', name: 'play-left', category: 'symbols', desc: 'Влево' },
+            { emoji: '▶️', name: 'play-right', category: 'symbols', desc: 'Вправо' },
+            { emoji: '⏸️', name: 'pause', category: 'symbols', desc: 'Пауза' },
+            { emoji: '⏹️', name: 'stop', category: 'symbols', desc: 'Стоп' },
+            { emoji: '⏺️', name: 'record', category: 'symbols', desc: 'Запись' },
+            { emoji: '⏯️', name: 'play-pause', category: 'symbols', desc: 'Воспроизвести/Пауза' },
+
+            { emoji: '0️⃣', name: 'zero', category: 'numbers', desc: '0' },
+            { emoji: '1️⃣', name: 'one', category: 'numbers', desc: '1' },
+            { emoji: '2️⃣', name: 'two', category: 'numbers', desc: '2' },
+            { emoji: '3️⃣', name: 'three', category: 'numbers', desc: '3' },
+            { emoji: '4️⃣', name: 'four', category: 'numbers', desc: '4' },
+            { emoji: '5️⃣', name: 'five', category: 'numbers', desc: '5' },
+            { emoji: '6️⃣', name: 'six', category: 'numbers', desc: '6' },
+            { emoji: '7️⃣', name: 'seven', category: 'numbers', desc: '7' },
+            { emoji: '8️⃣', name: 'eight', category: 'numbers', desc: '8' },
+            { emoji: '9️⃣', name: 'nine', category: 'numbers', desc: '9' },
+            { emoji: '🔟', name: 'ten', category: 'numbers', desc: '10' },
+            { emoji: '❶', name: 'one-circle', category: 'numbers', desc: '1 (круг)' },
+            { emoji: '❷', name: 'two-circle', category: 'numbers', desc: '2 (круг)' },
+            { emoji: '❸', name: 'three-circle', category: 'numbers', desc: '3 (круг)' },
+            { emoji: '❹', name: 'four-circle', category: 'numbers', desc: '4 (круг)' },
+            { emoji: '❺', name: 'five-circle', category: 'numbers', desc: '5 (круг)' },
+            { emoji: '❻', name: 'six-circle', category: 'numbers', desc: '6 (круг)' },
+            { emoji: '❼', name: 'seven-circle', category: 'numbers', desc: '7 (круг)' },
+            { emoji: '❽', name: 'eight-circle', category: 'numbers', desc: '8 (круг)' },
+            { emoji: '❾', name: 'nine-circle', category: 'numbers', desc: '9 (круг)' },
+            { emoji: '❿', name: 'ten-circle', category: 'numbers', desc: '10 (круг)' },
+
+            { emoji: '⭐', name: 'star', category: 'stars', desc: 'Звезда' },
+            { emoji: '🌟', name: 'glowing-star', category: 'stars', desc: 'Сияющая звезда' },
+            { emoji: '✨', name: 'sparkles', category: 'stars', desc: 'Искры' },
+            { emoji: '💫', name: 'dizzy', category: 'stars', desc: 'Головокружение' },
+            { emoji: '⭐', name: 'gold-star', category: 'stars', desc: 'Золотая звезда' },
+            { emoji: '⚡', name: 'lightning', category: 'stars', desc: 'Молния' },
+            { emoji: '🔥', name: 'fire', category: 'stars', desc: 'Огонь' },
+            { emoji: '💥', name: 'boom', category: 'stars', desc: 'Взрыв' },
+            { emoji: '💢', name: 'anger', category: 'stars', desc: 'Гнев' },
+            { emoji: '❇️', name: 'sparkle', category: 'stars', desc: 'Искра' },
+            { emoji: '✳️', name: 'eight-spoked-asterisk', category: 'stars', desc: 'Звезда' },
+            { emoji: '✴️', name: 'eight-pointed-star', category: 'stars', desc: 'Восьмиконечная звезда' },
+            { emoji: '💠', name: 'diamond-star', category: 'stars', desc: 'Алмаз' },
+            { emoji: '🔯', name: 'six-pointed-star', category: 'stars', desc: 'Шестиконечная звезда' },
+
+            { emoji: '👍', name: 'thumbs-up', category: 'hand', desc: 'Лайк / Хорошо' },
+            { emoji: '👎', name: 'thumbs-down', category: 'hand', desc: 'Дизлайк / Плохо' },
+            { emoji: '👆', name: 'index-up', category: 'hand', desc: 'Наверх' },
+            { emoji: '👇', name: 'index-down', category: 'hand', desc: 'Вниз' },
+            { emoji: '👈', name: 'index-left', category: 'hand', desc: 'Налево' },
+            { emoji: '👉', name: 'index-right', category: 'hand', desc: 'Направо' },
+            { emoji: '👌', name: 'ok', category: 'hand', desc: 'ОК' },
+            { emoji: '✌️', name: 'victory', category: 'hand', desc: 'Победа' },
+            { emoji: '🤞', name: 'cross-fingers', category: 'hand', desc: 'На удачу' },
+            { emoji: '🤟', name: 'love-you', category: 'hand', desc: 'Люблю' },
+            { emoji: '🤘', name: 'rock', category: 'hand', desc: 'Рок' },
+            { emoji: '👋', name: 'wave', category: 'hand', desc: 'Привет' },
+            { emoji: '✋', name: 'raised-hand', category: 'hand', desc: 'Рука' },
+            { emoji: '🖐️', name: 'raised-hand-fingers', category: 'hand', desc: 'Рука с пальцами' },
+            { emoji: '✊', name: 'fist', category: 'hand', desc: 'Кулак' },
+            { emoji: '🤛', name: 'fist-left', category: 'hand', desc: 'Кулак влево' },
+            { emoji: '🤜', name: 'fist-right', category: 'hand', desc: 'Кулак вправо' },
+            { emoji: '👏', name: 'clap', category: 'hand', desc: 'Аплодисменты' },
+            { emoji: '🙌', name: 'raised-hands', category: 'hand', desc: 'Поднятые руки' },
+            { emoji: '🤲', name: 'palms-up', category: 'hand', desc: 'Ладони вверх' },
+
+            { emoji: '😊', name: 'smile', category: 'faces', desc: 'Улыбка' },
+            { emoji: '😃', name: 'big-smile', category: 'faces', desc: 'Широкая улыбка' },
+            { emoji: '😄', name: 'happy', category: 'faces', desc: 'Счастливый' },
+            { emoji: '😁', name: 'grin', category: 'faces', desc: 'Ухмылка' },
+            { emoji: '😆', name: 'laugh', category: 'faces', desc: 'Смех' },
+            { emoji: '😂', name: 'joy', category: 'faces', desc: 'Смех до слёз' },
+            { emoji: '🤣', name: 'rofl', category: 'faces', desc: 'Катаюсь от смеха' },
+            { emoji: '🙂', name: 'slight-smile', category: 'faces', desc: 'Лёгкая улыбка' },
+            { emoji: '😐', name: 'neutral', category: 'faces', desc: 'Нейтральный' },
+            { emoji: '😑', name: 'expressionless', category: 'faces', desc: 'Без выражения' },
+            { emoji: '😶', name: 'silence', category: 'faces', desc: 'Молчание' },
+            { emoji: '😏', name: 'smirk', category: 'faces', desc: 'Самодовольный' },
+            { emoji: '😒', name: 'unamused', category: 'faces', desc: 'Недовольный' },
+            { emoji: '😟', name: 'worried', category: 'faces', desc: 'Взволнованный' },
+            { emoji: '😠', name: 'angry', category: 'faces', desc: 'Злой' },
+            { emoji: '😡', name: 'rage', category: 'faces', desc: 'Ярость' },
+            { emoji: '😢', name: 'cry', category: 'faces', desc: 'Плач' },
+            { emoji: '😭', name: 'sob', category: 'faces', desc: 'Рыдание' },
+            { emoji: '😱', name: 'scream', category: 'faces', desc: 'Крик' },
+            { emoji: '😨', name: 'fear', category: 'faces', desc: 'Страх' },
+            { emoji: '😰', name: 'anxious', category: 'faces', desc: 'Тревога' },
+            { emoji: '😥', name: 'sad-relief', category: 'faces', desc: 'Облегчение' },
+            { emoji: '😓', name: 'sweat', category: 'faces', desc: 'Пот' },
+            { emoji: '🤗', name: 'hug', category: 'faces', desc: 'Объятие' },
+            { emoji: '🤔', name: 'thinking', category: 'faces', desc: 'Размышление' },
+            { emoji: '🤭', name: 'hand-over-mouth', category: 'faces', desc: 'Рука у рта' },
+            { emoji: '🤫', name: 'shush', category: 'faces', desc: 'Тсс' },
+            { emoji: '🤥', name: 'lying', category: 'faces', desc: 'Ложь' },
+            { emoji: '🤠', name: 'cowboy', category: 'faces', desc: 'Ковбой' },
+            { emoji: '🤡', name: 'clown', category: 'faces', desc: 'Клоун' },
+            { emoji: '🤢', name: 'nauseated', category: 'faces', desc: 'Тошнота' },
+            { emoji: '🤮', name: 'vomit', category: 'faces', desc: 'Рвота' },
+            { emoji: '🤧', name: 'sneeze', category: 'faces', desc: 'Чихание' },
+            { emoji: '😷', name: 'mask', category: 'faces', desc: 'Маска' },
+            { emoji: '🤒', name: 'fever', category: 'faces', desc: 'Температура' },
+            { emoji: '🤕', name: 'hurt', category: 'faces', desc: 'Боль' },
+            { emoji: '🤖', name: 'robot', category: 'faces', desc: 'Робот' },
+            { emoji: '👽', name: 'alien', category: 'faces', desc: 'Инопланетянин' },
+
+            { emoji: '🎪', name: 'circus-tent', category: 'circus', desc: 'Цирк-шапито / Арена' },
+            { emoji: '🎭', name: 'performing-arts', category: 'circus', desc: 'Театральные маски / Искусство' },
+            { emoji: '🎫', name: 'ticket', category: 'circus', desc: 'Билет в цирк' },
+            { emoji: '🎠', name: 'carousel-horse', category: 'circus', desc: 'Карусельная лошадка' },
+            { emoji: '🎡', name: 'ferris-wheel', category: 'circus', desc: 'Колесо обозрения' },
+            { emoji: '🎢', name: 'roller-coaster', category: 'circus', desc: 'Американские горки' },
+            { emoji: '🎩', name: 'top-hat', category: 'circus', desc: 'Цилиндр / Фокусник' },
+            { emoji: '🃏', name: 'joker-card', category: 'circus', desc: 'Карта Джокер' },
+            { emoji: '🤡', name: 'clown-face', category: 'circus', desc: 'Клоун' },
+            { emoji: '🐘', name: 'elephant', category: 'circus', desc: 'Слон цирковой' },
+            { emoji: '🦁', name: 'lion', category: 'circus', desc: 'Лев — царь зверей' },
+            { emoji: '🐻', name: 'bear', category: 'circus', desc: 'Медведь на велосипеде' },
+            { emoji: '🐅', name: 'tiger', category: 'circus', desc: 'Тигр в клетке' },
+            { emoji: '🐒', name: 'monkey', category: 'circus', desc: 'Обезьянка-акробат' },
+            { emoji: '🐕', name: 'dog', category: 'circus', desc: 'Собачка-артистка' },
+            { emoji: '🐎', name: 'horse', category: 'circus', desc: 'Лошадь на манеже' },
+
+            { emoji: '🤹', name: 'juggling', category: 'juggling', desc: 'Жонглирование' },
+            { emoji: '🤹‍♂️', name: 'man-juggling', category: 'juggling', desc: 'Мужчина жонглирует' },
+            { emoji: '🤹‍♀️', name: 'woman-juggling', category: 'juggling', desc: 'Женщина жонглирует' },
+            { emoji: '🎪', name: 'juggling-tent', category: 'juggling', desc: 'Цирковая арена для жонглёров' },
+            { emoji: '🎯', name: 'juggling-target', category: 'juggling', desc: 'Мишень для жонглёров' },
+            { emoji: '✨', name: 'juggling-sparkles', category: 'juggling', desc: 'Искры от жонглирования' },
+
+            { emoji: '🔥', name: 'fire-flame', category: 'fire', desc: 'Огонь / Фаер-шоу' },
+            { emoji: '🎆', name: 'fireworks', category: 'fire', desc: 'Фейерверк / Салют' },
+            { emoji: '🎇', name: 'sparkler', category: 'fire', desc: 'Бенгальский огонь' },
+            { emoji: '✨', name: 'sparkles-fire', category: 'fire', desc: 'Искры от фаера' },
+            { emoji: '⚡', name: 'lightning-fire', category: 'fire', desc: 'Молния / Энергия' },
+            { emoji: '🧨', name: 'firecracker', category: 'fire', desc: 'Петарда / Хлопушка' },
+            { emoji: '💥', name: 'explosion-fire', category: 'fire', desc: 'Взрыв / Пиротехника' },
+            { emoji: '🔥', name: 'fire-performance', category: 'fire', desc: 'Огненное шоу' },
+            { emoji: '🎇', name: 'fire-spinning', category: 'fire', desc: 'Фаер-спиннинг' },
+            { emoji: '⚡', name: 'fire-energy', category: 'fire', desc: 'Энергия огня' },
+
+            { emoji: '🌐', name: 'globe-internet', category: 'internet', desc: 'Глобус / Интернет' },
+            { emoji: '🌍', name: 'globe-europe-africa', category: 'internet', desc: 'Глобус (Европа-Африка)' },
+            { emoji: '🌎', name: 'globe-americas', category: 'internet', desc: 'Глобус (Америка)' },
+            { emoji: '🌏', name: 'globe-asia-australia', category: 'internet', desc: 'Глобус (Азия-Австралия)' },
+            { emoji: '📡', name: 'satellite-antenna', category: 'internet', desc: 'Спутниковая антенна / Сигнал' },
+            { emoji: '📶', name: 'wifi-signal', category: 'internet', desc: 'WiFi / Беспроводная сеть' },
+            { emoji: '🖥️', name: 'desktop-computer', category: 'internet', desc: 'Компьютер / ПК' },
+            { emoji: '💻', name: 'laptop', category: 'internet', desc: 'Ноутбук / Лэптоп' },
+            { emoji: '📱', name: 'smartphone', category: 'internet', desc: 'Смартфон / Телефон' },
+            { emoji: '📲', name: 'mobile-arrow', category: 'internet', desc: 'Мобильное приложение' },
+            { emoji: '🗺️', name: 'world-map', category: 'internet', desc: 'Карта мира / География' },
+            { emoji: '📧', name: 'email', category: 'internet', desc: 'Электронная почта' },
+            { emoji: '📨', name: 'incoming-email', category: 'internet', desc: 'Входящее письмо' },
+            { emoji: '📩', name: 'outgoing-email', category: 'internet', desc: 'Исходящее письмо' },
+            { emoji: '📤', name: 'upload-outbox', category: 'internet', desc: 'Отправка / Загрузка' },
+            { emoji: '📥', name: 'download-inbox', category: 'internet', desc: 'Получение / Скачивание' },
+            { emoji: '🖨️', name: 'printer', category: 'internet', desc: 'Принтер / Печать' },
+            { emoji: '⌨️', name: 'keyboard', category: 'internet', desc: 'Клавиатура / Ввод' },
+            { emoji: '🖱️', name: 'mouse', category: 'internet', desc: 'Компьютерная мышь' },
+            { emoji: '🗂️', name: 'card-index', category: 'internet', desc: 'Картотека / Файлы' },
+            { emoji: '📁', name: 'folder-internet', category: 'internet', desc: 'Папка / Директория' },
+            { emoji: '📂', name: 'open-folder-internet', category: 'internet', desc: 'Открытая папка' },
+            { emoji: '📄', name: 'document-internet', category: 'internet', desc: 'Документ / Страница' },
+            { emoji: '📃', name: 'page-curl', category: 'internet', desc: 'Документ со скруглением' },
+            { emoji: '📊', name: 'chart-internet', category: 'internet', desc: 'Диаграмма / Статистика' },
+            { emoji: '📈', name: 'growth-chart', category: 'internet', desc: 'Рост / Увеличение' },
+            { emoji: '📉', name: 'decline-chart', category: 'internet', desc: 'Спад / Уменьшение' },
+            { emoji: '🕸️', name: 'spider-web', category: 'internet', desc: 'Паутина / Всемирная паутина' },
+            { emoji: '💾', name: 'save-internet', category: 'internet', desc: 'Сохранить / Дискета' },
+            { emoji: '💿', name: 'cd-internet', category: 'internet', desc: 'CD-диск' },
+            { emoji: '📀', name: 'dvd-internet', category: 'internet', desc: 'DVD-диск' },
+            { emoji: '📹', name: 'video-camera', category: 'internet', desc: 'Видеокамера / Запись' },
+            { emoji: '📽️', name: 'film-projector', category: 'internet', desc: 'Проектор / Фильм' },
+            { emoji: '🎬', name: 'clapper-board', category: 'internet', desc: 'Хлопушка / Медиа' },
+            { emoji: '📺', name: 'television', category: 'internet', desc: 'Телевизор / Трансляция' },
+            { emoji: '📻', name: 'radio', category: 'internet', desc: 'Радио / Вещание' },
+            { emoji: '🎧', name: 'headphones', category: 'internet', desc: 'Наушники / Аудио' },
+            { emoji: '🔊', name: 'speaker-internet', category: 'internet', desc: 'Громкоговоритель / Звук' },
+            { emoji: '🔔', name: 'notification-internet', category: 'internet', desc: 'Уведомление' },
+            { emoji: '📎', name: 'attachment-internet', category: 'internet', desc: 'Вложение / Скрепка' },
+            { emoji: '✏️', name: 'edit-internet', category: 'internet', desc: 'Редактировать' },
+            { emoji: '📝', name: 'note-internet', category: 'internet', desc: 'Заметка / Текст' },
+            { emoji: '📋', name: 'clipboard-internet', category: 'internet', desc: 'Буфер обмена' },
+            { emoji: '🗑️', name: 'trash-internet', category: 'internet', desc: 'Удалить / Корзина' },
+            { emoji: '🕹️', name: 'joystick', category: 'internet', desc: 'Джойстик / Игры' },
+            { emoji: '🏷️', name: 'tag-internet', category: 'internet', desc: 'Метка / Тег' },
+            { emoji: '🔗', name: 'link-internet', category: 'internet', desc: 'Ссылка / Гиперссылка' },
+            { emoji: '🔒', name: 'lock-internet', category: 'internet', desc: 'Замок / Безопасность' },
+            { emoji: '🔓', name: 'unlock-internet', category: 'internet', desc: 'Открыто / Разблокировано' },
+            { emoji: '🔐', name: 'secure-lock', category: 'internet', desc: 'Безопасное соединение' },
+            { emoji: '🛡️', name: 'shield-internet', category: 'internet', desc: 'Щит / Защита' },
+            { emoji: '🔍', name: 'search-internet', category: 'internet', desc: 'Поиск (лупа)' },
+            { emoji: '🔎', name: 'search-detail-internet', category: 'internet', desc: 'Детальный поиск' },
+        ];
+
+        const grid = document.getElementById('iconGrid');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const codeOutput = document.getElementById('codeOutput');
+        const copyBtn = document.getElementById('copyBtn');
+        const copyText = document.getElementById('copyText');
+        const tabs = document.querySelectorAll('.code-tabs button');
+        const categoryBtns = document.querySelectorAll('.categories button');
+        const toast = document.getElementById('toast');
+        const totalCount = document.getElementById('totalCount');
+
+        let selectedIcon = null;
+        let currentFormat = 'emoji';
+        let currentCategory = 'all';
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function getEmojiUnicode(emoji) {
+            if (!emoji) return '';
+            const code = emoji.codePointAt(0);
+            return 'U+' + code.toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        function getHtmlEntity(emoji) {
+            if (!emoji) return '';
+            const code = emoji.codePointAt(0);
+            return '&#' + code + ';';
+        }
+
+        function getFormattedCode(icon, format) {
+            if (!icon) return '';
+            const emoji = icon.emoji;
+            switch (format) {
+                case 'emoji':
+                    return emoji;
+                case 'unicode':
+                    return getEmojiUnicode(emoji);
+                case 'js':
+                    return `"${emoji}"`;
+                case 'cpp':
+                    return `R"(${emoji})"`;
+                case 'html':
+                    return getHtmlEntity(emoji);
+                default:
+                    return emoji;
+            }
+        }
+
+        function renderIcons(filter = '', category = 'all') {
+            let filtered = ICONS;
+
+            if (filter) {
+                const q = filter.toLowerCase().trim();
+                filtered = filtered.filter(icon =>
+                    icon.name.toLowerCase().includes(q) ||
+                    icon.emoji.includes(q) ||
+                    icon.desc.toLowerCase().includes(q)
+                );
+            }
+
+            if (category !== 'all') {
+                filtered = filtered.filter(icon => icon.category === category);
+            }
+
+            totalCount.textContent = filtered.length;
+
+            if (filtered.length === 0) {
+                grid.innerHTML =
+                    `<div class="empty"><span>🔍</span><p>Ничего не найдено</p></div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(icon => `
+                    <div class="icon-card ${selectedIcon && selectedIcon.name === icon.name ? 'selected' : ''}" 
+                         data-name="${icon.name}" 
+                         onclick="selectIcon('${icon.name}')">
+                        <span class="emoji">${icon.emoji}</span>
+                        <span class="name">${icon.name}</span>
+                        <span class="code-preview">${icon.emoji}</span>
+                        <span class="copy-badge"></span>
+                    </div>
+                `).join('');
+        }
+
+        window.selectIcon = function(name) {
+            const icon = ICONS.find(i => i.name === name);
+            if (!icon) return;
+
+            selectedIcon = icon;
+            document.querySelectorAll('.icon-card').forEach(el => el.classList.remove('selected'));
+            const card = document.querySelector(`[data-name="${name}"]`);
+            if (card) card.classList.add('selected');
+            updateCodeOutput();
+            showToast(`${icon.emoji}  ${icon.name}`);
+        };
+
+        function updateCodeOutput() {
+            if (!selectedIcon) {
+                codeOutput.innerHTML = `
+                        <span class="preview-emoji"></span>
+                        <span class="preview-code">Кликните на значок</span>
+                    `;
+                return;
+            }
+
+            const code = getFormattedCode(selectedIcon, currentFormat);
+            codeOutput.innerHTML = `
+                    <span class="preview-emoji">${selectedIcon.emoji}</span>
+                    <span class="preview-code">${code}</span>
+                `;
+        }
+
+        function copyCode() {
+            if (!selectedIcon) {
+                showToast('Сначала выберите значок');
+                return;
+            }
+
+            const code = getFormattedCode(selectedIcon, currentFormat);
+
+            const input = document.createElement('input');
+            input.value = code;
+            input.style.position = 'fixed';
+            input.style.left = '-9999px';
+            document.body.appendChild(input);
+            input.select();
+            input.setSelectionRange(0, 99999);
+
+            try {
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast(`Скопировано: ${code}`);
+            } catch (_) {
+                document.body.removeChild(input);
+                showToast('Ошибка копирования');
+            }
+        }
+
+        function copyWithName() {
+            if (!selectedIcon) {
+                showToast('Сначала выберите значок');
+                return;
+            }
+
+            const text = `${selectedIcon.emoji}  ${selectedIcon.name}`;
+
+            const input = document.createElement('input');
+            input.value = text;
+            input.style.position = 'fixed';
+            input.style.left = '-9999px';
+            document.body.appendChild(input);
+            input.select();
+            input.setSelectionRange(0, 99999);
+
+            try {
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showToast(`Скопировано: ${text}`);
+            } catch (_) {
+                document.body.removeChild(input);
+                showToast('Ошибка копирования');
+            }
+        }
+
+        searchBtn.addEventListener('click', () => {
+            renderIcons(searchInput.value, currentCategory);
+        });
+        searchInput.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') renderIcons(searchInput.value, currentCategory);
+        });
+        searchInput.addEventListener('input', () => {
+            renderIcons(searchInput.value, currentCategory);
+        });
+
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                categoryBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentCategory = this.dataset.category;
+                renderIcons(searchInput.value, currentCategory);
+            });
+        });
+
+        tabs.forEach(btn => {
+            btn.addEventListener('click', function() {
+                tabs.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFormat = this.dataset.format;
+                if (selectedIcon) updateCodeOutput();
+            });
+        });
+
+        copyBtn.addEventListener('click', copyCode);
+        copyText.addEventListener('click', copyWithName);
+
+        renderIcons('', 'all');
+
+        setTimeout(() => {
+            const firstShop = document.querySelector('[data-name="globe-internet"]') ||
+                document.querySelector('[data-name="cart"]') ||
+                document.querySelector('[data-name="delivery-truck"]') ||
+                document.querySelector('.icon-card');
+            if (firstShop) {
+                firstShop.click();
+            }
+        }, 150);
+    </script>
+</body>
+</html>
