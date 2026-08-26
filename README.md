@@ -1,5 +1,7 @@
-![Изображение](https://raw.githubusercontent.com/an-core/FieryLedLamp_mod/main/FieryLedLamp/image.jpg)
-# Модифицированная прошивка FieryLedLamp
+<p align="center">
+<img width="1248" height="832" alt="FieryLedLamp" src="https://github.com/user-attachments/assets/7505feff-03ec-4d2f-bef0-c6a335407d3f" />
+</p>
+<h1 align="center">Модифицированная прошивка FieryLedLamp</h1>
 1. Поддерживаемое оборудование:
 - [x] ESP32 WROOM
 - [x] ESP32-S3 (N16R8)
