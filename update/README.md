@@ -1,9 +1,9 @@
 <p align="center">Информация по бинарникам</p>
 <p align="center">
- <img width="642" height="532" alt="esp32" src="https://github.com/user-attachments/assets/1228b7ab-f874-49b1-a995-26f74815c843" />
+<img width="620" height="530" alt="esp32" src="https://github.com/user-attachments/assets/f56d05cf-5151-4075-a253-4347e4c10b4a" />
 </p>
 <p align="center">
- <img width="679" height="564" alt="esp32s3" src="https://github.com/user-attachments/assets/696cc4e6-551c-4f5b-913c-c83526722e50" />
+<img width="674" height="579" alt="esp32s3" src="https://github.com/user-attachments/assets/e1773e62-4c63-4d42-a60b-4a585725fa69" />
 </p>
 
 
