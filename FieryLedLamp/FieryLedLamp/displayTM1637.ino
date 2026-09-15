@@ -169,7 +169,7 @@ void clockTicker_blink() {
 
     uint8_t h = ti->tm_hour;
     uint8_t m = ti->tm_min;
-
+    #if USE_DAWN
     if (dawnFlag == 1) { // если рассвет - мигаем дисплеем
       display.displayClock(h, m);
       if (millis() - tmr_blink > 100) {
@@ -184,13 +184,13 @@ void clockTicker_blink() {
         else DispBrightness -= 51U;
       }
     } 
-    else {
+    #endif
+
       tm1637_brightness();
       display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
       display.displayClock(h, m);
     }
   }
-}
 
 void tm1637_brightness() {
   if (NIGHT_HOURS_START >= NIGHT_HOURS_STOP) { // переход через полночь

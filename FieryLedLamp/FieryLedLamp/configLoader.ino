@@ -169,6 +169,25 @@ void loadBasicSettings() {
     ONflag = false;
     jsonWrite(configSetup, "Power", ONflag);
   }
+
+  if (jsonRead(configSetup, "anim_sel").isEmpty()) {
+    jsonWrite(configSetup, "anim_sel", "1");
+    needSave = true;
+  }
+  if (jsonRead(configSetup, "lastNonAnimSel").isEmpty()) {
+    jsonWrite(configSetup, "lastNonAnimSel", "1");
+    needSave = true;
+  }
+
+  jsonWrite(configSetup, "use_animations", String(USE_ANIMATIONS));
+  needSave = true;
+
+  jsonWrite(configSetup, "use_sd", String(sdEnabled ? 1 : 0));
+
+  if (needSave) {
+    configChanged = true;
+  }
+
 } // void loadBasicSettings()
 
 // ======================================================================== ДИСПЛЕЙ ST7789 ============================================================
@@ -937,6 +956,23 @@ void loadMatrixAndInitLEDs() {
 
   }
 
+#if USE_SD
+  if (sdType == 1) {
+    String sizeFolder = String(matrixWidth) + "x" + String(matrixHeight);
+    String folderPath = "/effects/" + sizeFolder + "/";
+    if (!LittleFS.exists(folderPath)) {
+      if (LittleFS.mkdir(folderPath)) {
+#if SD_LOG
+        SYSLOG.add("Папка %s создана", folderPath.c_str());
+#endif
+      } else {
+#if SD_LOG
+        SYSLOG.add("Ошибка создания папки %s", folderPath.c_str());
+#endif
+      }
+    }
+  }
+#endif
   printFreeHeap("После выделения матрицы");
 }
 
@@ -1406,6 +1442,15 @@ void loadEffectsAndCycleSettings() {
     }
   }
 
+  // Вычисляем индекс EFF_SD в списке эффектов
+  effSdIndex = 255;
+  for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+    if (eff_num_correct[i] == EFF_SD) {
+      effSdIndex = i;
+      break;
+    }
+  }
+
 #ifdef USE_SHUFFLE_FAVORITES
   for (uint8_t i = 0; i < MODE_AMOUNT; i++)
     shuffleFavoriteModes[i] = i;
@@ -1422,6 +1467,13 @@ void loadEffectsAndCycleSettings() {
   modes[currentMode].Brightness = jsonReadtoInt(configSetup, "br");
   modes[currentMode].Speed = jsonReadtoInt(configSetup, "sp");
   modes[currentMode].Scale = jsonReadtoInt(configSetup, "sc");
+
+#if USE_SD
+  String savedOutFile = jsonRead(configSetup, "out_sel");
+  if (savedOutFile.length() > 0 && savedOutFile != "0" && savedOutFile != "null") {
+    lastOutFileName = savedOutFile;
+  }
+#endif
 
   SetBrightness(modes[currentMode].Brightness);
   FastLED.setBrightness(modes[currentMode].Brightness);
@@ -1483,6 +1535,16 @@ void loadModuleSettings() {
 #endif
 #endif
 
+#if USE_SD
+#if defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)
+  sdEnabled = jsonReadtoInt(configSetup, "sd_enabled", 0) == 1;
+  sdType = constrain(jsonReadtoInt(configSetup, "sd_type", SD_TYPE), 0, 1);
+#else
+  sdEnabled = (USE_SD == 1);
+  sdType = 0; // на ESP32 всегда физическая карта
+#endif
+#endif
+
 #if USE_IR_RECEIVER
 #if defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)
   irEnabled = jsonReadtoInt(configSetup, "ir_enabled", 0) == 1;
@@ -1536,7 +1598,7 @@ void loadAllSettings() {
   loadDateSettings();             // Дата на матрице
   loadWeatherSettings();          // Погода на матрице
   loadTimerSettings();            // Таймеры отображения на матрице часы/дата/погода
-  loadModuleSettings();
+  loadModuleSettings();           // Модули (плеер, диспле, пульт, кнопка, sd)
   loadFontSettings();             // Шрифт текста бегущей строки
   loadStaticFontSettings();       // загрузка шрифта для статики (часы, дата, погода)
   loadDawnSunsetSettings();       // Яркость рассвета и заката

@@ -72,7 +72,7 @@ bool Favorites::HandleFavorites(
   uint8_t* selectedSettings,
   char* udpBuffer
 ) {
-  if (FavoritesRunning == 0 || !*ONflag || (*currentMode == EFF_WHITE_COLOR && FavoriteModes[EFF_WHITE_COLOR] == 0U)) {
+  if (FavoritesRunning == 0 || !*ONflag || (*currentMode == EFF_ANIMATION && FavoriteModes[EFF_ANIMATION] == 0U)) {
     return false;
   }
 

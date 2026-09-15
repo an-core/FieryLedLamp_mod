@@ -6,9 +6,71 @@
 
 void effectsTick() {
   if (systemShuttingDown || !ONflag) return;
-  if (currentMode == EFF_CLOCK && nightModeBrightness > 0) {
-    FastLED.setBrightness(nightModeBrightness);
+#if USE_SD
+  if (currentMode == EFF_SD) {
+    loadingFlag = false;
+
+    if (!outAnimationActive || !outFile) {
+      if (lastOutFileName.length() > 0) {
+        startOutAnimation(lastOutFileName);
+      } else {
+        FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+      }
+    }
+
+    uint32_t baseDelay = outFrameDelay;
+
+    uint32_t speedNum = modes[currentMode].Speed;
+    if (speedNum < 1) speedNum = 128;
+    uint32_t currentDelay = baseDelay * 128 / speedNum;
+    if (currentDelay < 10) currentDelay = 10;
+
+    uint32_t now = millis();
+    if (now - outLastFrameTime >= currentDelay) {
+      outLastFrameTime = now;
+
+      int delayByte = outFile.read();
+      if (delayByte == -1) {
+        outFile.seek(0);
+        outFile.read();
+      }
+
+      for (uint16_t i = 0; i < usedLeds; i++) {
+        int r = outFile.read();
+        int g = outFile.read();
+        int b = outFile.read();
+
+        if (r == -1 || g == -1 || b == -1) {
+          outFile.seek(0);
+          outFile.read();
+          for (uint16_t j = 0; j < usedLeds; j++) {
+            r = outFile.read(); g = outFile.read(); b = outFile.read();
+            if (r == -1 || g == -1 || b == -1) {
+              outFile.close();
+              outAnimationActive = false;
+              FastLED.clear(); FastLED.show();
+              Eff_Tick(); return;
+            }
+            uint8_t fileX = j % matrixWidth;
+            uint8_t fileY = j / matrixWidth;
+            uint8_t lampY = matrixHeight - 1 - fileY;
+            drawPixelXY(fileX, lampY, CRGB(g, r, b));
+          }
+          break;
+        }
+
+        uint8_t fileX = i % matrixWidth;
+        uint8_t fileY = i / matrixWidth;
+        uint8_t lampY = matrixHeight - 1 - fileY;
+        drawPixelXY(fileX, lampY, CRGB(g, r, b));
+      }
+      FastLED.show();
+    }
+    Eff_Tick();
+    return;
   }
+#endif
+
 #if USE_DAWN && USE_SUNSET
   if (!dawnFlag && !sunsetFlag && ONflag) {
 #elif USE_DAWN
@@ -30,7 +92,9 @@ void effectsTick() {
     }
 
     switch (currentMode) {
-      case EFF_WHITE_COLOR:         HIGH_DELAY_TICK { effTimer = millis(); whiteColorStripeRoutine();        Eff_Tick (); }  break;  // (  0U) Бeлый cвeт
+#if USE_ANIMATIONS
+      case EFF_ANIMATION:           LOW_DELAY_TICK { effTimer = millis(); animationRoutine();                Eff_Tick (); }  break;  // (  0U) Анимация
+#endif
       case EFF_AVRORA:              HIGH_DELAY_TICK { effTimer = millis(); Avrora();                         Eff_Tick (); }  break;  // (  1U) Аврора
       case EFF_WATERCOLOR:          DYNAMIC_DELAY_TICK { effTimer = millis(); Watercolor();                  Eff_Tick (); }  break;  // (  2U) Акварель
       case EFF_FLOWERRUTA:          DYNAMIC_DELAY_TICK { effTimer = millis(); FlowerRuta();                  Eff_Tick (); }  break;  // (  3U) Аленький цветочек
@@ -58,125 +122,114 @@ void effectsTick() {
       case EFF_STARS:               DYNAMIC_DELAY_TICK { effTimer = millis(); EffectStars();                 Eff_Tick (); }  break;  // ( 25U) Звезды
       case EFF_ZEBRA:               HIGH_DELAY_TICK { effTimer = millis(); zebraNoiseRoutine();              Eff_Tick (); }  break;  // ( 26U) Зебра
       case EFF_TIXYLAND:            DYNAMIC_DELAY_TICK { effTimer = millis(); TixyLand();                    Eff_Tick (); }  break;  // ( 27U) Земля Тикси
-      case EFF_SNAKES:              LOW_DELAY_TICK { effTimer = millis(); snakesRoutine();                   Eff_Tick (); }  break;  // ( 28U) Змейки
-      case EFF_FOUNTAIN:            DYNAMIC_DELAY_TICK { effTimer = millis(); starfield2Routine();           Eff_Tick (); }  break;  // ( 29U) Источник
-      case EFF_DROP_IN_WATER:       DYNAMIC_DELAY_TICK { effTimer = millis(); DropInWater();                 Eff_Tick (); }  break;  // ( 30U) Капли на воде
-      case EFF_DROPS:               LOW_DELAY_TICK { effTimer = millis(); newMatrixRoutine();                Eff_Tick (); }  break;  // ( 31U) Капли на стекле
-      case EFF_LLAND:               DYNAMIC_DELAY_TICK { effTimer = millis(); LLandRoutine();                Eff_Tick (); }  break;  // ( 32U) Кипение
-      case EFF_RINGS:               DYNAMIC_DELAY_TICK { effTimer = millis(); ringsRoutine();                Eff_Tick (); }  break;  // ( 33U) Кодовый замок
-      case EFF_COMET:               DYNAMIC_DELAY_TICK { effTimer = millis(); RainbowCometRoutine();         Eff_Tick (); }  break;  // ( 34U) Комета
-      case EFF_COMET_COLOR:         DYNAMIC_DELAY_TICK { effTimer = millis(); ColorCometRoutine();           Eff_Tick (); }  break;  // ( 35U) Комета одноцветная
-      case EFF_COMET_TWO:           DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream();              Eff_Tick (); }  break;  // ( 36U) Комета двойная
-      case EFF_COMET_THREE:         DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream2();             Eff_Tick (); }  break;  // ( 37U) Комета тройная
-      case EFF_CONTACTS:            DYNAMIC_DELAY_TICK { effTimer = millis(); Contacts();                    Eff_Tick (); }  break;  // ( 38U) Контакты
-      case EFF_SPARKLES:            DYNAMIC_DELAY_TICK { effTimer = millis(); sparklesRoutine();             Eff_Tick (); }  break;  // ( 39U) Конфетти
-      case EFF_CUBERUBIKA:          DYNAMIC_DELAY_TICK { effTimer = millis(); cubeRubik();                   Eff_Tick (); }  break;  // ( 40U) Кубик Рубика
-      case EFF_LAVA:                HIGH_DELAY_TICK { effTimer = millis(); lavaNoiseRoutine();               Eff_Tick (); }  break;  // ( 41U) Лава
-      case EFF_LAVALAMP:            LOW_DELAY_TICK { effTimer = millis(); LavaLampRoutine();                 Eff_Tick (); }  break;  // ( 42U) Лавовая лампа
-      case EFF_BUTTERFLYS_LAMP:     LOW_DELAY_TICK { effTimer = millis(); butterflysRoutine(false);          Eff_Tick (); }  break;  // ( 43U) Лампа с мотыльками
-      case EFF_FOREST:              HIGH_DELAY_TICK { effTimer = millis(); forestNoiseRoutine();             Eff_Tick (); }  break;  // ( 44U) Лес
-      case EFF_LUMENJER:            DYNAMIC_DELAY_TICK { effTimer = millis(); lumenjerRoutine();             Eff_Tick (); }  break;  // ( 45U) Люмeньep
-      case EFF_MAGMA:               DYNAMIC_DELAY_TICK { effTimer = millis(); magmaRoutine();                Eff_Tick (); }  break;  // ( 46U) Магма
-      case EFF_PAINTS:              DYNAMIC_DELAY_TICK { effTimer = millis(); OilPaints();                   Eff_Tick (); }  break;  // ( 47U) Масляные краски
-      case EFF_MATRIX:              DYNAMIC_DELAY_TICK { effTimer = millis(); matrixRoutine();               Eff_Tick (); }  break;  // ( 48U) Матрица
-      case EFF_TWINKLES:            DYNAMIC_DELAY_TICK { effTimer = millis(); twinklesRoutine();             Eff_Tick (); }  break;  // ( 49U) Мерцание
-      case EFF_METEOR:              DYNAMIC_DELAY_TICK { effTimer = millis(); meteorRoutine();               Eff_Tick (); }  break;  // ( 50U) Метеор
-      case EFF_METABALLS:           LOW_DELAY_TICK { effTimer = millis(); MetaBallsRoutine();                Eff_Tick (); }  break;  // ( 51U) Метоболз
-      case EFF_WEB_TOOLS:           SOFT_DELAY_TICK { effTimer = millis(); WebTools();                       Eff_Tick (); }  break;  // ( 52U) Мечта дизайнера
-      case EFF_MOSAIC:              DYNAMIC_DELAY_TICK { effTimer = millis(); squaresNdotsRoutine();         Eff_Tick (); }  break;  // ( 53U) Мозайка
-      case EFF_BUTTERFLYS:          LOW_DELAY_TICK { effTimer = millis(); butterflysRoutine(true);           Eff_Tick (); }  break;  // ( 54U) Moтыльки
-      case EFF_BBALLS:              LOW_DELAY_TICK { effTimer = millis(); BBallsRoutine();                   Eff_Tick (); }  break;  // ( 55U) Мячики
-      case EFF_BALLS_BOUNCE:        LOW_DELAY_TICK { effTimer = millis(); bounceRoutine();                   Eff_Tick (); }  break;  // ( 56U) Мячики без границ
-      case EFF_CHRISTMAS_TREE:      DYNAMIC_DELAY_TICK { effTimer = millis(); ChristmasTree();               Eff_Tick (); }  break;  // ( 57U) Новогодняя Елка
-      case EFF_NEW_STARS:           LOW_DELAY_TICK { effTimer = millis(); newStars();                        Eff_Tick (); }  break;  // ( 58U) Новые Звёзды
-      case EFF_NIGHTCITY:           HIGH_DELAY_TICK { effTimer = millis(); NightCity();                      Eff_Tick (); }  break;  // ( 59U) Ночной Город
-      case EFF_FIRE:                DYNAMIC_DELAY_TICK { effTimer = millis(); fireRoutine();                 Eff_Tick (); }  break;  // ( 60U) Огонь
-      case EFF_FIRE_2012:           DYNAMIC_DELAY_TICK { effTimer = millis(); fire2012again();               Eff_Tick (); }  break;  // ( 61U) Огонь 2012
-      case EFF_FIRE_2018:           DYNAMIC_DELAY_TICK { effTimer = millis(); Fire2018_2();                  Eff_Tick (); }  break;  // ( 62U) Огонь 2018
-      case EFF_FIRE_2020:           DYNAMIC_DELAY_TICK { effTimer = millis(); fire2020Routine2();            Eff_Tick (); }  break;  // ( 63U) Огонь 2020
-      case EFF_FIRE_2021:           LOW_DELAY_TICK { effTimer = millis(); Fire2021Routine();                 Eff_Tick (); }  break;  // ( 64U) Огонь 2021
-      case EFF_FIREFLY_TOP:         DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream5();             Eff_Tick (); }  break;  // ( 65U) Огoнь верховой
-      case EFF_FIREFLY:             DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream3();             Eff_Tick (); }  break;  // ( 66U) Огoнь парящий
-      case EFF_FIRESPARKS:          HIGH_DELAY_TICK { effTimer = millis(); FireSparks();                     Eff_Tick (); }  break;  // ( 67U) Огонь с искрами
-      case EFF_COLOR_RAIN:          DYNAMIC_DELAY_TICK { effTimer = millis(); coloredRain();                 Eff_Tick (); }  break;  // ( 68U) Осадки
-      case EFF_OSCILLATING:         DYNAMIC_DELAY_TICK { effTimer = millis(); oscillatingRoutine();          Eff_Tick (); }  break;  // ( 69U) Осциллятор
-      case EFF_CLOUDS:              HIGH_DELAY_TICK { effTimer = millis(); cloudsNoiseRoutine();             Eff_Tick (); }  break;  // ( 70U) Облака
-      case EFF_OCEAN:               HIGH_DELAY_TICK { effTimer = millis(); oceanNoiseRoutine();              Eff_Tick (); }  break;  // ( 71U) Океан
-      case EFF_OCTOPUS:             DYNAMIC_DELAY_TICK { effTimer = millis(); Octopus();                     Eff_Tick (); }  break;  // ( 72U) Осьминог
-      case EFF_RAINBOW_STRIPE:      HIGH_DELAY_TICK { effTimer = millis(); rainbowStripeNoiseRoutine();      Eff_Tick (); }  break;  // ( 73U) Павлин
-      case EFF_HOURGLASS:           DYNAMIC_DELAY_TICK { effTimer = millis(); Hourglass();                   Eff_Tick (); }  break;  // ( 74U) Песочные часы
-      case EFF_PAINTBALL:           DYNAMIC_DELAY_TICK { effTimer = millis(); lightBallsRoutine();           Eff_Tick (); }  break;  // ( 75U) Пейнтбол
-      case EFF_PICASSO:             DYNAMIC_DELAY_TICK { effTimer = millis(); picassoSelector();             Eff_Tick (); }  break;  // ( 76U) Пикассо
-      case EFF_PLASMA:              HIGH_DELAY_TICK { effTimer = millis(); plasmaNoiseRoutine();             Eff_Tick (); }  break;  // ( 77U) Плазма
-      case EFF_SPIDER:              LOW_DELAY_TICK { effTimer = millis(); spiderRoutine();                   Eff_Tick (); }  break;  // ( 78U) Плазменная лампа
-      case EFF_PLASMA_WAVES:        SOFT_DELAY_TICK { effTimer = millis(); Plasma_Waves();                   Eff_Tick (); }  break;  // ( 79U) Плазменные волны
-      case EFF_FLAME:               LOW_DELAY_TICK { effTimer = millis(); execStringsFlame();                Eff_Tick (); }  break;  // ( 80U) Пламя
-      case EFF_PLANETEARTH:         SOFT_DELAY_TICK { effTimer = millis(); PlanetEarth();                    Eff_Tick (); }  break;  // ( 81U) Планета Земля
-      case EFF_BY_EFFECT:           DYNAMIC_DELAY_TICK { effTimer = millis(); ByEffect();                    Eff_Tick (); }  break;  // ( 82U) Побочный эффект
-      case EFF_POPCORN:             LOW_DELAY_TICK { effTimer = millis(); popcornRoutine();                  Eff_Tick (); }  break;  // ( 83U) Попкорн
-      case EFF_PRISMATA:            LOW_DELAY_TICK { effTimer = millis(); PrismataRoutine();                 Eff_Tick (); }  break;  // ( 84U) Призмата
-      case EFF_ATTRACT:             DYNAMIC_DELAY_TICK { effTimer = millis(); attractRoutine();              Eff_Tick (); }  break;  // ( 85U) Притяжение
-      case EFF_LEAPERS:             DYNAMIC_DELAY_TICK { effTimer = millis(); LeapersRoutine();              Eff_Tick (); }  break;  // ( 86U) Пpыгyны
-      case EFF_PULSE:               DYNAMIC_DELAY_TICK { effTimer = millis(); pulseRoutine(2U);              Eff_Tick (); }  break;  // ( 87U) Пульс
-      case EFF_PULSE_WHITE:         LOW_DELAY_TICK     { effTimer = millis(); pulseRoutine(8U);              Eff_Tick (); }  break;  // ( 88U) Пульс белый
-      case EFF_PULSE_RAINBOW:       DYNAMIC_DELAY_TICK { effTimer = millis(); pulseRoutine(4U);              Eff_Tick (); }  break;  // ( 89U) Пульс радужный
-      case EFF_RADIAL_WAWE:         DYNAMIC_DELAY_TICK { effTimer = millis(); RadialWave();                  Eff_Tick (); }  break;  // ( 90U) Радиальная волна
-      case EFF_RAINBOW_VER:         DYNAMIC_DELAY_TICK { effTimer = millis(); rainbowRoutine();              Eff_Tick (); }  break;  // ( 91U) Радуга
-      case EFF_RAINBOW:             HIGH_DELAY_TICK { effTimer = millis(); rainbowNoiseRoutine();            Eff_Tick (); }  break;  // ( 92U) Радуга 3D
-      case EFF_RAINBOW_SPOT:        DYNAMIC_DELAY_TICK { effTimer = millis(); RainbowSpot();                 Eff_Tick (); }  break;  // ( 93U) Радужное Пятно
-      case EFF_RAINBOW_RINGS:       DYNAMIC_DELAY_TICK { effTimer = millis(); RainbowRings();                Eff_Tick (); }  break;  // ( 94U) Радужные кольца
-      case EFF_SNAKE:               DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream8();             Eff_Tick (); }  break;  // ( 95U) Радужный змей
-      case EFF_RAIN:                DYNAMIC_DELAY_TICK { effTimer = millis(); RainRoutine();                 Eff_Tick (); }  break;  // ( 96U) Разноцветный дождь
-      case EFF_DANDELIONS:          SOFT_DELAY_TICK  { effTimer = millis(); Dandelions();                    Eff_Tick (); }  break;  // ( 97U) Разноцветные одуванчики
-      case EFF_RIVERS:              DYNAMIC_DELAY_TICK { effTimer = millis(); BotswanaRivers();              Eff_Tick (); }  break;  // ( 98U) Реки Ботсваны
-      case EFF_LIGHTERS:            DYNAMIC_DELAY_TICK { effTimer = millis(); lightersRoutine();             Eff_Tick (); }  break;  // ( 99U) Светлячки
-      case EFF_LIGHTER_TRACES:      DYNAMIC_DELAY_TICK { effTimer = millis(); ballsRoutine();                Eff_Tick (); }  break;  // (100U) Светлячки со шлейфом
-      case EFF_FEATHER_CANDLE:      DYNAMIC_DELAY_TICK { effTimer = millis(); FeatherCandleRoutine();        Eff_Tick (); }  break;  // (101U) Свеча
-      case EFF_AURORA:              HIGH_DELAY_TICK { effTimer = millis(); polarRoutine();                   Eff_Tick (); }  break;  // (102U) Северное сияние
-      case EFF_SERPENTINE:          HIGH_DELAY_TICK { effTimer = millis(); Serpentine();                     Eff_Tick (); }  break;  // (103U) Серпантин
-      case EFF_SCANNER:             DYNAMIC_DELAY_TICK { effTimer = millis(); Scanner();                     Eff_Tick (); }  break;  // (104U) Сканер
-      case EFF_SINUSOID3:           HIGH_DELAY_TICK { effTimer = millis(); Sinusoid3Routine();               Eff_Tick (); }  break;  // (105U) Синусоид
-      case EFF_COLORS:              HIGH_DELAY_TICK { effTimer = millis(); colorsRoutine2();                 Eff_Tick (); }  break;  // (106U) Смена цвета
-      case EFF_SNOW:                DYNAMIC_DELAY_TICK { effTimer = millis(); Snowfall();                    Eff_Tick (); }  break;  // (107U) Снегопад
-      case EFF_SPECTRUM:            DYNAMIC_DELAY_TICK { effTimer = millis(); Spectrum();                    Eff_Tick (); }  break;  // (108U) Спектрум
-      case EFF_SPIRO:               LOW_DELAY_TICK { effTimer = millis(); spiroRoutine();                    Eff_Tick (); }  break;  // (109U) Спирали
-      case EFF_FLOCK:               LOW_DELAY_TICK { effTimer = millis(); flockRoutine(false);               Eff_Tick (); }  break;  // (110U) Стая
-      case EFF_FLOCK_N_PR:          LOW_DELAY_TICK { effTimer = millis(); flockRoutine(true);                Eff_Tick (); }  break;  // (111U) Стая и хищник
-      case EFF_ARROWS:              DYNAMIC_DELAY_TICK { effTimer = millis(); arrowsRoutine();               Eff_Tick (); }  break;  // (112U) Стрелки
-      case EFF_STROBE:              LOW_DELAY_TICK { effTimer = millis(); StrobeAndDiffusion();              Eff_Tick (); }  break;  // (113U) Строб.Хаос.Дифузия
-      case EFF_SHADOWS:             LOW_DELAY_TICK { effTimer = millis(); shadowsRoutine();                  Eff_Tick (); }  break;  // (114U) Тени
-      case EFF_PACIFIC:             LOW_DELAY_TICK { effTimer = millis(); pacificRoutine();                  Eff_Tick (); }  break;  // (115U) Тихий океан
-      case EFF_TORNADO:             LOW_DELAY_TICK { effTimer = millis(); Tornado();                         Eff_Tick (); }  break;  // (116U) Торнадо
-      case EFF_SIMPLE_RAIN:         DYNAMIC_DELAY_TICK { effTimer = millis(); simpleRain();                  Eff_Tick (); }  break;  // (117U) Tyчкa в банке
-      case EFF_FIREWORK:            SOFT_DELAY_TICK { effTimer = millis(); Firework();                       Eff_Tick (); }  break;  // (118U) Фейерверк
-      case EFF_FIREWORK_2:          DYNAMIC_DELAY_TICK { effTimer = millis(); fireworksRoutine();            Eff_Tick (); }  break;  // (119U) Фейерверк 2
-      case EFF_FAIRY:               DYNAMIC_DELAY_TICK { effTimer = millis(); fairyRoutine();                Eff_Tick (); }  break;  // (120U) Фея
-      case EFF_FONTAN:              DYNAMIC_DELAY_TICK { effTimer = millis(); Fountain();                    Eff_Tick (); }  break;  // (121U) Фонтан
-      case EFF_TRICOLOR:            LOW_DELAY_TICK { effTimer = millis(); FlagRoutine();                     Eff_Tick (); }  break;  // (122U) Флаг (Триколор)
-      case EFF_COLOR:               LOW_DELAY_TICK  { effTimer = millis(); colorRoutine();                   Eff_Tick (); }  break;  // (123U) Цвет
-      case EFF_COLORED_PYTHON:      LOW_DELAY_TICK { effTimer = millis(); Colored_Python();                  Eff_Tick (); }  break;  // (124U) Цветной Питон
-      case EFF_SAND:                DYNAMIC_DELAY_TICK { effTimer = millis(); sandRoutine();                 Eff_Tick (); }  break;  // (125U) Цветные драже
-      case EFF_COLOR_FRIZZLES:      SOFT_DELAY_TICK { effTimer = millis(); ColorFrizzles();                  Eff_Tick (); }  break;  // (126U) Цветные кудри
-      case EFF_LOTUS:               DYNAMIC_DELAY_TICK { effTimer = millis(); LotusFlower();                 Eff_Tick (); }  break;  // (127U) Цветок лотоса
-      case EFF_TURBULENCE:          DYNAMIC_DELAY_TICK { effTimer = millis(); Turbulence();                  Eff_Tick (); }  break;  // (128U) Цифровая турбулентность
-      case EFF_SPHERES:             LOW_DELAY_TICK { effTimer = millis(); spheresRoutine();                  Eff_Tick (); }  break;  // (129U) Шapы
-      case EFF_NEXUS:               LOW_DELAY_TICK { effTimer = millis(); nexusRoutine();                    Eff_Tick (); }  break;  // (130U) Nexus
-      case EFF_COLOR_FADED:         LOW_DELAY_TICK { effTimer = millis(); colorFaded();                      Eff_Tick (); }  break;  // (131U) Цвет с затуханием
-      case EFF_CLOCK:               DYNAMIC_DELAY_TICK { effTimer = millis(); clockRoutine(); effectDrawn = true; Eff_Tick (); } break;  // (132U) Часы
-#if USE_SD
-      case EFF_OUT_EFFECT:
-        if (loadingFlag) {
-          loadingFlag = false;
-          loadOutEffect(currentMode);
-        }
-        static uint32_t frameTimer = 0;
-        if (millis() - frameTimer >= frameDelay) {
-          frameTimer = millis();
-          showNextFrame();
-        }
-        Eff_Tick();
-        break;
-#endif // USE_SD
+      case EFF_SNAKE_GAME:          DYNAMIC_DELAY_TICK { effTimer = millis(); snakeGameRoutine();            Eff_Tick (); }  break;  // ( 28U) Змейка (игра)
+      case EFF_SNAKES:              LOW_DELAY_TICK { effTimer = millis(); snakesRoutine();                   Eff_Tick (); }  break;  // ( 29U) Змейки
+      case EFF_FOUNTAIN:            DYNAMIC_DELAY_TICK { effTimer = millis(); starfield2Routine();           Eff_Tick (); }  break;  // ( 30U) Источник
+      case EFF_DROP_IN_WATER:       DYNAMIC_DELAY_TICK { effTimer = millis(); DropInWater();                 Eff_Tick (); }  break;  // ( 31U) Капли на воде
+      case EFF_DROPS:               LOW_DELAY_TICK { effTimer = millis(); newMatrixRoutine();                Eff_Tick (); }  break;  // ( 32U) Капли на стекле
+      case EFF_LLAND:               DYNAMIC_DELAY_TICK { effTimer = millis(); LLandRoutine();                Eff_Tick (); }  break;  // ( 33U) Кипение
+      case EFF_RINGS:               DYNAMIC_DELAY_TICK { effTimer = millis(); ringsRoutine();                Eff_Tick (); }  break;  // ( 34U) Кодовый замок
+      case EFF_COMET:               DYNAMIC_DELAY_TICK { effTimer = millis(); RainbowCometRoutine();         Eff_Tick (); }  break;  // ( 35U) Комета
+      case EFF_COMET_COLOR:         DYNAMIC_DELAY_TICK { effTimer = millis(); ColorCometRoutine();           Eff_Tick (); }  break;  // ( 36U) Комета одноцветная
+      case EFF_COMET_TWO:           DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream();              Eff_Tick (); }  break;  // ( 37U) Комета двойная
+      case EFF_COMET_THREE:         DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream2();             Eff_Tick (); }  break;  // ( 38U) Комета тройная
+      case EFF_CONTACTS:            DYNAMIC_DELAY_TICK { effTimer = millis(); Contacts();                    Eff_Tick (); }  break;  // ( 39U) Контакты
+      case EFF_SPARKLES:            DYNAMIC_DELAY_TICK { effTimer = millis(); sparklesRoutine();             Eff_Tick (); }  break;  // ( 40U) Конфетти
+      case EFF_CUBERUBIKA:          DYNAMIC_DELAY_TICK { effTimer = millis(); cubeRubik();                   Eff_Tick (); }  break;  // ( 41U) Кубик Рубика
+      case EFF_LAVA:                HIGH_DELAY_TICK { effTimer = millis(); lavaNoiseRoutine();               Eff_Tick (); }  break;  // ( 42U) Лава
+      case EFF_LAVALAMP:            LOW_DELAY_TICK { effTimer = millis(); LavaLampRoutine();                 Eff_Tick (); }  break;  // ( 43U) Лавовая лампа
+      case EFF_BUTTERFLYS_LAMP:     LOW_DELAY_TICK { effTimer = millis(); butterflysRoutine(false);          Eff_Tick (); }  break;  // ( 44U) Лампа с мотыльками
+      case EFF_FOREST:              HIGH_DELAY_TICK { effTimer = millis(); forestNoiseRoutine();             Eff_Tick (); }  break;  // ( 45U) Лес
+      case EFF_LUMENJER:            DYNAMIC_DELAY_TICK { effTimer = millis(); lumenjerRoutine();             Eff_Tick (); }  break;  // ( 46U) Люмeньep
+      case EFF_MAGMA:               DYNAMIC_DELAY_TICK { effTimer = millis(); magmaRoutine();                Eff_Tick (); }  break;  // ( 47U) Магма
+      case EFF_MARIO:               LOW_DELAY_TICK { effTimer = millis(); marioRoutine();                    Eff_Tick (); }  break;  // ( 48U) Марио (игра)
+      case EFF_PAINTS:              DYNAMIC_DELAY_TICK { effTimer = millis(); OilPaints();                   Eff_Tick (); }  break;  // ( 49U) Масляные краски
+      case EFF_MATRIX:              DYNAMIC_DELAY_TICK { effTimer = millis(); matrixRoutine();               Eff_Tick (); }  break;  // ( 50U) Матрица
+      case EFF_TWINKLES:            DYNAMIC_DELAY_TICK { effTimer = millis(); twinklesRoutine();             Eff_Tick (); }  break;  // ( 51U) Мерцание
+      case EFF_METEOR:              DYNAMIC_DELAY_TICK { effTimer = millis(); meteorRoutine();               Eff_Tick (); }  break;  // ( 52U) Метеор
+      case EFF_METABALLS:           LOW_DELAY_TICK { effTimer = millis(); MetaBallsRoutine();                Eff_Tick (); }  break;  // ( 53U) Метоболз
+      case EFF_WEB_TOOLS:           SOFT_DELAY_TICK { effTimer = millis(); WebTools();                       Eff_Tick (); }  break;  // ( 54U) Мечта дизайнера
+      case EFF_MOSAIC:              DYNAMIC_DELAY_TICK { effTimer = millis(); squaresNdotsRoutine();         Eff_Tick (); }  break;  // ( 55U) Мозайка
+      case EFF_BUTTERFLYS:          LOW_DELAY_TICK { effTimer = millis(); butterflysRoutine(true);           Eff_Tick (); }  break;  // ( 56U) Moтыльки
+      case EFF_BBALLS:              LOW_DELAY_TICK { effTimer = millis(); BBallsRoutine();                   Eff_Tick (); }  break;  // ( 57U) Мячики
+      case EFF_BALLS_BOUNCE:        LOW_DELAY_TICK { effTimer = millis(); bounceRoutine();                   Eff_Tick (); }  break;  // ( 58U) Мячики без границ
+      case EFF_CHRISTMAS_TREE:      DYNAMIC_DELAY_TICK { effTimer = millis(); ChristmasTree();               Eff_Tick (); }  break;  // ( 59U) Новогодняя Елка
+      case EFF_NEW_STARS:           LOW_DELAY_TICK { effTimer = millis(); newStars();                        Eff_Tick (); }  break;  // ( 60U) Новые Звёзды
+      case EFF_NIGHTCITY:           HIGH_DELAY_TICK { effTimer = millis(); NightCity();                      Eff_Tick (); }  break;  // ( 61U) Ночной Город
+      case EFF_FIRE:                DYNAMIC_DELAY_TICK { effTimer = millis(); fireRoutine();                 Eff_Tick (); }  break;  // ( 62U) Огонь
+      case EFF_FIRE_2012:           DYNAMIC_DELAY_TICK { effTimer = millis(); fire2012again();               Eff_Tick (); }  break;  // ( 63U) Огонь 2012
+      case EFF_FIRE_2018:           DYNAMIC_DELAY_TICK { effTimer = millis(); Fire2018_2();                  Eff_Tick (); }  break;  // ( 64U) Огонь 2018
+      case EFF_FIRE_2020:           DYNAMIC_DELAY_TICK { effTimer = millis(); fire2020Routine2();            Eff_Tick (); }  break;  // ( 65U) Огонь 2020
+      case EFF_FIRE_2021:           LOW_DELAY_TICK { effTimer = millis(); Fire2021Routine();                 Eff_Tick (); }  break;  // ( 66U) Огонь 2021
+      case EFF_FIREFLY_TOP:         DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream5();             Eff_Tick (); }  break;  // ( 67U) Огoнь верховой
+      case EFF_FIREFLY:             DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream3();             Eff_Tick (); }  break;  // ( 68U) Огoнь парящий
+      case EFF_FIRESPARKS:          HIGH_DELAY_TICK { effTimer = millis(); FireSparks();                     Eff_Tick (); }  break;  // ( 69U) Огонь с искрами
+      case EFF_COLOR_RAIN:          DYNAMIC_DELAY_TICK { effTimer = millis(); coloredRain();                 Eff_Tick (); }  break;  // ( 70U) Осадки
+      case EFF_OSCILLATING:         DYNAMIC_DELAY_TICK { effTimer = millis(); oscillatingRoutine();          Eff_Tick (); }  break;  // ( 71U) Осциллятор
+      case EFF_CLOUDS:              HIGH_DELAY_TICK { effTimer = millis(); cloudsNoiseRoutine();             Eff_Tick (); }  break;  // ( 72U) Облака
+      case EFF_OCEAN:               HIGH_DELAY_TICK { effTimer = millis(); oceanNoiseRoutine();              Eff_Tick (); }  break;  // ( 73U) Океан
+      case EFF_OCTOPUS:             DYNAMIC_DELAY_TICK { effTimer = millis(); Octopus();                     Eff_Tick (); }  break;  // ( 74U) Осьминог
+      case EFF_RAINBOW_STRIPE:      HIGH_DELAY_TICK { effTimer = millis(); rainbowStripeNoiseRoutine();      Eff_Tick (); }  break;  // ( 75U) Павлин
+      case EFF_HOURGLASS:           DYNAMIC_DELAY_TICK { effTimer = millis(); Hourglass();                   Eff_Tick (); }  break;  // ( 76U) Песочные часы
+      case EFF_PAINTBALL:           DYNAMIC_DELAY_TICK { effTimer = millis(); lightBallsRoutine();           Eff_Tick (); }  break;  // ( 77U) Пейнтбол
+      case EFF_PICASSO:             DYNAMIC_DELAY_TICK { effTimer = millis(); picassoSelector();             Eff_Tick (); }  break;  // ( 78U) Пикассо
+      case EFF_PLASMA:              HIGH_DELAY_TICK { effTimer = millis(); plasmaNoiseRoutine();             Eff_Tick (); }  break;  // ( 79U) Плазма
+      case EFF_SPIDER:              LOW_DELAY_TICK { effTimer = millis(); spiderRoutine();                   Eff_Tick (); }  break;  // ( 80U) Плазменная лампа
+      case EFF_PLASMA_WAVES:        SOFT_DELAY_TICK { effTimer = millis(); Plasma_Waves();                   Eff_Tick (); }  break;  // ( 81U) Плазменные волны
+      case EFF_FLAME:               LOW_DELAY_TICK { effTimer = millis(); execStringsFlame();                Eff_Tick (); }  break;  // ( 82U) Пламя
+      case EFF_PLANETEARTH:         SOFT_DELAY_TICK { effTimer = millis(); PlanetEarth();                    Eff_Tick (); }  break;  // ( 83U) Планета Земля
+      case EFF_BY_EFFECT:           DYNAMIC_DELAY_TICK { effTimer = millis(); ByEffect();                    Eff_Tick (); }  break;  // ( 84U) Побочный эффект
+      case EFF_POPCORN:             LOW_DELAY_TICK { effTimer = millis(); popcornRoutine();                  Eff_Tick (); }  break;  // ( 85U) Попкорн
+      case EFF_PRISMATA:            LOW_DELAY_TICK { effTimer = millis(); PrismataRoutine();                 Eff_Tick (); }  break;  // ( 86U) Призмата
+      case EFF_ATTRACT:             DYNAMIC_DELAY_TICK { effTimer = millis(); attractRoutine();              Eff_Tick (); }  break;  // ( 87U) Притяжение
+      case EFF_LEAPERS:             DYNAMIC_DELAY_TICK { effTimer = millis(); LeapersRoutine();              Eff_Tick (); }  break;  // ( 88U) Пpыгyны
+      case EFF_PULSE:               DYNAMIC_DELAY_TICK { effTimer = millis(); pulseRoutine(2U);              Eff_Tick (); }  break;  // ( 89U) Пульс
+      case EFF_PULSE_WHITE:         LOW_DELAY_TICK     { effTimer = millis(); pulseRoutine(8U);              Eff_Tick (); }  break;  // ( 90U) Пульс белый
+      case EFF_PULSE_RAINBOW:       DYNAMIC_DELAY_TICK { effTimer = millis(); pulseRoutine(4U);              Eff_Tick (); }  break;  // ( 91U) Пульс радужный
+      case EFF_RADIAL_WAWE:         DYNAMIC_DELAY_TICK { effTimer = millis(); RadialWave();                  Eff_Tick (); }  break;  // ( 92U) Радиальная волна
+      case EFF_RAINBOW_VER:         DYNAMIC_DELAY_TICK { effTimer = millis(); rainbowRoutine();              Eff_Tick (); }  break;  // ( 93U) Радуга
+      case EFF_RAINBOW:             HIGH_DELAY_TICK { effTimer = millis(); rainbowNoiseRoutine();            Eff_Tick (); }  break;  // ( 94U) Радуга 3D
+      case EFF_RAINBOW_SPOT:        DYNAMIC_DELAY_TICK { effTimer = millis(); RainbowSpot();                 Eff_Tick (); }  break;  // ( 95U) Радужное Пятно
+      case EFF_RAINBOW_RINGS:       DYNAMIC_DELAY_TICK { effTimer = millis(); RainbowRings();                Eff_Tick (); }  break;  // ( 96U) Радужные кольца
+      case EFF_SNAKE:               DYNAMIC_DELAY_TICK { effTimer = millis(); MultipleStream8();             Eff_Tick (); }  break;  // ( 97U) Радужный змей
+      case EFF_RAIN:                DYNAMIC_DELAY_TICK { effTimer = millis(); RainRoutine();                 Eff_Tick (); }  break;  // ( 98U) Разноцветный дождь
+      case EFF_DANDELIONS:          SOFT_DELAY_TICK  { effTimer = millis(); Dandelions();                    Eff_Tick (); }  break;  // ( 99U) Разноцветные одуванчики
+      case EFF_RIVERS:              DYNAMIC_DELAY_TICK { effTimer = millis(); BotswanaRivers();              Eff_Tick (); }  break;  // (100U) Реки Ботсваны
+      case EFF_LIGHTERS:            DYNAMIC_DELAY_TICK { effTimer = millis(); lightersRoutine();             Eff_Tick (); }  break;  // (101U) Светлячки
+      case EFF_LIGHTER_TRACES:      DYNAMIC_DELAY_TICK { effTimer = millis(); ballsRoutine();                Eff_Tick (); }  break;  // (102U) Светлячки со шлейфом
+      case EFF_FEATHER_CANDLE:      DYNAMIC_DELAY_TICK { effTimer = millis(); FeatherCandleRoutine();        Eff_Tick (); }  break;  // (103U) Свеча
+      case EFF_AURORA:              HIGH_DELAY_TICK { effTimer = millis(); polarRoutine();                   Eff_Tick (); }  break;  // (104U) Северное сияние
+      case EFF_SERPENTINE:          HIGH_DELAY_TICK { effTimer = millis(); Serpentine();                     Eff_Tick (); }  break;  // (105U) Серпантин
+      case EFF_SCANNER:             DYNAMIC_DELAY_TICK { effTimer = millis(); Scanner();                     Eff_Tick (); }  break;  // (106U) Сканер
+      case EFF_SINUSOID3:           HIGH_DELAY_TICK { effTimer = millis(); Sinusoid3Routine();               Eff_Tick (); }  break;  // (107U) Синусоид
+      case EFF_COLORS:              HIGH_DELAY_TICK { effTimer = millis(); colorsRoutine2();                 Eff_Tick (); }  break;  // (108U) Смена цвета
+      case EFF_SNOW:                DYNAMIC_DELAY_TICK { effTimer = millis(); Snowfall();                    Eff_Tick (); }  break;  // (109U) Снегопад
+      case EFF_SPECTRUM:            DYNAMIC_DELAY_TICK { effTimer = millis(); Spectrum();                    Eff_Tick (); }  break;  // (110U) Спектрум
+      case EFF_SPIRO:               LOW_DELAY_TICK { effTimer = millis(); spiroRoutine();                    Eff_Tick (); }  break;  // (111U) Спирали
+      case EFF_FLOCK:               LOW_DELAY_TICK { effTimer = millis(); flockRoutine(false);               Eff_Tick (); }  break;  // (112U) Стая
+      case EFF_FLOCK_N_PR:          LOW_DELAY_TICK { effTimer = millis(); flockRoutine(true);                Eff_Tick (); }  break;  // (113U) Стая и хищник
+      case EFF_ARROWS:              DYNAMIC_DELAY_TICK { effTimer = millis(); arrowsRoutine();               Eff_Tick (); }  break;  // (114U) Стрелки
+      case EFF_STROBE:              LOW_DELAY_TICK { effTimer = millis(); StrobeAndDiffusion();              Eff_Tick (); }  break;  // (115U) Строб.Хаос.Дифузия
+      case EFF_SHADOWS:             LOW_DELAY_TICK { effTimer = millis(); shadowsRoutine();                  Eff_Tick (); }  break;  // (116U) Тени
+      case EFF_PACIFIC:             LOW_DELAY_TICK { effTimer = millis(); pacificRoutine();                  Eff_Tick (); }  break;  // (117U) Тихий океан
+      case EFF_TORNADO:             LOW_DELAY_TICK { effTimer = millis(); Tornado();                         Eff_Tick (); }  break;  // (118U) Торнадо
+      case EFF_SIMPLE_RAIN:         DYNAMIC_DELAY_TICK { effTimer = millis(); simpleRain();                  Eff_Tick (); }  break;  // (119U) Tyчкa в банке
+      case EFF_FIREWORK:            SOFT_DELAY_TICK { effTimer = millis(); Firework();                       Eff_Tick (); }  break;  // (120U) Фейерверк
+      case EFF_FIREWORK_2:          DYNAMIC_DELAY_TICK { effTimer = millis(); fireworksRoutine();            Eff_Tick (); }  break;  // (121U) Фейерверк 2
+      case EFF_FAIRY:               DYNAMIC_DELAY_TICK { effTimer = millis(); fairyRoutine();                Eff_Tick (); }  break;  // (122U) Фея
+      case EFF_FONTAN:              DYNAMIC_DELAY_TICK { effTimer = millis(); Fountain();                    Eff_Tick (); }  break;  // (123U) Фонтан
+      case EFF_TRICOLOR:            LOW_DELAY_TICK { effTimer = millis(); FlagRoutine();                     Eff_Tick (); }  break;  // (124U) Флаг (Триколор)
+      case EFF_COLOR:               LOW_DELAY_TICK  { effTimer = millis(); colorRoutine();                   Eff_Tick (); }  break;  // (125U) Цвет
+      case EFF_COLORED_PYTHON:      LOW_DELAY_TICK { effTimer = millis(); Colored_Python();                  Eff_Tick (); }  break;  // (126U) Цветной Питон
+      case EFF_SAND:                DYNAMIC_DELAY_TICK { effTimer = millis(); sandRoutine();                 Eff_Tick (); }  break;  // (127U) Цветные драже
+      case EFF_COLOR_FRIZZLES:      SOFT_DELAY_TICK { effTimer = millis(); ColorFrizzles();                  Eff_Tick (); }  break;  // (128U) Цветные кудри
+      case EFF_LOTUS:               DYNAMIC_DELAY_TICK { effTimer = millis(); LotusFlower();                 Eff_Tick (); }  break;  // (129U) Цветок лотоса
+      case EFF_TURBULENCE:          DYNAMIC_DELAY_TICK { effTimer = millis(); Turbulence();                  Eff_Tick (); }  break;  // (130U) Цифровая турбулентность
+      case EFF_SPHERES:             LOW_DELAY_TICK { effTimer = millis(); spheresRoutine();                  Eff_Tick (); }  break;  // (131U) Шapы
+      case EFF_NEXUS:               LOW_DELAY_TICK { effTimer = millis(); nexusRoutine();                    Eff_Tick (); }  break;  // (132U) Nexus
+      case EFF_COLOR_FADED:         LOW_DELAY_TICK { effTimer = millis(); colorFaded();                      Eff_Tick (); }  break;  // (133U) Цвет с затуханием
+      case EFF_CLOCK:               DYNAMIC_DELAY_TICK { effTimer = millis(); clockRoutine(); effectDrawn = true; Eff_Tick (); } break;  // (134U) Часы
+
     } // switch
   } // if (ONflag)
 
@@ -205,22 +258,23 @@ void effectsTick() {
 
 // ----------------------------------------------------------------------------------------
 void changePower() {
-  static uint32_t lastPowerChangeMs = 0;
-  uint32_t nowMs = millis();
-  if (nowMs - lastPowerChangeMs < 500UL) {
-    return;
-  }
-  
-  lastPowerChangeMs = nowMs;
+#if EFF_LOG
+  SYSLOG.add("CP: start, millis=%u, ONflag=%d", millis(), ONflag);
+#endif
   systemShuttingDown = true;
-  
+#if EFF_LOG
+  SYSLOG.add("CP: systemShuttingDown=true, millis=%u", millis());
+#endif
   uint8_t targetBrightness;
   if (currentMode == EFF_CLOCK && nightModeBrightness > 0) {
     targetBrightness = nightModeBrightness;
   } else {
     targetBrightness = modes[currentMode].Brightness;
   }
-  
+#if EFF_LOG
+  SYSLOG.add("CP: targetBrightness=%d, millis=%u", targetBrightness, millis());
+#endif
+
   if (AutoBrightness && !day_night) {
     targetBrightness = constrain(targetBrightness >> AutoBrightness, 1, 100);
   }
@@ -260,7 +314,7 @@ void changePower() {
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
     digitalWrite(MOSFET_PIN, MOSFET_LEVEL);
 #endif
-    
+
     justPoweredOn = true;
     loadingFlag = true;
 #if LED_PANEL
@@ -279,17 +333,26 @@ void changePower() {
 
 #if USE_MP3_PLAYER
     if (mp3Enabled && eff_sound_on && mp3_player_connect == 4) {
-        mp3_folder = effects_folders[currentMode];
-        play_sound();
+      mp3_folder = effects_folders[currentMode];
+      play_sound();
     }
 #endif
 
     systemShuttingDown = false;
     effectsTick();
     FastLED.show();
-    
+
   } // if (ONflag) {
   else { // выключение
+    if (leds != nullptr) {
+      FastLED.setBrightness(0);
+      FastLED.clear();
+      FastLED.show();
+    }
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+
     timeout_save_file_changes = 0;
     save_file_changes = 0;
     manualOverride = true;
@@ -297,19 +360,13 @@ void changePower() {
 
 #if USE_MP3_PLAYER
     if (mp3Enabled && mp3_player_connect == 4) {
-        send_command(0x0E, FEEDBACK, 0, 0);
-        delay(50);
-        mp3_stop = true;
-        pause_on = true;
+      send_command(0x0E, FEEDBACK, 0, 0);
+      delay(50);
+      mp3_stop = true;
+      pause_on = true;
     }
 #endif
 
-    if (leds != nullptr) {
-      FastLED.setBrightness(0);
-      FastLED.clear();
-      FastLED.show();
-    }
-    
 #if USE_DAWN
     dawnFlag = 0;
 #endif
@@ -317,10 +374,6 @@ void changePower() {
     sunsetFlag = 0;
 #endif
     Favorites::instance().FavoritesRunning = false;
-
-#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
-    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
-#endif
 
     justPoweredOn = false;
     loadingFlag = false;
@@ -351,7 +404,7 @@ void Eff_Tick() {
     FastLED.show();
     return;
   }
-   if (currentMode == EFF_CLOCK && nightModeBrightness > 0) {
+  if (currentMode == EFF_CLOCK && nightModeBrightness > 0) {
     FastLED.setBrightness(nightModeBrightness);
   }
   uint32_t now = millis();
@@ -372,26 +425,26 @@ void Eff_Tick() {
 
     }
   }
-  
-// -------------------------------------------
-// мигание точек в дате и двоеточий в часах
+
+  // -------------------------------------------
+  // мигание точек в дате и двоеточий в часах
   static uint32_t lastBlinkTimer = 0;
   if (now - lastBlinkTimer >= 20) {
     lastBlinkTimer = now;
 
     if (nightModeBrightness > 0) {
-        // в ночном режиме точки в дате и знак ° в погоде не мигают
-        globalPointBrightness = 255;
-        globalDegBrightness = 255;
+      // в ночном режиме точки в дате и знак ° в погоде не мигают
+      globalPointBrightness = 255;
+      globalDegBrightness = 255;
     } else {
-        // обычный режим (мигание в зависимости от чекбоксов)
-        uint32_t phaseLong = now % 2000UL;
-        uint8_t brLong = (phaseLong < 1000) ? map(phaseLong, 0, 1000, 10, 255) : map(phaseLong - 1000, 0, 1000, 255, 10);
-        
-        globalPointBrightness = dateSeparatorBlinking ? brLong : 255;
-        
+      // обычный режим (мигание в зависимости от чекбоксов)
+      uint32_t phaseLong = now % 2000UL;
+      uint8_t brLong = (phaseLong < 1000) ? map(phaseLong, 0, 1000, 10, 255) : map(phaseLong - 1000, 0, 1000, 255, 10);
+
+      globalPointBrightness = dateSeparatorBlinking ? brLong : 255;
+
 #if USE_WEATHER
-        globalDegBrightness = degreeSymbolBlinking ? brLong : 255;
+      globalDegBrightness = degreeSymbolBlinking ? brLong : 255;
 #endif
     }
 
@@ -404,10 +457,12 @@ void Eff_Tick() {
     else brColon = map(phaseColon - 750, 0, 250, 0, 255);
     globalColonBrightness = brColon;
   }
-// -------------------------------------------
+  // -------------------------------------------
 
 #if LED_PANEL
-  led_panel(textIsRunning);
+  if (currentMode != EFF_SD) {
+    led_panel(textIsRunning);
+  }
 #endif
 
   // пропуск эффектов, когда бегущая строка в полноэкранном режиме

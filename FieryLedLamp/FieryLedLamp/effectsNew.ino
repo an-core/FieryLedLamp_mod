@@ -2872,7 +2872,7 @@ void draw(bool setup) {
     }
     drawCircle(circles[i]);
   }
- }
+}
 } // namespace Circles
 
 // ==============
@@ -3934,6 +3934,382 @@ void meteorRoutine() {
     uint8_t sy = y + random(-3, 4);
     if (sx < matrixWidth && sy < matrixHeight) {
       leds[XY(sx, sy)] = CRGB(255, 220, 100);
+    }
+  }
+}
+
+// ====================================================================== ЭФФЕКТ ЗЕМЛЯ ================================================================
+// @ Wa1den
+// ===============
+
+// коды карты: 0 - океан, 1 - суша, 2 - пустыня/степь, 3 - лёд
+static const uint8_t earthMap[16][16] PROGMEM = {
+  {3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}, // Арктика
+  {1, 1, 1, 1, 1, 3, 3, 0, 1, 1, 1, 1, 1, 1, 1, 1}, // тундра, Гренландия
+  {1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0}, // Аляска, Канада, Скандинавия, Сибирь
+  {0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0}, // юг Канады, Европа, Россия
+  {0, 0, 1, 1, 1, 0, 0, 0, 1, 2, 2, 2, 1, 1, 0, 0}, // США, Средиземноморье, Средняя Азия, Китай
+  {0, 0, 2, 1, 0, 0, 0, 2, 2, 2, 2, 1, 1, 1, 0, 0}, // Мексика, Сахара, Аравия, Индия
+  {0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 2, 1, 1, 1, 0, 0}, // Центральная Америка, Сахель, Индокитай
+  {0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0}, // Амазонка, Конго, Индонезия
+  {0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0}, // Бразилия, Конго, Индонезия
+  {0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0}, // Бразилия, юг Африки, север Австралии
+  {0, 0, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 2, 2, 0}, // Аргентина, ЮАР, Австралия
+  {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}, // Патагония, юг Австралии, Новая Зеландия
+  {0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Патагония
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, // Южный океан
+  {3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}, // Антарктида
+  {3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3}  // Антарктида
+};
+static const CRGB earthColors[4] = {CRGB(2U, 10U, 60U), CRGB(14U, 90U, 22U), CRGB(120U, 92U, 26U), CRGB(60U, 70U, 88U)};
+static const CRGB earthNightColors[4] = {CRGB(3U, 10U, 50U), CRGB(12U, 30U, 10U), CRGB(30U, 24U, 8U), CRGB(30U, 34U, 44U)};
+
+void earthRoutine() {
+  static uint16_t earthRot = 0U;
+
+  if (loadingFlag) {
+#if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
+    if (selectedSettings) {
+      setModeSettings(20U + random8(81U), 60U + random8(160U));
+    }
+#endif
+    loadingFlag = false;
+  }
+
+  earthRot += modes[currentMode].Speed;
+
+  uint8_t dayFactor[16];
+  if (timeSynched) {
+    uint32_t ms = millis();
+    uint32_t dayMs = 86400000UL; // 24 часа в миллисекундах
+    uint32_t utcSec = (ms / 1000) % 86400UL; // просто моделируем сутки с момента включения
+    uint16_t sunA = (uint16_t)(((129600UL - utcSec) % 86400UL) * 32768UL / 43200UL) + 32768U;
+    for (uint8_t c = 0U; c < 16U; c++) {
+        uint16_t colA = (uint16_t)c * 4096U + 2048U;
+        int32_t cs = cos16((uint16_t)(colA - sunA));
+        dayFactor[c] = constrain(40 + cs / 128, 0, 255);
+    }
+} else {
+    memset(dayFactor, 255, sizeof(dayFactor));
+}
+
+  CRGB nightPal[4];
+  uint8_t nightScale = (uint16_t)modes[currentMode].Scale * 255U / 100U;
+  for (uint8_t i = 0U; i < 4U; i++) {
+    nightPal[i] = earthNightColors[i];
+    nightPal[i].nscale8_video(nightScale);
+  }
+
+  for (uint8_t x = 0U; x < matrixWidth; x++) {
+    uint16_t a = (uint16_t)((uint32_t)x * 65536UL / matrixWidth) + earthRot;
+    uint8_t c0 = a >> 12;
+    uint8_t c1 = (c0 + 1U) & 0x0F;
+    uint8_t frac = (a >> 4) & 0xFF;
+
+    for (uint8_t y = 0U; y < matrixHeight; y++) {
+      uint8_t my = 15U - (uint16_t)y * 16U / matrixHeight;
+      uint8_t m0 = pgm_read_byte(&earthMap[my][c0]);
+      uint8_t m1 = pgm_read_byte(&earthMap[my][c1]);
+      CRGB day = blend(earthColors[m0], earthColors[m1], frac);
+      CRGB night = blend(nightPal[m0], nightPal[m1], frac);
+      drawPixelXY(x, y, blend(night, day, lerp8by8(dayFactor[c0], dayFactor[c1], frac)));
+    }
+  }
+}
+
+// ===================================================================== ЭФФЕКТ ЗМЕЙКА ================================================================
+// @ Wa1den
+// ===============
+
+#define MAX_SNAKE_LENGTH 1024
+
+void snakeGameRoutine() {
+  static uint8_t snakeX[MAX_SNAKE_LENGTH]; // тело змейки, индекс 0 - голова
+  static uint8_t snakeY[MAX_SNAKE_LENGTH];
+  static uint16_t snakeLen;
+  static int8_t dirX, dirY; // текущее направление движения
+  static uint8_t foodX, foodY;
+  static uint8_t blinkPhase;  // >0 - мигание после конца игры/победы
+  static uint8_t framePulse = 0; // фаза пульсации еды
+
+  if (loadingFlag) {
+#if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
+    if (selectedSettings) {
+      setModeSettings(1U + random8(100U), 150U + random8(90U));
+    }
+#endif
+    loadingFlag = false;
+    blinkPhase = 1U; // старт через ветку перезапуска ниже
+  }
+
+  framePulse += 12U;
+
+  // мигание в конце игры и перезапуск
+  if (blinkPhase > 0U) {
+    blinkPhase--;
+    if (blinkPhase == 0U) { // новая партия: змейка из трёх точек в центре
+      snakeLen = 3U;
+      for (uint8_t i = 0U; i < 3U; i++) {
+        snakeX[i] = (matrixWidth / 2U - i + matrixWidth) % matrixWidth;
+        snakeY[i] = matrixHeight / 2U;
+      }
+      dirX = 1;
+      dirY = 0;
+
+      do { // еда на свободной клетке
+        foodX = random8(matrixWidth);
+        foodY = random8(matrixHeight);
+      } while (foodY == matrixHeight / 2U); // не на стартовой строке змейки
+    } else {
+      dimAll(0); // вместо ledsClear
+      if (blinkPhase & 0x01) { // мигаем телом через кадр
+        uint8_t hue = modes[currentMode].Scale * 2.55;
+        for (uint16_t i = 0U; i < snakeLen; i++) {
+          drawPixelXY(snakeX[i], snakeY[i], CHSV(hue, 255U, 255U));
+        }
+      }
+      return;
+    }
+  }
+
+  // выбор направления: вперёд / поворот налево / поворот направо (разворот на 180 запрещён)
+  int8_t candX[3] = {dirX, (int8_t) - dirY, dirY};
+  int8_t candY[3] = {dirY, dirX, (int8_t) - dirX};
+  int8_t bestDir = -1;
+  uint8_t bestDist = 255U;
+
+  for (uint8_t c = 0U; c < 3U; c++) {
+    uint8_t nx = (uint8_t)((snakeX[0] + candX[c] + matrixWidth) % matrixWidth); // горизонталь замкнута
+    int8_t nyRaw = (int8_t)snakeY[0] + candY[c];
+    if (nyRaw < 0 || nyRaw >= (int8_t)matrixHeight) { // вертикаль - стенки
+      continue;
+    }
+    uint8_t ny = (uint8_t)nyRaw;
+
+    bool occupied = false; // проверка на столкновение с телом
+    for (uint16_t i = 0U; i < snakeLen; i++) {
+      if (snakeX[i] == nx && snakeY[i] == ny) {
+        occupied = true;
+        break;
+      }
+    }
+    if (occupied) continue;
+
+    uint8_t dxRight = (uint8_t)((foodX - nx + matrixWidth) % matrixWidth);
+    uint8_t dxWrap = min(dxRight, (uint8_t)(matrixWidth - dxRight));
+    uint8_t dist = dxWrap + abs((int8_t)foodY - (int8_t)ny);
+    if (dist < bestDist) { // строгое "меньше": при равенстве побеждает движение прямо
+      bestDist = dist;
+      bestDir = c;
+    }
+  }
+
+  if (bestDir < 0) { // все направления заняты - врезались, конец партии
+    blinkPhase = 7U;
+    return;
+  }
+
+  dirX = candX[bestDir];
+  dirY = candY[bestDir];
+  uint8_t newX = (uint8_t)((snakeX[0] + dirX + matrixWidth) % matrixWidth);
+  uint8_t newY = (uint8_t)((int8_t)snakeY[0] + dirY);
+
+  bool ate = (newX == foodX && newY == foodY);
+  uint16_t shift = ate ? snakeLen : snakeLen - 1U; // при еде хвост не отбрасывается - змейка растёт
+  for (uint16_t i = shift; i > 0U; i--) {
+    snakeX[i] = snakeX[i - 1U];
+    snakeY[i] = snakeY[i - 1U];
+  }
+  snakeX[0] = newX;
+  snakeY[0] = newY;
+  if (ate) {
+    snakeLen++;
+    if (snakeLen >= (uint16_t)(matrixWidth * matrixHeight)) { // вся матрица заполнена - победа
+      blinkPhase = 7U;
+      return;
+    }
+
+    uint8_t tries = 0U;
+    bool occupied;
+    do { // новая еда на свободной клетке
+      foodX = random8(matrixWidth);
+      foodY = random8(matrixHeight);
+      occupied = false;
+      for (uint16_t i = 0U; i < snakeLen; i++) {
+        if (snakeX[i] == foodX && snakeY[i] == foodY) {
+          occupied = true;
+          break;
+        }
+      }
+    } while (occupied && ++tries < 200U);
+    if (occupied) {
+      for (uint8_t yy = 0U; yy < matrixHeight && occupied; yy++) {
+        for (uint8_t xx = 0U; xx < matrixWidth && occupied; xx++) {
+          occupied = false;
+          for (uint16_t i = 0U; i < snakeLen; i++) {
+            if (snakeX[i] == xx && snakeY[i] == yy) {
+              occupied = true;
+              break;
+            }
+          }
+          if (!occupied) {
+            foodX = xx;
+            foodY = yy;
+          }
+        }
+      }
+    }
+  }
+
+  dimAll(0); // вместо ledsClear
+  uint8_t hue = modes[currentMode].Scale * 2.55;
+  for (uint16_t i = 0U; i < snakeLen; i++) { // тело с затуханием к хвосту
+    uint8_t v = 255U - (uint16_t)i * 165U / snakeLen;
+    drawPixelXY(snakeX[i], snakeY[i], CHSV(hue, 255U, v));
+  }
+  drawPixelXY(foodX, foodY, CHSV(hue + 128U, 255U, 120U + (sin8(framePulse) >> 1)));
+}
+
+// ========================================================================== ЭФФЕКТ МАРИО ============================================================
+// @ Wa1den
+// ===============
+
+static const CRGB marioPalette[] = {CRGB::Black, CRGB(200U, 30U, 10U), CRGB(230U, 130U, 50U), CRGB(60U, 25U, 6U), CRGB(30U, 70U, 230U), CRGB(15U, 110U, 25U), CRGB(6U, 45U, 10U), CRGB(150U, 230U, 80U)};
+
+static const uint8_t marioSprite[3][8][7] PROGMEM = {
+  { {0, 0, 1, 1, 1, 1, 0}, {0, 1, 1, 1, 1, 1, 1}, {0, 3, 2, 2, 3, 2, 0}, {0, 3, 2, 2, 2, 2, 0}, {0, 1, 4, 4, 4, 1, 0}, {0, 0, 4, 4, 4, 0, 0}, {0, 4, 4, 0, 0, 4, 0}, {3, 3, 0, 0, 0, 3, 3} },
+  { {0, 0, 1, 1, 1, 1, 0}, {0, 1, 1, 1, 1, 1, 1}, {0, 3, 2, 2, 3, 2, 0}, {0, 3, 2, 2, 2, 2, 0}, {0, 1, 4, 4, 4, 1, 0}, {0, 0, 4, 4, 4, 0, 0}, {0, 0, 4, 4, 0, 0, 0}, {0, 0, 3, 3, 0, 0, 0} },
+  { {0, 0, 1, 1, 1, 1, 0}, {0, 1, 1, 1, 1, 1, 1}, {0, 3, 2, 2, 3, 2, 0}, {0, 3, 2, 2, 2, 2, 0}, {0, 1, 4, 4, 4, 1, 0}, {0, 0, 4, 4, 4, 0, 0}, {0, 4, 4, 0, 4, 4, 0}, {3, 3, 0, 0, 0, 3, 3} }
+};
+
+static const uint8_t goombaSprite[2][3][3] PROGMEM = {
+  { {5, 5, 5}, {7, 5, 7}, {6, 0, 6} },
+  { {5, 5, 5}, {7, 5, 7}, {0, 6, 0} }
+};
+
+void marioDrawPix(int16_t x, int16_t y, CRGB color) {
+  drawPixelXY((int8_t)(((x % (int16_t)matrixWidth) + matrixWidth) % matrixWidth), (int8_t)y, color);
+}
+
+#define MARIO_PARTICLES (8U)
+
+void marioRoutine() {
+  static float obsX;
+  static float groundShift;
+  static uint8_t obsType;
+  static uint8_t brokenIdx;
+  static float partX[MARIO_PARTICLES], partY[MARIO_PARTICLES];
+  static float partVX[MARIO_PARTICLES], partVY[MARIO_PARTICLES];
+  static uint8_t partLife[MARIO_PARTICLES];
+
+  if (loadingFlag) {
+#if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
+    if (selectedSettings) {
+      setModeSettings(10U + random8(81U), 60U + random8(160U));
+    }
+#endif
+    loadingFlag = false;
+    obsX = 16.0F + random8(16U);
+    obsType = random8(2U);
+    brokenIdx = 0xFF;
+    groundShift = 0.0F;
+    memset(partLife, 0, sizeof(partLife));
+  }
+
+  float scrollStep = (modes[currentMode].Speed + 4U) / 64.0F;
+  obsX -= scrollStep;
+  groundShift += scrollStep;
+  while (groundShift >= 4.0F) groundShift -= 4.0F;
+
+  if (obsX < -5.0F) {
+    obsX = 14.0F + random8(26U);
+    obsType = (random8(10U) < 4U) ? 0U : 1U;
+    brokenIdx = 0xFF;
+  }
+
+  uint8_t cx = (uint16_t)modes[currentMode].Scale * (matrixWidth - 1U) / 100U;
+
+  float jumpArc = 0.0F;
+  if (obsType == 0U) {
+    if (obsX < 5.5F && obsX > -2.5F) {
+      float p = (5.5F - obsX) / 8.0F;
+      jumpArc = 16.0F * p * (1.0F - p);
+    }
+  } else {
+    if (obsX < 8.5F && obsX > -5.0F) {
+      float p = (8.5F - obsX) / 13.0F;
+      if (p < 1.0F) jumpArc = 20.0F * p * (1.0F - p);
+    }
+  }
+  int8_t jumpOffset = (int8_t)(jumpArc + 0.5F);
+
+  if (obsType == 0U && brokenIdx == 0xFF && jumpOffset >= 4) {
+    brokenIdx = (obsX >= 1.5F) ? 0U : 1U;
+    float baseX = obsX + brokenIdx * 2U;
+    uint8_t spawned = 0U;
+    for (uint8_t i = 0U; i < MARIO_PARTICLES && spawned < 4U; i++) {
+      if (partLife[i] > 0U) continue;
+      uint8_t dx = spawned & 0x01;
+      uint8_t dy = spawned >> 1;
+      partX[i] = baseX + dx;
+      partY[i] = 12.0F + dy;
+      partVX[i] = (dx ? 0.35F : -0.35F) + (random8(40U) - 20) * 0.01F;
+      partVY[i] = 0.55F + dy * 0.35F + random8(20U) * 0.01F;
+      partLife[i] = 24U;
+      spawned++;
+    }
+  }
+
+  for (uint8_t i = 0U; i < MARIO_PARTICLES; i++) {
+    if (partLife[i] == 0U) continue;
+    partLife[i]--;
+    partX[i] += partVX[i] - scrollStep;
+    partY[i] += partVY[i];
+    partVY[i] -= 0.18F;
+    if (partY[i] < 0.5F) partLife[i] = 0U;
+  }
+
+  dimAll(0); // вместо ledsClear
+
+  uint8_t gs = (uint8_t)groundShift;
+  for (uint8_t x = 0U; x < matrixWidth; x++) {
+    drawPixelXY(x, 0U, (((x + gs) & 0x03) == 0U) ? CRGB(70U, 35U, 10U) : CRGB(14U, 7U, 2U));
+  }
+
+  if (obsX < 13.4F) {
+    int16_t ox = cx + (int16_t)floorf(obsX + 0.5F);
+    if (obsType == 0U) {
+      for (uint8_t b = 0U; b < 2U; b++) {
+        if (b == brokenIdx) continue;
+        CRGB c = b ? CRGB(140U, 60U, 16U) : CRGB(210U, 95U, 25U);
+        for (uint8_t dx = 0U; dx < 2U; dx++) {
+          marioDrawPix(ox + b * 2U + dx, 12, c);
+          marioDrawPix(ox + b * 2U + dx, 13, c);
+        }
+      }
+    } else {
+      uint8_t ef = (millis() / 160U) & 0x01;
+      for (uint8_t r = 0U; r < 3U; r++) {
+        for (uint8_t c = 0U; c < 3U; c++) {
+          uint8_t idx = pgm_read_byte(&goombaSprite[ef][r][c]);
+          if (idx) marioDrawPix(ox + c, 3 - r, marioPalette[idx]);
+        }
+      }
+    }
+  }
+
+  for (uint8_t i = 0U; i < MARIO_PARTICLES; i++) {
+    if (partLife[i] == 0U) continue;
+    CRGB c = CRGB(210U, 95U, 25U);
+    c.nscale8(partLife[i] * 10U);
+    marioDrawPix(cx + (int16_t)floorf(partX[i] + 0.5F), (int16_t)(partY[i] + 0.5F), c);
+  }
+
+  uint8_t frame = (jumpOffset > 0) ? 2U : ((millis() / 120U) & 0x01);
+  for (uint8_t r = 0U; r < 8U; r++) {
+    for (uint8_t c = 0U; c < 7U; c++) {
+      uint8_t idx = pgm_read_byte(&marioSprite[frame][r][c]);
+      if (idx) marioDrawPix(cx + c, 8 - r + jumpOffset, marioPalette[idx]);
     }
   }
 }

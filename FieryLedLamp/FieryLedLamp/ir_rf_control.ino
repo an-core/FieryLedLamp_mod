@@ -4,6 +4,7 @@
 
 // Вкл / Выкл лампы
 void IR_Power() {
+  #if USE_DAWN
   if (dawnFlag == 1) {
 #if USE_MP3_PLAYER
     if (mp3Enabled && alarm_sound_flag) {
@@ -24,11 +25,23 @@ void IR_Power() {
       changePower();
     }
     return;
-  } else {
+  } 
+  #endif // USE_DAWN
+
     ONflag = !ONflag;
-    jsonWrite(configSetup, "Power", ONflag);
-    saveConfig();
-    changePower(); // сначала надо выключать матрицу
+jsonWrite(configSetup, "Power", ONflag);
+
+if (!ONflag && leds != nullptr) {
+    FastLED.setBrightness(0);
+    FastLED.clear();
+    FastLED.show();
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+}
+
+saveConfig();
+changePower();
     if (!ONflag) {
       timeout_save_file_changes = millis() - SAVE_FILE_DELAY_TIMEOUT;
       if (!Favorites::instance().FavoritesRunning) Eeprom::instance().EepromPut(modes);
@@ -38,7 +51,6 @@ void IR_Power() {
       Eeprom::instance().EepromGet(modes);
       timeout_save_file_changes = millis();
       bitSet(save_file_changes, 0);
-    }
   }
   loadingFlag = true;
 
@@ -326,7 +338,11 @@ void Print_IP() {
   loadingFlag = true;
 
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
-  digitalWrite(MOSFET_PIN, ONflag || (dawnFlag == 1 && !manualOff) ? MOSFET_LEVEL : !MOSFET_LEVEL);
+  #if USE_DAWN
+    digitalWrite(MOSFET_PIN, ONflag || (dawnFlag == 1 && !manualOff) ? MOSFET_LEVEL : !MOSFET_LEVEL);
+  #else
+    digitalWrite(MOSFET_PIN, ONflag ? MOSFET_LEVEL : !MOSFET_LEVEL);
+  #endif // USE_DAWN
 #endif
 }
 

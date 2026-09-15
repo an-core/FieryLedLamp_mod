@@ -10,7 +10,7 @@ void loadLocalAuthSettings() {
     deserializeJson(doc, configSetup);
   }
   JsonObject configObj = doc.as<JsonObject>();
- 
+
   if (configObj.containsKey("local_auth")) {
     String val = configObj["local_auth"].as<String>();
     val.trim();
@@ -20,9 +20,9 @@ void loadLocalAuthSettings() {
     jsonWrite(configSetup, "local_auth", "0");
     configChanged = true;
   }
-  #if GENERAL_LOG
+#if GENERAL_LOG
   SYSLOG.add("Запрашивать пароль для редактора: %s", requirePasswordInLocalNetwork ? "да" : "нет");
-  #endif
+#endif
 }
 
 static const char* public_prefixes[] = {
@@ -183,8 +183,8 @@ bool handleFileRead(String path) {
 void handleFileUpload() {
   if (!requireFileManagerAuth(true)) return;
   if (HTTP.uri() != "/edit") return;
-  
-  #if USE_OTA
+
+#if USE_OTA
   if (Ota::instance().isOtaActive()) {
     HTTP.send(503, "text/plain", "OTA in progress, try later");
     return;
@@ -193,9 +193,12 @@ void handleFileUpload() {
 
   HTTPUpload& upload = HTTP.upload();
 
+  static String uploadPath;
+
   if (upload.status == UPLOAD_FILE_START) {
     String filename = upload.filename;
     if (!filename.startsWith("/")) filename = "/" + filename;
+
     if (filename.length() <= 1 || isDangerousPath(filename)) {
       HTTP.send(400, F("text/plain"), F("Invalid filename"));
       upload.status = UPLOAD_FILE_ABORTED;
@@ -207,15 +210,23 @@ void handleFileUpload() {
       upload.status = UPLOAD_FILE_ABORTED;
       return;
     }
+
     if (isForbiddenExtension(filename)) {
       HTTP.send(403, F("text/plain"), F("Forbidden file type"));
       upload.status = UPLOAD_FILE_ABORTED;
       return;
     }
 
-    fsUploadFile = LittleFS.open(filename, "w");
+    if (fsUploadFile) {
+      fsUploadFile.close();
+    }
+
+    uploadPath = filename;
+    fsUploadFile = LittleFS.open(uploadPath, "w");
+
     if (!fsUploadFile) {
       HTTP.send(500, F("text/plain"), F("Failed to create file"));
+      uploadPath = "";
       upload.status = UPLOAD_FILE_ABORTED;
     }
   }
@@ -231,17 +242,21 @@ void handleFileUpload() {
     } else {
       HTTP.send(500, F("text/plain"), F("Upload failed"));
     }
+    uploadPath = "";
   }
   else if (upload.status == UPLOAD_FILE_ABORTED) {
     if (fsUploadFile) {
       fsUploadFile.close();
-      LittleFS.remove(upload.filename);
+    }
+    if (uploadPath.length() > 0) {
+      LittleFS.remove(uploadPath);
+      uploadPath = "";
     }
   }
 }
 
 void handleJsonUpload() {
-  #if USE_OTA
+#if USE_OTA
   if (Ota::instance().isOtaActive()) {
     HTTP.send(503, "text/plain", "OTA in progress");
     return;
@@ -273,11 +288,118 @@ void handleJsonUpload() {
   }
 }
 
+bool removeRecursive(const String& path) {
+  bool isDir = false;
+
+  File f = LittleFS.open(path);
+
+  if (!f) return false;
+  isDir = f.isDirectory();
+  f.close();
+
+  if (!isDir) {
+    return LittleFS.remove(path);
+  }
+
+  File dir = LittleFS.open(path);
+
+  if (!dir || !dir.isDirectory()) {
+    if (dir) dir.close();
+    return false;
+  }
+
+  File entry = dir.openNextFile();
+  while (entry) {
+    String name = entry.name();
+    int lastSlash = name.lastIndexOf('/');
+    if (lastSlash >= 0) name = name.substring(lastSlash + 1);
+
+    String fullPath = path;
+    if (!fullPath.endsWith("/")) fullPath += "/";
+    fullPath += name;
+
+    bool entryIsDir = entry.isDirectory();
+    entry.close();
+
+    if (entryIsDir) {
+      removeRecursive(fullPath);
+    } else {
+      LittleFS.remove(fullPath);
+    }
+
+    dir.close();
+    dir = LittleFS.open(path);
+
+    if (!dir) break;
+    entry = dir.openNextFile();
+  }
+  dir.close();
+
+  String dirPath = path;
+  if (dirPath.endsWith("/")) dirPath = dirPath.substring(0, dirPath.length() - 1);
+
+  return LittleFS.rmdir(dirPath);
+}
+
+bool copyFile(const String& src, const String& dst) {
+  File s = LittleFS.open(src, "r");
+  File d = LittleFS.open(dst, "w");
+
+  if (!s || !d) {
+    if (s) s.close();
+    if (d) d.close();
+    return false;
+  }
+
+  uint8_t buf[512];
+  while (s.available()) {
+    size_t n = s.read(buf, sizeof(buf));
+    if (n == 0) break;
+    d.write(buf, n);
+  }
+  s.close();
+  d.close();
+  return true;
+}
+
+bool copyDirRecursive(const String& src, const String& dst) {
+  if (!LittleFS.mkdir(dst)) return false;
+  File dir = LittleFS.open(src);
+
+  if (!dir || !dir.isDirectory()) {
+    if (dir) dir.close();
+    return false;
+  }
+
+  File entry = dir.openNextFile();
+  while (entry) {
+    String name = entry.name();
+    int lastSlash = name.lastIndexOf('/');
+    if (lastSlash >= 0) name = name.substring(lastSlash + 1);
+
+    String srcEntry = src + "/" + name;
+    String dstEntry = dst + "/" + name;
+
+    bool isDir = entry.isDirectory();
+    entry.close();
+
+    if (isDir) {
+      copyDirRecursive(srcEntry, dstEntry);
+    } else {
+      copyFile(srcEntry, dstEntry);
+    }
+
+    entry = dir.openNextFile();
+  }
+  dir.close();
+  return true;
+}
+
 void handleFileDelete() {
   if (!requireFileManagerAuth(true)) return;
   if (HTTP.args() == 0) return HTTP.send(500, F("text/plain"), F("BAD ARGS"));
-  
-  #if USE_OTA
+
+#if USE_OTA
   if (Ota::instance().isOtaActive()) {
     HTTP.send(503, "text/plain", "OTA in progress");
     return;
@@ -299,11 +421,21 @@ void handleFileDelete() {
     return HTTP.send(403, F("text/plain"), F("Protected file"));
   }
 
-  if (!LittleFS.exists(path)) {
+  bool isDir = path.endsWith("/");
+  String cleanPath = isDir ? path.substring(0, path.length() - 1) : path;
+
+  if (!LittleFS.exists(cleanPath)) {
     return HTTP.send(404, F("text/plain"), F("FileNotFound"));
   }
 
-  if (LittleFS.remove(path)) {
+  bool ok = false;
+  if (isDir) {
+    ok = removeRecursive(cleanPath);
+  } else {
+    ok = LittleFS.remove(cleanPath);
+  }
+
+  if (ok) {
     HTTP.send(200, F("text/plain"), F("Deleted"));
   } else {
     HTTP.send(500, F("text/plain"), F("Delete failed"));
@@ -316,7 +448,7 @@ void handleFileCreate() {
     return HTTP.send(500, F("text/plain"), F("BAD ARGS"));
   }
 
-  #if USE_OTA
+#if USE_OTA
   if (Ota::instance().isOtaActive()) {
     HTTP.send(503, "text/plain", "OTA in progress");
     return;
@@ -338,10 +470,23 @@ void handleFileCreate() {
     return HTTP.send(403, F("text/plain"), F("Protected path"));
   }
 
+  if (path.endsWith("/")) {
+    String dirPath = path.substring(0, path.length() - 1);
+
+    if (LittleFS.exists(dirPath)) {
+      return HTTP.send(409, F("text/plain"), F("Directory already exists"));
+    }
+    if (LittleFS.mkdir(dirPath)) {
+      HTTP.send(200, F("text/plain"), F("Directory created"));
+    } else {
+      HTTP.send(500, F("text/plain"), F("Directory create failed"));
+    }
+    return;
+  }
+
   if (LittleFS.exists(path)) {
     return HTTP.send(409, F("text/plain"), F("File already exists"));
   }
-
   File file = LittleFS.open(path, "w");
   if (file) {
     file.close();

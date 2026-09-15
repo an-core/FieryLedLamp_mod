@@ -11,12 +11,90 @@
 void User_settings() {
 
   // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
   HTTP.on("/get_settings", HTTP_GET, []() {
     DynamicJsonDocument doc(4096);
     deserializeJson(doc, configSetup);
     String output;
     serializeJson(doc, output);
     HTTP.send(200, "application/json", output);
+  });
+
+  HTTP.on("/rename", HTTP_POST, []() {
+    if (!requireFileManagerAuth(true)) return;
+
+    if (!HTTP.hasArg("old") || !HTTP.hasArg("new")) {
+      HTTP.send(400, "text/plain", "Missing old or new path");
+      return;
+    }
+
+    String oldPath = HTTP.arg("old");
+    String newPath = HTTP.arg("new");
+    oldPath.trim();
+    newPath.trim();
+
+    if (oldPath.length() == 0 || newPath.length() == 0) {
+      HTTP.send(400, "text/plain", "Empty path");
+      return;
+    }
+
+    if (!oldPath.startsWith("/")) oldPath = "/" + oldPath;
+    if (!newPath.startsWith("/")) newPath = "/" + newPath;
+
+    if (isDangerousPath(oldPath) || isDangerousPath(newPath)) {
+      HTTP.send(400, "text/plain", "Invalid path");
+      return;
+    }
+
+    bool isDir = oldPath.endsWith("/");
+    String cleanOld = isDir ? oldPath.substring(0, oldPath.length() - 1) : oldPath;
+    String cleanNew = newPath.endsWith("/") ? newPath.substring(0, newPath.length() - 1) : newPath;
+
+    // --- рантайм-выбор FS ---
+    auto fsExists = [](const String & p) -> bool {
+      return (sdType == 1) ? LittleFS.exists(p) : SD.exists(p);
+    };
+    auto fsRename = [](const String & a, const String & b) -> bool {
+      return (sdType == 1) ? LittleFS.rename(a, b) : SD.rename(a, b);
+    };
+    auto fsOpen = [](const String & p) -> File {
+      return (sdType == 1) ? LittleFS.open(p) : SD.open(p);
+    };
+
+    if (!fsExists(cleanOld)) {
+      HTTP.send(404, "text/plain", "Source not found");
+      return;
+    }
+    if (fsExists(cleanNew)) {
+      HTTP.send(409, "text/plain", "Destination already exists");
+      return;
+    }
+
+    bool ok = false;
+
+    if (isDir) {
+      File f = fsOpen(cleanOld);
+      bool oldIsDir = f && f.isDirectory();
+      if (f) f.close();
+
+      if (oldIsDir) {
+        if (copyDirRecursive(cleanOld, cleanNew)) {
+          ok = removeRecursive(cleanOld);
+        } else {
+          ok = false;
+        }
+      } else {
+        ok = fsRename(cleanOld, cleanNew);
+      }
+    } else {
+      ok = fsRename(cleanOld, cleanNew);
+    }
+
+    if (ok) {
+      HTTP.send(200, "text/plain", "Renamed");
+    } else {
+      HTTP.send(500, "text/plain", "Rename failed");
+    }
   });
 
   // ----------------------------------------------------------------------------------------------------------------------------------------------------
@@ -26,6 +104,7 @@ void User_settings() {
   HTTP.on("/lang", handle_lang);                             // Язык
 
   // ------------------------------------------------------------ РЕГУЛИРОВКА НАСТРОЕК ЭФФЕКТОВ ---------------------------------------------------------
+
   HTTP.on("/all_br", handle_all_br);                         // Общая яркость всех эффектов
   HTTP.on("/br", handle_br);                                 // Яркость эффекта
   HTTP.on("/brm", handle_brm);                               // Уменьшение яркости (-1)
@@ -37,6 +116,7 @@ void User_settings() {
   HTTP.on("/scm", handle_scm);                               // Уменьшение масштаба (-1)
   HTTP.on("/scp", handle_scp);                               // Увеличение масштаба (+1)
   HTTP.on("/auto_bri", handle_auto_bri);                     // Автояркость по времени суток
+  HTTP.on("/eff_sel", handle_eff_sel);                       // Выбор эффекта из списка
   HTTP.on("/eff", handle_eff);                               // Следующий / Предыдущий эффект
   HTTP.on("/eff_all", handle_eff_all);                       // Выбрать все
   HTTP.on("/eff_clr", handle_eff_clr);                       // Сбросить выбор
@@ -48,7 +128,15 @@ void User_settings() {
   HTTP.on("/favorit", handle_favorit);                       // Включить / Выключить переход кнопкой только по эффектам из избранного
   HTTP.on("/random_on", handle_random);                      // Случайные настройки эффектов в режиме цикл
   HTTP.on("/effect_always", handle_effect_always);           // Не возобновлять эффекты после обесточивания лампы
-  HTTP.on("/eff_sel", handle_eff_sel);                       // Выбор эффекта из списка
+
+  // -------------------------------------------------------------------------- ЦИКЛ --------------------------------------------------------------------
+
+  HTTP.on("/cycle_on", handle_cycle_on);             // Вкл/Выкл режим Цикл
+  HTTP.on("/rnd_cycle", handle_rnd_cycle);           // Перемешивать или по порядку
+  HTTP.on("/cycle_always", handle_cycle_always);     // Запускать цикл после включения
+  HTTP.on("/cycle_set", handle_cycle_set);           // Выбор эффектов для цикла
+
+  // ------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ В ВЭБ-ИНТЕРФЕЙС -----------------------------------------------
 
   HTTP.on("/button_enable", handle_button_enable);
   HTTP.on("/ir_enable", handle_ir_enable);
@@ -56,6 +144,8 @@ void User_settings() {
   HTTP.on("/tm1637_enable", handle_tm1637_enable);
   HTTP.on("/st7789_enable", handle_st7789_enable);
   HTTP.on("/mp3_enable", handle_mp3_enable);
+  HTTP.on("/sd_enable", handle_sd_enable);
+  HTTP.on("/sd_type", handle_sd_type);
 
   HTTP.on("/get_module_states", HTTP_GET, []() {
     DynamicJsonDocument doc(256);
@@ -65,14 +155,18 @@ void User_settings() {
     doc["tm1637_enable"] = tm1637Enabled ? "1" : "0";
     doc["st7789_enable"] = st7789Enabled ? "1" : "0";
     doc["mp3_enable"] = mp3Enabled ? "1" : "0";
+    doc["sd_enable"] = sdEnabled ? "1" : "0";
+    doc["sd_type"] = String(sdType);
     String response;
     serializeJson(doc, response);
     HTTP.send(200, "application/json", response);
   });
 
+  // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
 #if USE_BUTTON
-  HTTP.on("/button_type", handle_button_type);               // Сенсорная / механическая кнопка
-  HTTP.on("/save_btn_clicks", handle_save_btn_clicks);       // Настройки действий по количеству нажатий на кнопку
+  HTTP.on("/button_type", handle_button_type);         // Сенсорная / механическая кнопка
+  HTTP.on("/save_btn_clicks", handle_save_btn_clicks); // Настройки действий по количеству нажатий на кнопку
 #endif
 
 #if USE_SUNSET
@@ -96,13 +190,8 @@ void User_settings() {
   });
 #endif
 
-  // -------------------------------------------------------------------------- ЦИКЛ --------------------------------------------------------------------
-  HTTP.on("/cycle_on", handle_cycle_on);             // Вкл/Выкл режим Цикл
-  HTTP.on("/rnd_cycle", handle_rnd_cycle);           // Перемешивать или по порядку
-  HTTP.on("/cycle_always", handle_cycle_always);     // Запускать цикл после включения
-  HTTP.on("/cycle_set", handle_cycle_set);           // Выбор эффектов для цикла
-
   // -------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
+
 #if USE_MULTILAMP
   HTTP.on("/multi", HTTP_GET, handle_multiple_lamp);
   HTTP.on("/config_multilamp.json", HTTP_GET, []() {
@@ -119,6 +208,7 @@ void User_settings() {
   });
 
   // --------------------------------------------------------------------- ДИСПЛЕЙ ST7789 ---------------------------------------------------------------
+
 #if USE_ST7789
   HTTP.on("/tft_clock_color", handle_tft_clock_color);
   HTTP.on("/tft_weather_color", handle_tft_weather_color);
@@ -132,21 +222,8 @@ void User_settings() {
   HTTP.on("/tft_date_color", HTTP_GET, handle_tft_date_color);
 #endif
 
-  // --------------------------------------------------------------------- ЭФФЕКТЫ С SD -----------------------------------------------------------------
-#if USE_SD && !FS_AS_SD
-  HTTP.on("/list_out_files", handle_list_out_files);       // список всех .out файлов
-  HTTP.on("/out_file", handle_out_file);                   // выбор и активация .out файла
-#else
-  // Заглушки, когда SD-карта отключена
-  HTTP.on("/list_out_files", []() {
-    HTTP.send(404, F("text/plain"), F("SD card not enabled"));
-  });
-  HTTP.on("/out_file", []() {
-    HTTP.send(404, F("text/plain"), F("SD card not enabled"));
-  });
-#endif
-
   // -------------------------------------------------------------------------- ВРЕМЯ -------------------------------------------------------------------
+
   HTTP.on("/save_brightness", handle_save_brightness);
   HTTP.on("/save_time", handle_save_time);
   HTTP.on("/night_time", handle_night_time);
@@ -678,7 +755,8 @@ void User_settings() {
     HTTP.send(200, "text/plain", rainbowClock ? "1" : "0");
   });
 
-  // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) -------------------------------------------------------
+  // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) --------------------------------------------------------
+
 #if USE_WEATHER
   HTTP.on("/print_weather", handle_print_weather); // Интервал вывода погоды
   HTTP.on("/run_weather_text_enabled", handle_run_weather_text_enabled); // Включение/выключение погоды бегущей строкой
@@ -895,7 +973,8 @@ void User_settings() {
   });
 #endif
 
-  // ------------------------------------------------------------------------ НАСТРОЙКИ МАТРИЦЫ ---------------------------------------------------------
+  // ------------------------------------------------------------------------ НАСТРОЙКИ МАТРИЦЫ ----------------------------------------------------------
+
   HTTP.on("/m_t", handle_matrix_tipe);
   HTTP.on("/m_o", handle_matrix_orientation);
 
@@ -1076,7 +1155,216 @@ void User_settings() {
     }
   });
 
-  // ------------------------------------------------------------------------- LED ПАНЕЛЬ ---------------------------------------------------------------
+  // --------------------------------------------------------------------- АНИМАЦИОННЫЕ ЭФФЕКТЫ ----------------------------------------------------------
+
+#if USE_ANIMATIONS
+  HTTP.on("/get_anim_list", HTTP_GET, []() {
+    DynamicJsonDocument doc(1024);
+    JsonArray array = doc.to<JsonArray>();
+
+    String list = animations_list;
+    if (list.length() == 0) {
+      HTTP.send(200, "application/json; charset=utf-8", "[]");
+      return;
+    }
+    int start = 0;
+    while (true) {
+      int comma = list.indexOf(',', start);
+      String item;
+      if (comma == -1) {
+        item = list.substring(start);
+        if (item.length() > 0) {
+          item.trim();
+          array.add(item);
+        }
+        break;
+      } else {
+        item = list.substring(start, comma);
+        if (item.length() > 0) {
+          item.trim();
+          array.add(item);
+        }
+        start = comma + 1;
+      }
+    }
+    String response;
+    serializeJson(doc, response);
+    HTTP.send(200, "application/json; charset=utf-8", response);
+  });
+
+  HTTP.on("/set_anim", HTTP_GET, []() {
+#if USE_SD
+    if (outFile) {
+      outFile.close();
+      outAnimationActive = false;
+    }
+#endif
+    outEffectActive = false;
+    if (!HTTP.hasArg("anim")) {
+      HTTP.send(400, "text/plain", "Missing anim parameter");
+      return;
+    }
+
+    int idx = HTTP.arg("anim").toInt();
+    if (idx < 0 || idx > max_image_num) {
+      HTTP.send(400, "text/plain", "Invalid animation index");
+      return;
+    }
+
+    uint8_t currentEffSel = jsonReadtoInt(configSetup, "eff_sel");
+    if (currentMode != EFF_ANIMATION) {
+      lastNonAnimSel = currentEffSel;
+    }
+
+    if (idx == 0) {
+      specialTextEffectParam = 1;
+    } else {
+      specialTextEffectParam = idx;
+    }
+
+    jsonWrite(configSetup, "anim_sel", idx);
+
+    if (currentMode != EFF_ANIMATION) {
+      currentMode = EFF_ANIMATION;
+      uint8_t ui_index = 0;
+      for (ui_index = 0; ui_index < MODE_AMOUNT; ui_index++) {
+        if (eff_num_correct[ui_index] == currentMode) break;
+      }
+      jsonWrite(configSetup, "eff_sel", ui_index);
+    }
+
+    loadingFlag = true;
+    saveConfig();
+
+    String response = "{\"anim_sel\":" + String(idx) + ",\"eff_sel\":0}";
+    HTTP.send(200, "application/json", response);
+
+#if USE_MULTILAMP
+    repeat_multiple_lamp_control = true;
+#endif
+#if USE_MQTT
+    if (Wifi::instance().isConnected()) {
+      Mqtt::instance().needToPublish = true;
+    }
+#endif
+  });
+
+#endif // USE_ANIMATIONS
+
+  // -------------------------------------------------------------------------- ЭФФЕКТЫ .out -------------------------------------------------------------
+
+#if USE_SD
+
+  HTTP.on("/list_sd", HTTP_GET, []() {
+    String path = "/";
+    if (HTTP.hasArg("dir")) path = HTTP.arg("dir");
+
+    auto openDir = [](const String & p) -> File {
+      if (sdType == 1) return LittleFS.open(p);
+      else             return SD.open(p);
+    };
+
+    File root = openDir(path);
+    if (!root || !root.isDirectory()) {
+      if (root) root.close();
+      HTTP.send(404, "text/plain", "SD dir not found: " + path);
+      return;
+    }
+
+    String output = "[";
+    File file = root.openNextFile();
+    bool first = true;
+    while (file) {
+      if (!first) output += ",";
+      first = false;
+      output += "{\"type\":\"";
+      output += file.isDirectory() ? "dir" : "file";
+      output += "\",\"name\":\"";
+      output += file.name();
+      output += "\"}";
+      file.close();
+      file = root.openNextFile();
+    }
+    root.close();
+    output += "]";
+    HTTP.send(200, "application/json", output);
+  });
+
+  HTTP.on("/list_out_files", handle_list_out_files);
+
+  HTTP.on("/set_out_effect", HTTP_GET, []() {
+    if (!HTTP.hasArg("file")) {
+      HTTP.send(400, "text/plain", "Missing file parameter");
+      return;
+    }
+    if (!ONflag) {
+      HTTP.send(403, "text/plain", "Lamp is off");
+      return;
+    }
+
+    String fileName = HTTP.arg("file");
+    String sizeFolder = String(matrixWidth) + "x" + String(matrixHeight);
+    String path = "/effects/" + sizeFolder + "/" + fileName;
+
+    if (!sdFileExists(path)) {
+      HTTP.send(404, "text/plain", "File not found");
+      return;
+    }
+
+    if (outFile) {
+      outFile.close();
+    }
+    outAnimationActive = false;
+
+    lastOutFileName = fileName;
+    currentMode = EFF_SD;
+
+    uint8_t currentEffSel = jsonReadtoInt(configSetup, "eff_sel");
+    if (currentMode != EFF_SD) {
+      jsonWrite(configSetup, "last_non_sd_eff_sel", currentEffSel);
+    }
+
+    jsonWrite(configSetup, "eff_sel", effSdIndex);
+    jsonWrite(configSetup, "out_sel", fileName);
+    jsonWrite(configSetup, "anim_sel", "0");
+
+    writeFile(F("config.json"), configSetup);
+
+    if (startOutAnimation(fileName)) {
+      outAnimationActive = true;
+      outEffectActive = true;
+      FastLED.show();
+#if EFF_LOG
+      SYSLOG.add("SET_OUT: file=%s, outFrameDelay=%u", fileName.c_str(), outFrameDelay);
+#endif
+      HTTP.send(200, "text/plain", "OK");
+    } else {
+      HTTP.send(500, "text/plain", "Failed to start");
+    }
+  });
+#else // !USE_SD
+  HTTP.on("/set_out_effect", []() {
+    HTTP.send(404, F("text/plain"), F("SD card not enabled"));
+  });
+#endif // USE_SD
+
+  HTTP.on("/get_eff_sd_index", HTTP_GET, []() {
+    HTTP.send(200, "text/plain", String(effSdIndex));
+  });
+
+  // --------------------------------------------------------------------
+  HTTP.on("/debug.log", HTTP_GET, []() {
+    File logFile = LittleFS.open("/debug.log", "r");
+    if (!logFile) {
+      HTTP.send(404, "text/plain", "Log file not found");
+      return;
+    }
+    HTTP.send(200, "text/plain", logFile.readString());
+    logFile.close();
+  });
+
+  // ------------------------------------------------------------------------- LED ПАНЕЛЬ ----------------------------------------------------------------
+
   // бегущая строка
 #if LED_PANEL
   HTTP.on("/spt", handle_spt);                             // Скорость бегущей строки
@@ -1194,7 +1482,8 @@ void User_settings() {
   HTTP.on("/interval_c_d", handle_interval_c_d);
 #endif // LED_PANEL
 
-  // ------------------------------------------------------------------------- МП3 ПЛЕЕР ----------------------------------------------------------------
+  // ------------------------------------------------------------------------- МП3 ПЛЕЕР -----------------------------------------------------------------
+
 #if USE_MP3_PLAYER
   HTTP.on("/save_sound_settings", HTTP_GET, handle_save_sound_settings);
   HTTP.on("/on_sound", handle_on_sound);
@@ -1256,6 +1545,7 @@ void User_settings() {
   });
 
   // ------------------------------------------------------------------ УПРАВЛЕНИЕ ИК ПУЛЬТАМИ ---------------------------------------------------------
+
 #if USE_IR_RECEIVER
   // список всех пультов
   HTTP.on("/api/ir/remotes", HTTP_GET, []() {
@@ -1367,9 +1657,10 @@ void User_settings() {
     serializeJson(doc, response);
     HTTP.send(200, "application/json; charset=utf-8", response);
   });
-#endif
+#endif // USE_IR_RECEIVER
 
-  // ------------------------------------------------------------------------- НАСТРОЙКА ШРИФТА ---------------------------------------------------------
+  // ----------------------------------------------------------------------- НАСТРОЙКА ШРИФТА ------------------------------------------------------------
+
   HTTP.on("/static_font", HTTP_GET, []() {
     if (!HTTP.hasArg("static_font")) {
       HTTP.send(400, "text/plain", "Missing static_font parameter");
@@ -1396,7 +1687,8 @@ void User_settings() {
     HTTP.send(200, "text/plain", "OK");
   });
 
-  // ------------------------------------------------------------- МОДАЛЬНЫЕ ОКНА МЕНЮ ВЭБ-ИНТЕРФЕЙСА ---------------------------------------------------
+  // -------------------------------------------------------------- МОДАЛЬНЫЕ ОКНА МЕНЮ ВЭБ-ИНТЕРФЕЙСА ---------------------------------------------------
+
 #if STATUS_DEVICE
   HTTP.on("/sd_status", HTTP_GET, handle_sd_status);
   HTTP.on("/ota_status", HTTP_GET, handle_ota_status);
@@ -1583,7 +1875,8 @@ void User_settings() {
 
 #endif // SOFT_INFO
 
-  // --------------------------------------------------------------------- СКРЫТИЕ ПУНКТОВ МЕНЮ ---------------------------------------------------------
+  // ---------------------------------------------------------------------- СКРЫТИЕ ПУНКТОВ МЕНЮ ---------------------------------------------------------
+
   HTTP.on("/features", HTTP_GET, []() {
     DynamicJsonDocument doc(512);
     doc["mqtt"]           = !!USE_MQTT;
@@ -1598,7 +1891,7 @@ void User_settings() {
     doc["rf"]             = !!USE_RF_RECEIVER;
     doc["weather"]        = !!USE_WEATHER;
     doc["multilamp"]      = !!USE_MULTILAMP;
-    doc["out_files"]      = (USE_SD && !FS_AS_SD);
+    doc["out_files"]      = (USE_SD && sdType == 0);
     doc["dawn"]           = !!USE_DAWN;
     doc["sunset"]         = !!USE_SUNSET;
     doc["schedule"]       = !!USE_SCHEDULE;
@@ -1609,14 +1902,19 @@ void User_settings() {
     doc["backup"]         = !!BACKUP_CFG_FILES;
     doc["logs"]           = !!DEBUG_ENABLED;
     doc["syslog"]         = !!DEBUG_ENABLED;
-    doc["hardware"]       = USE_BUTTON || USE_IR_RECEIVER || USE_RF_RECEIVER || USE_TM1637 || USE_ST7789 || USE_MP3_PLAYER;
+  #if defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)
+    doc["hardware_menu"] = true;
+  #else
+    doc["hardware_menu"] = false;
+  #endif
 
     String response;
     serializeJson(doc, response);
     HTTP.send(200, "application/json", response);
   });
 
-  // ----------------------------------------------------------------------- MQTT ПОДКЛЮЧЕНИЕ -----------------------------------------------------------
+  // ------------------------------------------------------------------------ MQTT ПОДКЛЮЧЕНИЕ -----------------------------------------------------------
+
 #if USE_MQTT
   HTTP.on("/mqtt_set", handle_mqtt_set);
   HTTP.on("/mqtt_on", handle_mqtt_on);
@@ -1637,8 +1935,8 @@ void User_settings() {
 #endif
   });
 
+  // ------------------------------------------------------------- ОБНОВЛЕНИЕ ПРОШИВКИ ПО ВОЗДУХУ (OTA) --------------------------------------------------
 
-  // ------------------------------------------------------------ ОБНОВЛЕНИЕ ПРОШИВКИ ПО ВОЗДУХУ (OTA) --------------------------------------------------
 #if USE_OTA
   // страница OTA ОБНОВЛЕНИЕ
   HTTP.on("/update", HTTP_GET, []() {
@@ -1738,7 +2036,7 @@ void User_settings() {
     }
   });
 
-  // Обновление файловой системы
+  // обновление файловой системы
   HTTP.on("/update_fs", HTTP_POST, []() {}, []() {
     static bool updateStarted = false;
     static uint32_t expectedSize = 0;
@@ -1832,7 +2130,8 @@ void User_settings() {
 
 #endif // USE_OTA
 
-  // --------------------------------------------------- ПЕРЕКЛЮЧЕНИЕ "ЧАСЫ / ПОГОДА" НА ДИСПЛЕЯХ TM1637 и ST7789 ---------------------------------------
+  // -------------------------------------------------- ПЕРЕКЛЮЧЕНИЕ "ЧАСЫ / ПОГОДА" НА ДИСПЛЕЯХ TM1637 и ST7789 -----------------------------------------
+
 #if (USE_TM1637 || USE_ST7789)
   HTTP.on("/save_display_switch", HTTP_GET, []() {
     int interval = HTTP.arg("value").toInt();
@@ -1853,7 +2152,8 @@ void User_settings() {
   });
 #endif
 
-  // ----------------------------------------------------------------------- ПАРОЛЬ ДЛЯ РЕДАКТОРА -------------------------------------------------------
+  // ---------------------------------------------------------------------- ПАРОЛЬ ДЛЯ РЕДАКТОРА ---------------------------------------------------------
+
   HTTP.on("/set_local_auth", HTTP_GET, []() {
     if (!HTTP.hasArg("value")) {
       HTTP.send(400, "text/plain", "Missing value");
@@ -1875,7 +2175,8 @@ void User_settings() {
     ESP.restart();
   });
 
-  // ---------------------------------------------------------------------------------- ДЕБАГ -----------------------------------------------------------
+  // ------------------------------------------------------------------------ СИСТЕМНЫЕ ЛОГИ -------------------------------------------------------------
+
 #if DEBUG_ENABLED
   // Чекбокс "Включить получение новых логов"
   HTTP.on("/set_syslog", HTTP_GET, []() {
@@ -1923,7 +2224,8 @@ void User_settings() {
   });
 #endif // DEBUG_ENABLED
 
-  // ------------------------------------------------------------------------ Wi-Fi ПОДКЛЮЧЕНИЕ ---------------------------------------------------------
+  // --------------------------------------------------------------------- Wi-Fi ПОДКЛЮЧЕНИЕ -------------------------------------------------------------
+
   HTTP.on("/ssdp", handle_ssdp); // Имя лампы
   HTTP.on("/save_wifi", HTTP_GET, handle_save_wifi);
   HTTP.on("/wifi_reconnect_interval", handle_wifi_reconnect_interval);
@@ -1966,6 +2268,7 @@ void handle_ssdp() {
 }
 
 // ----------------------------------------------------------------------------- WI-FI ----------------------------------------------------------------
+
 // Показывать точку доступа всегда
 void handle_ap_always() {
   if (!HTTP.hasArg("ap_always")) {
@@ -2108,6 +2411,7 @@ void handle_set_static_ip() {
 }
 
 // ----------------------------------------------------------------------- НАСТРОЙКИ КНОПКИ -----------------------------------------------------------
+
 #if USE_BUTTON
 void handle_button_type() {
   if (!HTTP.hasArg("button_type")) {
@@ -2177,6 +2481,7 @@ void handle_save_btn_clicks() {
 #endif // USE_BUTTON
 
 // ----------------------------------------------------------------------- НАСТРОЙКИ МП3 ПЛЕЕРА -------------------------------------------------------
+
 #if USE_MP3_PLAYER
 // Сохранение настроек
 void handle_save_sound_settings() {
@@ -3038,17 +3343,90 @@ void handle_scp() {
 #endif
 }
 
-void handle_eff_sel () {
-  uint8_t temp = (HTTP.arg("eff_sel").toInt());
+void handle_eff_sel() {
+  systemShuttingDown = false;
+#if USE_SD
+  if (outFile) {
+    outFile.close();
+    outAnimationActive = false;
+  }
+#endif
+  outEffectActive = false;
+
+  uint8_t temp = HTTP.arg("eff_sel").toInt();
+  uint8_t newMode = eff_num_correct[temp];
+
+#if USE_SD
+  if (newMode == EFF_SD) {
+    uint8_t sdIndex = 255;
+    for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+      if (eff_num_correct[i] == EFF_SD) {
+        sdIndex = i;
+        break;
+      }
+    }
+    if (sdIndex == 255) {
+      HTTP.send(500, "text/plain", "EFF_SD not in effect list");
+      return;
+    }
+
+    if (lastOutFileName.length() > 0 && startOutAnimation(lastOutFileName)) {
+      currentMode = EFF_SD;
+      jsonWrite(configSetup, "eff_sel", sdIndex);
+      jsonWrite(configSetup, "anim_sel", "0");
+      loadingFlag = false;
+      saveConfig();
+      HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+      return;
+    }
+
+#if EFF_LOG
+    SYSLOG.add("EFF_SD: no valid .out file, staying on previous mode");
+#endif
+    HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+    return;
+  }
+#endif
+
   jsonWrite(configSetup, "eff_sel", temp);
-  currentMode = eff_num_correct[temp];
+
+  specialTextEffectParam = -1;
+  jsonWrite(configSetup, "anim_sel", "0");
+
+#if USE_ANIMATIONS
+  if (newMode == EFF_ANIMATION) {
+    if (HTTP.hasArg("anim")) {
+      int animIdx = HTTP.arg("anim").toInt();
+      if (animIdx >= 1 && animIdx <= max_image_num) {
+        specialTextEffectParam = animIdx;
+        jsonWrite(configSetup, "anim_sel", animIdx);
+      } else {
+        if (specialTextEffectParam < 1 || specialTextEffectParam > max_image_num) {
+          specialTextEffectParam = 1;
+        }
+      }
+    } else {
+      if (specialTextEffectParam < 1 || specialTextEffectParam > max_image_num) {
+        int saved = jsonReadtoInt(configSetup, "anim_sel");
+        specialTextEffectParam = (saved >= 1 && saved <= max_image_num) ? saved : 1;
+      }
+    }
+  }
+#endif
+
+  currentMode = newMode;
+
+  SetBrightness(modes[currentMode].Brightness);
   jsonWrite(configSetup, "br", modes[currentMode].Brightness);
   jsonWrite(configSetup, "sp", modes[currentMode].Speed);
   jsonWrite(configSetup, "sc", modes[currentMode].Scale);
-  SetBrightness(modes[currentMode].Brightness);
+
   loadingFlag = true;
-  if (random_on && Favorites::instance().FavoritesRunning)
+
+  if (random_on && Favorites::instance().FavoritesRunning) {
     selectedSettings = 1U;
+  }
+
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {
     Mqtt::instance().needToPublish = true;
@@ -3057,13 +3435,17 @@ void handle_eff_sel () {
 #if USE_BLYNK
   updateRemoteBlynkParams();
 #endif
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+
+  saveConfig();
+
+  HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
 void handle_night_time() {
   String day_hour_str = HTTP.arg("day_time_hour");
   String day_min_str = HTTP.arg("day_time_minute");
@@ -3140,6 +3522,7 @@ void handle_night_time() {
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
 void handle_save_time() {
   String day_hour_str = HTTP.arg("day_time_hour");
   String day_min_str = HTTP.arg("day_time_minute");
@@ -3197,6 +3580,7 @@ void handle_save_time() {
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
 // Чекбокс "Включать лампу после обесточивания" (изменённая логика, было наоборот)
 void handle_effect_always () {
   int value = HTTP.arg("effect_always").toInt();
@@ -3207,6 +3591,7 @@ void handle_effect_always () {
 }
 
 // --------------------------------------------------------------------------- ИЗБРАННОЕ --------------------------------------------------------------
+
 void handle_favorit() {
   jsonWrite(configSetup, "favorit", HTTP.arg("favorit").toInt());
   timeout_save_file_changes = millis();
@@ -3223,7 +3608,8 @@ void handle_random() {
   HTTP.send(200, F("text/plain"), F("OK"));
 }
 
-// ----------------------------------------------------------------------- УПРАВЛЕНИЕ ПИТАНИЕМ --------------------------------------------------------
+// ----------------------------------------------------------------------- УПРАВЛЕНИЕ ПИТАНИЕМ ---------------------------------------------------------
+
 void handle_Power() {
   static uint32_t lastPowerCommandMs = 0;
   uint32_t nowMs = millis();
@@ -3274,11 +3660,15 @@ void handle_Power() {
     // ВЫКЛ лампы
     ONflag = false;
     jsonWrite(configSetup, "Power", ONflag);
-    saveConfig();
 
     FastLED.setBrightness(0);
     FastLED.clear();
     FastLED.show();
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+
+    saveConfig();
 
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
     digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
@@ -3317,6 +3707,16 @@ void handle_Power() {
 
   ONflag = requestedState;
   jsonWrite(configSetup, "Power", ONflag);
+
+  if (!ONflag && leds != nullptr) {
+    FastLED.setBrightness(0);
+    FastLED.clear();
+    FastLED.show();
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+  }
+
   saveConfig();
 
   if (wasOn && !ONflag) {
@@ -3330,7 +3730,6 @@ void handle_Power() {
   if (ONflag) {
     Eeprom::instance().EepromGet(modes);
     loadingFlag = true;
-    // пользовательская яркость для обычных часов
     if (currentMode == EFF_CLOCK && nightModeBrightness == 0) {
       uint8_t normalBrightness = userClockBrightness;
       if (normalBrightness < 2) normalBrightness = 30;
@@ -3339,6 +3738,7 @@ void handle_Power() {
     }
 
     changePower();
+
     timeout_save_file_changes = millis();
     bitSet(save_file_changes, 0);
   } else {
@@ -3358,7 +3758,8 @@ void handle_Power() {
 #endif
 }
 
-// ----------------------------------------------------------------------------- РАССВЕТ --------------------------------------------------------------
+// ----------------------------------------------------------------------------- РАССВЕТ ---------------------------------------------------------------
+
 #if USE_DAWN
 bool firstStartAlarm = true;
 void handle_alarm() {
@@ -3445,72 +3846,12 @@ void handle_alarm() {
   HTTP.send(200, F("application/json"), F("{\"should_refresh\":\"true\"}"));
 }
 
-void save_alarms() {
-  if (configAlarm.isEmpty()) configAlarm = "{}";
-
-  bool changed = false;
-
-  for (uint8_t i = 0; i < 7; i++) {
-    char idx[2];
-    itoa(i + 1, idx, 10);
-
-    String key_a = "a" + String(idx);
-    String key_h = "h" + String(idx);
-    String key_m = "m" + String(idx);
-
-    uint8_t currentState = jsonReadtoInt(configAlarm, key_a);
-    uint8_t currentHours = jsonReadtoInt(configAlarm, key_h);
-    uint8_t currentMins  = jsonReadtoInt(configAlarm, key_m);
-    uint16_t currentTime = currentHours * 60 + currentMins;
-
-    if (alarms[i].State != currentState || alarms[i].Time != currentTime) {
-      changed = true;
-
-      jsonWrite(configAlarm, key_a, alarms[i].State);
-
-      char buf[3];
-      sprintf(buf, "%02d", alarms[i].Time / 60);
-      jsonWrite(configAlarm, key_h, String(buf));
-      sprintf(buf, "%02d", alarms[i]. Time % 60);
-      jsonWrite(configAlarm, key_m, String(buf));
-    }
-  }
-
-  if (dawnMode + 1 != jsonReadtoInt(configAlarm, "t")) {
-    jsonWrite(configAlarm, "t", dawnMode + 1);
-    changed = true;
-  }
-  if (DAWN_TIMEOUT != jsonReadtoInt(configAlarm, "after")) {
-    jsonWrite(configAlarm, "after", DAWN_TIMEOUT);
-    changed = true;
-  }
-  if (DAWN_BRIGHT != jsonReadtoInt(configAlarm, "a_br")) {
-    jsonWrite(configAlarm, "a_br", DAWN_BRIGHT);
-    changed = true;
-  }
-
-  if (changed) {
-    saveAlarmConfig(configAlarm);
-    configAlarm = readFile(F("config_alarm.json"), 2048);
-  }
-}
-
-void saveAlarmConfig(const String & data) {
-  File file = LittleFS.open(F("/config_alarm.json"), "w");
-  if (!file) {
-    return;
-  }
-  file.print(data);
-  file.flush();
-  delay(5);
-  file.close();
-}
 #endif // USE_DAWN
 
 // ------------------------------------------------------------------------------ ЗАКАТ ---------------------------------------------------------------
+
 #if USE_SUNSET
 bool firstStartSunset = true;
-
 void saveSunsetConfig(const String & data) {
   writeFile(F("config_sunset.json"), data);
 }
@@ -3595,55 +3936,10 @@ void handle_sunset() {
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-void save_sunsets() {
-  if (configSunset.isEmpty() || configSunset == "null") {
-    configSunset = "{}";
-  }
-
-  bool saveNeeded = false;
-
-  for (uint8_t i = 0; i < 7; i++) {
-    char idx[2];
-    itoa(i + 1, idx, 10);
-
-    String key_a = "a" + String(idx);
-    String key_h = "h" + String(idx);
-    String key_m = "m" + String(idx);
-
-    uint8_t currentState = jsonReadtoInt(configSunset, key_a);
-    uint8_t currentHour = jsonReadtoInt(configSunset, key_h);
-    uint8_t currentMin = jsonReadtoInt(configSunset, key_m);
-    uint16_t currentTime = currentHour * 60U + currentMin;
-
-    if (sunsets[i].State != currentState || sunsets[i].Time != currentTime) {
-      saveNeeded = true;
-      jsonWrite(configSunset, key_a, sunsets[i].State);
-      jsonWrite(configSunset, key_h, zeroPad(String(sunsets[i].Time / 60U), 2));
-      jsonWrite(configSunset, key_m, zeroPad(String(sunsets[i].Time % 60U), 2));
-    }
-
-    yield();
-  }
-
-  int8_t configMode = jsonReadtoInt(configSunset, "t") - 1;
-  if (sunsetMode != configMode) {
-    saveNeeded = true;
-    jsonWrite(configSunset, "t", (sunsetMode + 1));
-  }
-
-  if (SUNSET_BRIGHT != jsonReadtoInt(configSunset, "s_br")) {
-    saveNeeded = true;
-    jsonWrite(configSunset, "s_br", SUNSET_BRIGHT);
-  }
-
-  if (saveNeeded) {
-    writeFile(F("config_sunset.json"), configSunset);
-    configSunset = readFile(F("config_sunset.json"), 512);
-  }
-}
 #endif // USE_SUNSET
 
-// ----------------------------------------------------------------------------- РАСПИСАНИЕ -----------------------------------------------------------
+// ----------------------------------------------------------------------------- РАСПИСАНИЕ ------------------------------------------------------------
+
 #if USE_SCHEDULE
 void handle_schedule() {
   if (configSchedule.isEmpty() || configSchedule == "null") {
@@ -3770,80 +4066,10 @@ void handle_schedule() {
   serializeJson(resp, respStr);
   HTTP.send(200, "application/json", respStr);
 }
-
-// загрузка расписания
-void load_schedule() {
-  if (configSchedule.isEmpty() || configSchedule == "null") {
-    configSchedule = "{}";
-  }
-
-  for (uint8_t i = 0; i < MAX_SCHEDULE_ENTRIES; i++) {
-    schedule[i].State = 0;
-    schedule[i].Day = 0;
-    schedule[i].Time = 0;
-    schedule[i].Action = 0;
-    schedule[i].EffectNum = 255;
-  }
-
-  String enableStr = jsonRead(configSchedule, "schedule_enabled");
-  if (enableStr != "1") return;
-
-  uint8_t timerIndex = 0;
-
-  for (uint8_t slot = 1; slot <= 6 && timerIndex < MAX_SCHEDULE_ENTRIES; slot++) {
-    String aKey = "a" + String(slot);
-    String hKey = "h" + String(slot);
-    String mKey = "m" + String(slot);
-    String effKey = (slot == 3) ? "eff3" : "";
-
-    uint8_t action = jsonReadtoInt(configSchedule, aKey, 0);
-    if (action == 0) continue;
-
-    String hStr = jsonRead(configSchedule, hKey);
-    if (hStr == "" || hStr == "null") hStr = "00";
-    String mStr = jsonRead(configSchedule, mKey);
-    if (mStr == "" || mStr == "null") mStr = "00";
-
-    uint8_t hour = constrain(hStr.toInt(), 0, 23);
-    uint8_t minute = constrain(mStr.toInt(), 0, 59);
-    uint16_t timeInMinutes = hour * 60 + minute;
-
-    uint8_t effectNum = 255;
-
-    if (slot == 3 && action == 3) {
-      String effStr = jsonRead(configSchedule, effKey);
-      if (effStr != "" && effStr != "null") {
-        effectNum = constrain(effStr.toInt(), 0, MODE_AMOUNT - 1);
-      }
-    }
-
-    schedule[timerIndex].State = 1;
-    schedule[timerIndex].Day = 0;
-    schedule[timerIndex].Time = timeInMinutes;
-    schedule[timerIndex].Action = action;
-
-    if (slot == 3 && action == 3) {
-      // включить указанный эффект
-      schedule[timerIndex].EffectNum = effectNum;
-    } else if (slot == 5) {
-      // обычные часы
-      schedule[timerIndex].EffectNum = EFF_CLOCK;
-      schedule[timerIndex].Action = 4;
-    } else if (slot == 6) {
-      // ночные часы
-      schedule[timerIndex].EffectNum = EFF_CLOCK;
-      schedule[timerIndex].Action = 7;
-    } else {
-      schedule[timerIndex].EffectNum = 255;
-    }
-
-    timerIndex++;
-  }
-}
-
 #endif // USE_SCHEDULE
 
-// -------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
+// --------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
+
 #if USE_MULTILAMP
 void handle_multiple_lamp() {
   jsonWrite(configMultilamp, "ml1", HTTP.arg("ml1").toInt());
@@ -3982,9 +4208,19 @@ void multiple_lamp_control() {
 
 #endif // USE_MULTILAMP
 
-// ----------------------------------------------------------------------- РЕЖИМ ЦИКЛ -----------------------------------------------------------------
+// ------------------------------------------------------------------------ РЕЖИМ ЦИКЛ -----------------------------------------------------------------
+
 // Включение/выключение режима Цикл
 void handle_cycle_on() {
+  if (currentMode != EFF_SD) {
+#if USE_SD
+    if (outFile) {
+      outFile.close();
+      outAnimationActive = false;
+    }
+#endif
+    outEffectActive = false;
+  }
   uint8_t tmp;
   tmp = HTTP.arg("cycle_on").toInt();
   if (tmp == 2) tmp = (jsonReadtoInt(configSetup, "cycle_on") == 0) ? 1 : 0;
@@ -4087,6 +4323,15 @@ void cycle_get () {
 
 // Выбрать эффекты
 void handle_eff() {
+  if (currentMode != EFF_SD) {
+#if USE_SD
+    if (outFile) {
+      outFile.close();
+      outAnimationActive = false;
+    }
+#endif
+    outEffectActive = false;
+  }
   int temp = jsonReadtoInt(configSetup, "eff_sel");
   bool next = HTTP.arg("eff").toInt();
 
@@ -4169,9 +4414,11 @@ void handle_eff_clr () {
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-// --------------------------------------------------------- СОХРАНЕНИЕ, СБРОС И ЗАГРУЗКА НАСТРОЕК ЭФФЕКТОВ -------------------------------------------
+// --------------------------------------------------------- СОХРАНЕНИЕ, СБРОС И ЗАГРУЗКА НАСТРОЕК ЭФФЕКТОВ --------------------------------------------
+
 // Сброс настроек текущего эффекта по умолчанию
 void handle_def() {
+  outEffectActive = false;
   setModeSettings();
   updateSets();
 
@@ -4206,6 +4453,13 @@ void handle_def() {
 
 // Сброс настроек всех эффектов по умолчанию
 void handle_eff_reset() {
+#if USE_SD
+  if (outFile) {
+    outFile.close();
+    outAnimationActive = false;
+  }
+#endif
+  outEffectActive = false;
   restoreSettings();
   updateSets();
 
@@ -4328,7 +4582,8 @@ void handle_eff_read() {
 #endif
 }
 
-// ------------------------------------------------- АВТОЯРКОСТЬ ЭФФЕКТОВ (в зависимости от времени суток) --------------------------------------------
+// -------------------------------------------------- АВТОЯРКОСТЬ ЭФФЕКТОВ (в зависимости от времени суток) --------------------------------------------
+
 void handle_auto_bri () {
   AutoBrightness = HTTP.arg("auto_bri").toInt();
   jsonWrite(configSetup, "auto_bri", AutoBrightness);
@@ -4343,7 +4598,8 @@ void handle_auto_bri () {
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-// ----------------------------------------------------------------- НАСТРОЙКИ ДИСПЛЕЯ ST7789 ---------------------------------------------------------
+// ------------------------------------------------------------------ НАСТРОЙКИ ДИСПЛЕЯ ST7789 ---------------------------------------------------------
+
 #if USE_ST7789
 void handle_tft_clock_color() {
   int val = HTTP.arg("tft_clock_color").toInt();
@@ -4475,7 +4731,7 @@ void handle_tft_auto_brightness() {
 }
 
 #endif // USE_ST7789
-// ---------------------------------------------------------------------------------
+// --------------------------------
 void handle_save_brightness() {
   uint8_t day_bright = constrain(HTTP.arg("day_bright").toInt(), 0, 255);
   uint8_t night_bright = constrain(HTTP.arg("night_bright").toInt(), 0, 255);
@@ -4509,7 +4765,8 @@ void handle_save_brightness() {
   HTTP.send(200, F("text/plain"), F("OK"));
 }
 
-// --------------------------------------------------------------------- НАСТРОЙКИ МАТРИЦЫ ------------------------------------------------------------
+// ---------------------------------------------------------------------- НАСТРОЙКИ МАТРИЦЫ ------------------------------------------------------------
+
 void handle_matrix_tipe() {
   String configLED = readFile(F("config_led_matrix.json"), 8192);
   if (configLED == "Failed" || configLED == "Large") {
@@ -4552,7 +4809,8 @@ void handle_matrix_orientation() {
   }
 }
 
-// ------------------------------------------------------------------------- НАСТРОЙКИ MQTT -----------------------------------------------------------
+// -------------------------------------------------------------------------- НАСТРОЙКИ MQTT -----------------------------------------------------------
+
 #if USE_MQTT
 void handle_mqtt_set() {
   String mq_ip = HTTP.arg("mq_ip");
@@ -4610,105 +4868,64 @@ void handle_mqtt_period() {
 
 #endif // USE_MQTT
 
-// ------------------------------------------------------------------- СПИСОК ЭФФЕКТОВ ЛАМПЫ ----------------------------------------------------------
-void EffectList(const __FlashStringHelper * filename) {
-  String effList = String(filename);
-  effList += jsonRead(configSetup, "lang");
-  effList += F(".ini");
+// -------------------------------------------------------------------- ЧТЕНИЕ ФАЙЛОВ ФОЛРМАТА .OUT ---------------------------------------------------
 
-  File file = LittleFS.open(effList, "r");
-  if (!file) {
-    return;
-  }
-
-  String content = file.readString();
-  file.close();
-
-  Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
-  Udp.print(content);
-  Udp.endPacket();
-}
-
-// ---------------------------------------------------------------------- НАСТРОЙКИ SD КАРТЫ ----------------------------------------------------------
-// Эффекты с SD карты
-#if USE_SD && !FS_AS_SD
-void handle_out_file() {
-  String outFileName = HTTP.arg("out_file");
-  if (outFileName.length() == 0 || !outFileName.endsWith(".out")) {
-    HTTP.send(400, F("text/plain"), F("Invalid or empty file name"));
-    return;
-  }
-
-  jsonWrite(configSetup, "out_file", outFileName);
-
-  if (currentMode != EFF_OUT_EFFECT) {
-    currentMode = EFF_OUT_EFFECT;
-    jsonWrite(configSetup, "eff_sel", EFF_OUT_EFFECT);
-  }
-
-  loadingFlag = true;
-  saveConfig();
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": true}"));
-
-#if USE_MULTILAMP
-  repeat_multiple_lamp_control = true;
-#endif
-
-#if USE_MQTT
-  if (Wifi::instance().isConnected()) {
-    Mqtt::instance().needToPublish = true;
-  }
-#endif
-}
-
-// Список файлов
+#if USE_SD
 void handle_list_out_files() {
+  if (!sdEnabled) {
+    HTTP.send(200, "application/json", "[]");
+    return;
+  }
+
   String fileList = "[";
-  File root = SD.open("/");
+  bool first = true;
+  File root;
+
+  String sizeFolder = String(matrixWidth) + "x" + String(matrixHeight);
+  String effectsPath = "/effects/" + sizeFolder;
+
+  auto openDir = [](const String & path) -> File {
+    if (sdType == 1) return LittleFS.open(path);
+    else             return SD.open(path);
+  };
+
+#if EFF_LOG
+  SYSLOG.add("handle_list_out_files: sdType=%u, path=%s", sdType, effectsPath.c_str());
+#endif
+
+  root = openDir(effectsPath);
   if (!root || !root.isDirectory()) {
     if (root) root.close();
-    HTTP.send(404, F("text/plain"), F("Failed to open directory"));
-    return;
+    root = openDir("/effects/");
+    if (!root || !root.isDirectory()) {
+      if (root) root.close();
+      HTTP.send(200, "application/json", "[]");
+      return;
+    }
   }
 
-  bool first = true;
-  File file = root.openNextFile();
-  while (file) {
+  while (true) {
+    File file = root.openNextFile();
+    if (!file) break;
     String name = file.name();
-
+    int lastSlash = name.lastIndexOf('/');
+    if (lastSlash >= 0) name = name.substring(lastSlash + 1);
     if (name.endsWith(".out")) {
       if (!first) fileList += ",";
       fileList += "\"" + name + "\"";
       first = false;
     }
-
-    File temp = file;
-    file = root.openNextFile();
-    temp.close();
+    file.close();
   }
-
   root.close();
   fileList += "]";
-
-  HTTP.send(200, F("application/json"), fileList);
+  HTTP.send(200, "application/json", fileList);
 }
-
-#else
-
-// Заглушки, когда SD отключена
-void handle_out_file() {
-  HTTP.send(404, F("text/plain"), F("SD card not enabled"));
-}
-
-void handle_list_out_files() {
-  HTTP.send(404, F("text/plain"), F("SD card not enabled"));
-}
-
-#endif // USE_SD && !FS_AS_SD
+#endif // USE_SD
 
 // --------------------------------------------------------- СТАТУСЫ УСТРОЙСТВ В МОДАЛЬНОМ ОКНЕ МЕНЮ --------------------------------------------------
-#if STATUS_DEVICE
 
+#if STATUS_DEVICE
 // статус кнопки
 void handle_button_status() {
   DynamicJsonDocument doc(256);
@@ -4873,6 +5090,35 @@ void handle_mp3_status() {
   HTTP.send(200, "application/json; charset=utf-8", response);
 }
 
+// статус SD
+void handle_sd_status() {
+  DynamicJsonDocument doc(512);
+  String sd_status;
+
+#if USE_SD
+  if (!sdEnabled) {
+    sd_status = "ВЫКЛЮЧЕНО";
+    doc["fs_status"] = "—";
+  } else if (sdType == 1) {
+    sd_status = "ЭМУЛЯЦИЯ В LITTLEFS";
+    doc["fs_status"] = LittleFS.begin() ? "ОК" : "ОШИБКА";
+  } else {
+    sd_status = sd_card_present ? "ОК" : "КАРТА НЕ НАЙДЕНА";
+    doc["fs_status"] = sd_card_present ? "ОК" : "ОШИБКА";
+  }
+#else
+  sd_status = "ОТКЛЮЧЕНО В ПРОШИВКЕ";
+#endif
+
+  doc["sd_status"] = sd_status;
+  doc["sd_enabled"] = sdEnabled;
+  doc["sd_type"]    = sdType;
+  doc["card_present"] = sd_card_present;
+  String response;
+  serializeJson(doc, response);
+  HTTP.send(200, "application/json; charset=utf-8", response);
+}
+
 // статус погоды
 void handle_show_weather() {
 #if USE_WEATHER
@@ -4963,32 +5209,10 @@ void handle_multilamp_status() {
   HTTP.send(200, "application/json; charset=utf-8", resp);
 }
 
-// статус SD
-void handle_sd_status() {
-  DynamicJsonDocument doc(512);
-  String sd_status;
-
-#if USE_SD
-#if FS_AS_SD
-  sd_status = "ЭМУЛЯЦИЯ В LITTLEFS";
-#else
-  sd_status = sd_card_present ? "ОК" : "КАРТА НЕ НАЙДЕНА";
-#endif
-  doc["fs_status"] = LittleFS.begin() ? "ОК" : "ОШИБКА";
-#else
-  sd_status = "ОТКЛЮЧЕНО В ПРОШИВКЕ";
-  doc["fs_status"] = "—";
-#endif
-
-  doc["sd_status"] = sd_status;
-  String response;
-  serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
-}
-
 #endif // STATUS_DEVICE
 
 // -------------------------------------------------------------------- НАСТРОЙКИ БЕГУЩЕЙ СТРОКИ ------------------------------------------------------
+
 #if LED_PANEL
 void ApplyRunningTextSettings() {
   if (!runTextEnabled) {
@@ -5327,6 +5551,7 @@ void handle_font_size() {
 #endif // LED_PANEL
 
 // --------------------------------------------------------------------------- НАСТРОЙКИ ЧАСОВ --------------------------------------------------------
+
 // Чекбокс "Авто-сдвиг часов"
 void handle_auto_move_clock() {
   String arg = HTTP.arg("value");
@@ -5671,6 +5896,7 @@ void handle_clock_hue() {
 #endif // LED_PANEL
 
 // ------------------------------------------------------------------------- НАСТРОЙКИ ПОГОДЫ ---------------------------------------------------------
+
 #if USE_WEATHER
 // Интервал вывода погоды
 void handle_print_weather() {
@@ -5880,6 +6106,7 @@ void handle_degree_blink() {
 #endif // USE_WEATHER
 
 // ------------------------------------------------------------------------ НАСТРОЙКИ ДАТЫ ------------------------------------------------------------
+
 // Чекбокс "Включить дату для отображеня на матрице"
 void handle_date_enabled() {
   if (!HTTP.hasArg("value")) {
@@ -6106,6 +6333,7 @@ void handle_date_show_year() {
 }
 
 // ----------------------------------------------------------------------- ТАЙМЕРЫ и ИНТЕРВАЛЫ --------------------------------------------------------
+
 #if USE_WEATHER
 // Таймер Часы / Погода
 void handle_timer_c_w() {
@@ -6607,6 +6835,7 @@ void handle_interval_c_d() {
 #endif // LED_PANEL
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
 void handle_index () {
   bool flg = false;
   if (HTTP.arg("index").toInt()) {
@@ -6618,6 +6847,7 @@ void handle_index () {
 }
 
 // ---------------------------------------------------------------
+
 // Пароль на страницу настроек
 void handle_PassOn () {
   jsonWrite(configSetup, "PassOn", HTTP.arg("PassOn").toInt());
@@ -6626,6 +6856,7 @@ void handle_PassOn () {
 }
 
 // ----------------------------------------------------------------------- ЯЗЫК ИНТЕРФЕЙСА ------------------------------------------------------------
+
 void  handle_lang () {
   jsonWrite(configSetup, "lang", HTTP.arg("lang"));
   saveConfig();
@@ -6643,6 +6874,7 @@ void Lang_set () {
 }
 
 // ----------------------------------------------------------------- СБРОС НАСТРОЕК ПО УМОЛЧАНИЮ ------------------------------------------------------
+
 void handle_reset_to_default() {
   showWarning(CRGB::Red, 500, 250);
   setModeSettings();
@@ -6682,6 +6914,7 @@ void handle_reset_to_default() {
 }
 
 // ---------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ ЧЕРЕЗ ВЕБ --------------------------------------------------
+
 // Кнопка
 void handle_button_enable() {
   if (!HTTP.hasArg("value")) {
@@ -6813,6 +7046,88 @@ void handle_mp3_enable() {
 #endif
   }
   HTTP.send(200, "text/plain", mp3Enabled ? "1" : "0");
+}
+
+// SD карта
+void handle_sd_enable() {
+  if (!HTTP.hasArg("value")) {
+    HTTP.send(400, "text/plain", "Missing value");
+    return;
+  }
+  bool val = HTTP.arg("value").toInt() != 0;
+
+#if USE_SD
+  if (val != sdEnabled) {
+    sdEnabled = val;
+    jsonWrite(configSetup, "sd_enabled", sdEnabled ? "1" : "0");
+    saveConfig();
+
+    if (!sdEnabled) {
+      if (outFile) {
+        outFile.close();
+        outAnimationActive = false;
+      }
+      outEffectActive = false;
+      if (currentMode == EFF_SD) {
+        currentMode = EFF_RAINBOW_VER;
+        for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+          if (eff_num_correct[i] == currentMode) {
+            jsonWrite(configSetup, "eff_sel", i);
+            break;
+          }
+        }
+        saveConfig();
+        loadingFlag = true;
+      }
+    } else {
+      initSD();
+    }
+  }
+  HTTP.send(200, "text/plain", sdEnabled ? "1" : "0");
+#else
+  HTTP.send(200, "text/plain", "Not supported");
+#endif
+}
+
+void handle_sd_type() {
+  if (!HTTP.hasArg("sd_type")) {
+    HTTP.send(400, "text/plain", "Missing sd_type");
+    return;
+  }
+  uint8_t val = constrain(HTTP.arg("sd_type").toInt(), 0, 1);
+
+#if USE_SD && (defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
+  if (val == sdType) {
+    HTTP.send(200, "text/plain", String(sdType));
+    return;
+  }
+
+  if (outFile) {
+    outFile.close();
+    outAnimationActive = false;
+  }
+  outEffectActive = false;
+
+  if (currentMode == EFF_SD) {
+    currentMode = EFF_RAINBOW_VER;
+    for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+      if (eff_num_correct[i] == currentMode) {
+        jsonWrite(configSetup, "eff_sel", i);
+        break;
+      }
+    }
+  }
+
+  sdType = val;
+  jsonWrite(configSetup, "sd_type", sdType);
+  saveConfig();
+
+  HTTP.send(200, "text/plain", "OK_REBOOT");
+  delay(500);
+  ESP.restart();
+#else
+  HTTP.send(200, "text/plain", "Not supported on this build");
+#endif
 }
 
 // *****************************************************************************************************************************************************

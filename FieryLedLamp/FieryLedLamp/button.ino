@@ -3,7 +3,7 @@
 // --------------------------
 
 #if USE_BUTTON
-bool brightDirection = true;               // true — увеличение, false — уменьшение
+bool brightDirection = true;               // true - увеличение, false - уменьшение
 static bool startButtonHolding = false;    // кнопка удерживается для изменения яркости/скорости/масштаба лампы кнопкой
 static bool Button_Holding = false;
 
@@ -11,9 +11,6 @@ void buttonTick() {
   if (!buttonEnabled) {
     touch.tick();
     if (touch.isStep() && touch.getHoldClicks() == 14U) {
-#if BUTTON_LOG
-      SYSLOG.add("\n*** Reset to Default ***");
-#endif
       showWarning(CRGB::Red, 500, 250U);
       setModeSettings();
       updateSets();
@@ -31,85 +28,90 @@ void buttonTick() {
   uint8_t clickCount = touch.hasClicks() ? touch.getClicks() : 0U;
   // --------------------------------------------------------------------------------
 
-// 1 клик — Вкл/Выкл (или обработка рассвета/заката)
-if (clickCount == btn_click_power) {
-    // Если кнопка отключена через веб – игнорируем
-    #if USE_BUTTON
+  // 1 клик - Вкл/Выкл (или обработка рассвета/заката)
+  if (clickCount == btn_click_power) {
+#if USE_BUTTON
     if (!buttonEnabled) return;
-    #endif
+#endif
 
-    #if USE_DAWN || USE_SUNSET
+#if USE_DAWN || USE_SUNSET
     if (dawnFlag == 1 || sunsetFlag == 1) {
-        if (dawnFlag == 1) {
-            manualOff = true;
-            dawnFlag = 0;
-            #if USE_MP3_PLAYER
-            if (mp3Enabled && alarm_sound_flag) {
-                send_command(0x0E, 0, 0, 0);
-                mp3_stop = true;
-                alarm_sound_flag = false;
-            }
-            #endif
-        } else if (sunsetFlag == 1) {
-            manualOff = true;
-            sunsetFlag = 0;
-            #if USE_MP3_PLAYER
-            if (mp3Enabled && sunset_sound_flag) {
-                sunset_sound_flag = false;
-            }
-            #endif
+      if (dawnFlag == 1) {
+        manualOff = true;
+        dawnFlag = 0;
+#if USE_MP3_PLAYER
+        if (mp3Enabled && alarm_sound_flag) {
+          send_command(0x0E, 0, 0, 0);
+          mp3_stop = true;
+          alarm_sound_flag = false;
         }
-        #if USE_TM1637
-        if (tm1637Enabled) {
-            clockTicker_blink();
+#endif
+      } else if (sunsetFlag == 1) {
+        manualOff = true;
+        sunsetFlag = 0;
+#if USE_MP3_PLAYER
+        if (mp3Enabled && sunset_sound_flag) {
+          sunset_sound_flag = false;
         }
-        #endif
-        FastLED.clear();
-        FastLED.setBrightness(0);
-        FastLED.show();
-        yield();
-        ONflag = true;
-        jsonWrite(configSetup, "Power", ONflag);
-        saveConfig();
-        loadingFlag = true;
-        changePower();
-        return;
+#endif
+      }
+#if USE_TM1637
+      if (tm1637Enabled) {
+        clockTicker_blink();
+      }
+#endif
+      FastLED.clear();
+      FastLED.setBrightness(0);
+      FastLED.show();
+      yield();
+      ONflag = true;
+      jsonWrite(configSetup, "Power", ONflag);
+      saveConfig();
+      loadingFlag = true;
+      changePower();
+      return;
     }
-    #endif // USE_DAWN || USE_SUNSET
+#endif // USE_DAWN || USE_SUNSET
 
     ONflag = !ONflag;
     jsonWrite(configSetup, "Power", ONflag);
-    saveConfig();
 
+    if (!ONflag) {
+      if (leds != nullptr) {
+        FastLED.setBrightness(0);
+        FastLED.clear();
+        FastLED.show();
+      }
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+      digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+    }
+
+    saveConfig();
     changePower();
 
     if (!ONflag) {
-        timeout_save_file_changes = millis() - SAVE_FILE_DELAY_TIMEOUT;
-        if (!Favorites::instance().FavoritesRunning) {
-            Eeprom::instance().EepromPut(modes);
-        }
-        save_file_changes = 7;
-        Save_File_Changes();
+      timeout_save_file_changes = millis() - SAVE_FILE_DELAY_TIMEOUT;
     } else {
-        Eeprom::instance().EepromGet(modes);
-        timeout_save_file_changes = millis();
-        bitSet(save_file_changes, 0);
+      Eeprom::instance().EepromGet(modes);
+      timeout_save_file_changes = millis();
+      bitSet(save_file_changes, 0);
     }
     loadingFlag = true;
 
-    #if USE_MQTT
+#if USE_MQTT
     if (Wifi::instance().isConnected()) {
-        Mqtt::instance().needToPublish = true;
+      Mqtt::instance().needToPublish = true;
     }
-    #endif
-    #if USE_BLYNK
+#endif
+#if USE_BLYNK
     updateRemoteBlynkParams();
-    #endif
-    #if USE_MULTILAMP
+#endif
+#if USE_MULTILAMP
     if (ONflag) repeat_multiple_lamp_control = true;
     else multiple_lamp_control();
-    #endif
-}
+#endif
+  }
 
   // --------------------------------------------------------------------------------
   // 2 клика — Следующий эффект
@@ -202,7 +204,7 @@ if (clickCount == btn_click_power) {
       showWarning(CRGB::Yellow, 2000, 500);
       ONflag = true;
       jsonWrite(configSetup, "Power", ONflag);
-      currentMode = EFF_WHITE_COLOR;
+      currentMode = EFF_ANIMATION;
       jsonWrite(configSetup, "eff_sel", currentMode);
       jsonWrite(configSetup, "br", 255);
       saveConfig();
@@ -225,7 +227,7 @@ if (clickCount == btn_click_power) {
     }
 #if USE_ST7789
     if (st7789Enabled) {
-        TFT_HideIP();
+      TFT_HideIP();
     }
 #endif
     loadingFlag = true;
@@ -453,7 +455,7 @@ if (clickCount == btn_click_power) {
           // белый свет при выключенной лампе
           case 0U: {
               Button_Holding = true;
-              currentMode = EFF_WHITE_COLOR;
+              currentMode = EFF_ANIMATION;
 #if USE_MP3_PLAYER
               mp3_folder = pgm_read_byte(&default_effects_folders[currentMode]);
 #endif

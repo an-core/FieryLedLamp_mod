@@ -10,7 +10,7 @@ bool FS_init(void) {
     delay(200);
     if (!LittleFS.begin(false)) {
 #if GENERAL_LOG
-      SYSLOG.add("LittleFS не удалось смонтировать даже после форматирования!");
+      SYSLOG.add("LittleFS не удалось смонтировать даже после форматирования");
 #endif
       return false;
     }
@@ -45,50 +45,8 @@ bool FS_init(void) {
   return true;
 }
 
-// ----------------------------------------------------------------
-bool FileCopy(const String& SourceFile, const String& TargetFile) {
-#if USE_OTA
-  if (Ota::instance().isOtaActive()) return false;
-#endif
-  LittleFS.remove(TargetFile);
-  File s = LittleFS.open(SourceFile, "r");
-  File t = LittleFS.open(TargetFile, "w");
-  if (!s || !t) {
-    if (s) s.close();
-    return false;
-  }
-  uint8_t buf[512];
-  while (s.available()) {
-    size_t len = s.read(buf, sizeof(buf));
-    t.write(buf, len);
-    yield();
-  }
-  s.close(); t.close();
-  return true;
-}
-
 // =================================================================== АППАРАТНАЯ ИНИЦИАЛИЗАЦИЯ ========================================================
 void initHardware() {
-  // SD карта
-#if USE_SD && !FS_AS_SD
-  if (SD.begin(SD_CS_PIN)) {
-    sd_card_present = true;
-#if SD_LOG
-    SYSLOG.add("SD-карта инициализирована");
-#endif
-
-    for (uint8_t i = 0; i < MODE_AMOUNT; i++)
-      effects_folders[i] = pgm_read_byte(&default_effects_folders[i]);
-    jsonWrite(configSetup, "out_file", "/effects/effect133.out");
-  } else {
-    sd_card_present = false;
-#if SD_LOG
-    SYSLOG.add("Ошибка инициализации SD-карты");
-#endif
-
-  }
-#endif
-
   // мосфет
 #ifdef MOSFET_PIN
   pinMode(MOSFET_PIN, OUTPUT);
@@ -106,34 +64,41 @@ void initHardware() {
 #endif
 }
 
-// ------------------------------------------------------------------
-fs::File openEffectFile(const String& filename) {
-#if (FS_AS_SD == 1)
-  return LittleFS.open("/effects/" + filename, "r");
-#else
-  return SD.open("/effects/" + filename, "r");
-#endif
-}
-// ------------------------------------------------------------------
-void loadOutEffect(uint8_t effectIndex) {
-  if (!ONflag) return;
-  String filename = "/effects/effect" + String(effectIndex) + ".out";
-  fs::File file = openEffectFile(filename);
+// ====================================================================== ИНИЦИАЛИЗАЦИЯ SD КАРТЫ =======================================================
+void initSD() {
+#if USE_SD
+  if (!sdEnabled) return;
 
-  if (!file || file.size() != usedLeds * 3) {
+  if (sdType == 0) {
+    if (SD.begin(SD_CS_PIN)) {
+      sd_card_present = true;
 #if SD_LOG
-    SYSLOG.add("Ошибка: файл .out повреждён");
+      SYSLOG.add("SD-карта инициализирована");
 #endif
-
-    if (file) file.close();
-    return;
+      for (uint8_t i = 0; i < MODE_AMOUNT; i++)
+        effects_folders[i] = pgm_read_byte(&default_effects_folders[i]);
+      jsonWrite(configSetup, "out_file", "");
+    } else {
+      sd_card_present = false;
+#if SD_LOG
+      SYSLOG.add("Ошибка инициализации SD-карты");
+#endif
+    }
+  } else {
+    sd_card_present = true;
+    if (!LittleFS.exists("/effects/")) {
+      if (LittleFS.mkdir("/effects/")) {
+#if SD_LOG
+        SYSLOG.add("Папка /effects/ создана в LittleFS");
+#endif
+      } else {
+#if SD_LOG
+        SYSLOG.add("Ошибка создания папки /effects/ в LittleFS");
+#endif
+      }
+    }
   }
-
-  for (uint16_t i = 0; i < usedLeds; i++) {
-    leds[i] = CRGB(file.read(), file.read(), file.read());
-  }
-  file.close();
-  FastLED.show();
+#endif // USE_SD
 }
 
 // ==================================================================== ИНИЦИАЛИЗАЦИЯ МП3 ПЛЕЕРА =======================================================
@@ -189,7 +154,6 @@ void initMP3Hardware() {
     }
   }
 
-  // настройка текущей папки
   if (currentMode >= MODE_AMOUNT) currentMode = 0;
   uint8_t newFolder = effects_folders[currentMode];
   if (newFolder == 0) newFolder = 1;
@@ -212,7 +176,7 @@ void initMP3Hardware() {
 // ======================================================================= ИНИЦИАЛИЗАЦИЯ КНОПКИ ========================================================
 void initButtonHardware() {
 #if USE_BUTTON
-  if (button_type) {  // сенсорная
+  if (button_type) { // сенсорная
     touch.setType(LOW_PULL);
     touch.setDebounce(BUTTON_SET_DEBOUNCE_SENSORY);
   } else {  // механическая
@@ -295,7 +259,7 @@ void initSchedule() {
 void initNightClockSettings() {
   nightClockEnabled = false;
   jsonWrite(configLedPanel, "night_clock_enabled", "0");
-  
+
   nightClockBrightness = jsonReadtoInt(configLedPanel, "night_clock_brightness", 1);
   if (nightClockBrightness < 1) nightClockBrightness = 1;
   nightClockHue = jsonReadtoInt(configLedPanel, "night_clock_hue", 0);
@@ -321,7 +285,6 @@ void initSystemTimers() {
 // ======================================================================= ИНИЦАЛИЗАЦИЯ MQTT ===========================================================
 void initMQTT() {
 #if USE_MQTT
-  // Инициализация MQTT клиента
   if (MqttOn && Wifi::instance().isConnected()) {
     mqttClient = new AsyncMqttClient();
     if (mqttClient) {

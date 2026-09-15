@@ -17,6 +17,56 @@ void loadSystemLogSettings() {
 }
 #endif
 
+void writeDebugLog(const String& msg) {
+  File logFile = LittleFS.open("/debug.log", "a");
+  if (logFile) {
+    logFile.println(String(millis()) + ": " + msg);
+    logFile.close();
+  }
+}
+
+// ----------------------------------------------------------------------
+bool FileCopy(const String& SourceFile, const String& TargetFile) {
+#if USE_OTA
+  if (Ota::instance().isOtaActive()) return false;
+#endif
+  LittleFS.remove(TargetFile);
+  File s = LittleFS.open(SourceFile, "r");
+  File t = LittleFS.open(TargetFile, "w");
+  if (!s || !t) {
+    if (s) s.close();
+    return false;
+  }
+  uint8_t buf[512];
+  while (s.available()) {
+    size_t len = s.read(buf, sizeof(buf));
+    t.write(buf, len);
+    yield();
+  }
+  s.close(); t.close();
+  return true;
+}
+
+// ----------------------------------------------------------------------
+// список эффектов
+void EffectList(const __FlashStringHelper * filename) {
+  String effList = String(filename);
+  effList += jsonRead(configSetup, "lang");
+  effList += F(".ini");
+
+  File file = LittleFS.open(effList, "r");
+  if (!file) {
+    return;
+  }
+
+  String content = file.readString();
+  file.close();
+
+  Udp.beginPacket(Udp.remoteIP(), Udp.remotePort());
+  Udp.print(content);
+  Udp.endPacket();
+}
+
 // ----------------------------------------------------------------------
 // ведущий ноль (для будильника Рассвет и заката)
 String zeroPad(String str, uint8_t len) {
@@ -321,6 +371,195 @@ void performUpdateCheck() {
 }
 
 // ----------------------------------------------------------------------
+#if USE_DAWN
+void saveAlarmConfig(const String & data) {
+  File file = LittleFS.open(F("/config_alarm.json"), "w");
+  if (!file) {
+    return;
+  }
+  file.print(data);
+  file.flush();
+  delay(5);
+  file.close();
+}
+// ---------------------------------------
+// сохранение
+void save_alarms() {
+  if (configAlarm.isEmpty()) configAlarm = "{}";
+
+  bool changed = false;
+
+  for (uint8_t i = 0; i < 7; i++) {
+    char idx[2];
+    itoa(i + 1, idx, 10);
+
+    String key_a = "a" + String(idx);
+    String key_h = "h" + String(idx);
+    String key_m = "m" + String(idx);
+
+    uint8_t currentState = jsonReadtoInt(configAlarm, key_a);
+    uint8_t currentHours = jsonReadtoInt(configAlarm, key_h);
+    uint8_t currentMins  = jsonReadtoInt(configAlarm, key_m);
+    uint16_t currentTime = currentHours * 60 + currentMins;
+
+    if (alarms[i].State != currentState || alarms[i].Time != currentTime) {
+      changed = true;
+
+      jsonWrite(configAlarm, key_a, alarms[i].State);
+
+      char buf[3];
+      sprintf(buf, "%02d", alarms[i].Time / 60);
+      jsonWrite(configAlarm, key_h, String(buf));
+      sprintf(buf, "%02d", alarms[i]. Time % 60);
+      jsonWrite(configAlarm, key_m, String(buf));
+    }
+  }
+
+  if (dawnMode + 1 != jsonReadtoInt(configAlarm, "t")) {
+    jsonWrite(configAlarm, "t", dawnMode + 1);
+    changed = true;
+  }
+  if (DAWN_TIMEOUT != jsonReadtoInt(configAlarm, "after")) {
+    jsonWrite(configAlarm, "after", DAWN_TIMEOUT);
+    changed = true;
+  }
+  if (DAWN_BRIGHT != jsonReadtoInt(configAlarm, "a_br")) {
+    jsonWrite(configAlarm, "a_br", DAWN_BRIGHT);
+    changed = true;
+  }
+
+  if (changed) {
+    saveAlarmConfig(configAlarm);
+    configAlarm = readFile(F("config_alarm.json"), 2048);
+  }
+}
+#endif // USE_DAWN
+
+// ----------------------------------------------------------------------
+#if USE_SUNSET
+// сохранение
+void save_sunsets() {
+  if (configSunset.isEmpty() || configSunset == "null") {
+    configSunset = "{}";
+  }
+
+  bool saveNeeded = false;
+
+  for (uint8_t i = 0; i < 7; i++) {
+    char idx[2];
+    itoa(i + 1, idx, 10);
+
+    String key_a = "a" + String(idx);
+    String key_h = "h" + String(idx);
+    String key_m = "m" + String(idx);
+
+    uint8_t currentState = jsonReadtoInt(configSunset, key_a);
+    uint8_t currentHour = jsonReadtoInt(configSunset, key_h);
+    uint8_t currentMin = jsonReadtoInt(configSunset, key_m);
+    uint16_t currentTime = currentHour * 60U + currentMin;
+
+    if (sunsets[i].State != currentState || sunsets[i].Time != currentTime) {
+      saveNeeded = true;
+      jsonWrite(configSunset, key_a, sunsets[i].State);
+      jsonWrite(configSunset, key_h, zeroPad(String(sunsets[i].Time / 60U), 2));
+      jsonWrite(configSunset, key_m, zeroPad(String(sunsets[i].Time % 60U), 2));
+    }
+
+    yield();
+  }
+
+  int8_t configMode = jsonReadtoInt(configSunset, "t") - 1;
+  if (sunsetMode != configMode) {
+    saveNeeded = true;
+    jsonWrite(configSunset, "t", (sunsetMode + 1));
+  }
+
+  if (SUNSET_BRIGHT != jsonReadtoInt(configSunset, "s_br")) {
+    saveNeeded = true;
+    jsonWrite(configSunset, "s_br", SUNSET_BRIGHT);
+  }
+
+  if (saveNeeded) {
+    writeFile(F("config_sunset.json"), configSunset);
+    configSunset = readFile(F("config_sunset.json"), 512);
+  }
+}
+#endif // USE_SUNSET
+
+// ----------------------------------------------------------------------
+#if USE_SCHEDULE
+// загрузка расписания
+void load_schedule() {
+  if (configSchedule.isEmpty() || configSchedule == "null") {
+    configSchedule = "{}";
+  }
+
+  for (uint8_t i = 0; i < MAX_SCHEDULE_ENTRIES; i++) {
+    schedule[i].State = 0;
+    schedule[i].Day = 0;
+    schedule[i].Time = 0;
+    schedule[i].Action = 0;
+    schedule[i].EffectNum = 255;
+  }
+
+  String enableStr = jsonRead(configSchedule, "schedule_enabled");
+  if (enableStr != "1") return;
+
+  uint8_t timerIndex = 0;
+
+  for (uint8_t slot = 1; slot <= 6 && timerIndex < MAX_SCHEDULE_ENTRIES; slot++) {
+    String aKey = "a" + String(slot);
+    String hKey = "h" + String(slot);
+    String mKey = "m" + String(slot);
+    String effKey = (slot == 3) ? "eff3" : "";
+
+    uint8_t action = jsonReadtoInt(configSchedule, aKey, 0);
+    if (action == 0) continue;
+
+    String hStr = jsonRead(configSchedule, hKey);
+    if (hStr == "" || hStr == "null") hStr = "00";
+    String mStr = jsonRead(configSchedule, mKey);
+    if (mStr == "" || mStr == "null") mStr = "00";
+
+    uint8_t hour = constrain(hStr.toInt(), 0, 23);
+    uint8_t minute = constrain(mStr.toInt(), 0, 59);
+    uint16_t timeInMinutes = hour * 60 + minute;
+
+    uint8_t effectNum = 255;
+
+    if (slot == 3 && action == 3) {
+      String effStr = jsonRead(configSchedule, effKey);
+      if (effStr != "" && effStr != "null") {
+        effectNum = constrain(effStr.toInt(), 0, MODE_AMOUNT - 1);
+      }
+    }
+
+    schedule[timerIndex].State = 1;
+    schedule[timerIndex].Day = 0;
+    schedule[timerIndex].Time = timeInMinutes;
+    schedule[timerIndex].Action = action;
+
+    if (slot == 3 && action == 3) {
+      // включить указанный эффект
+      schedule[timerIndex].EffectNum = effectNum;
+    } else if (slot == 5) {
+      // обычные часы
+      schedule[timerIndex].EffectNum = EFF_CLOCK;
+      schedule[timerIndex].Action = 4;
+    } else if (slot == 6) {
+      // ночные часы
+      schedule[timerIndex].EffectNum = EFF_CLOCK;
+      schedule[timerIndex].Action = 7;
+    } else {
+      schedule[timerIndex].EffectNum = 255;
+    }
+
+    timerIndex++;
+  }
+}
+#endif // USE_SCHEDULE
+
+// ----------------------------------------------------------------------
 void Save_File_Changes() {
   if (save_file_changes && millis() - timeout_save_file_changes >= SAVE_FILE_DELAY_TIMEOUT) {
     if (save_file_changes & SAVE_CONFIG_BIT) {
@@ -486,6 +725,7 @@ void handleHeapMonitor() {
 
 // -----------------------
 void handleFavorites() {
+  if (outEffectActive) return;
   static uint32_t lastFav = 0;
   if (millis() - lastFav >= 100) {
     lastFav = millis();
@@ -506,6 +746,86 @@ void handleFavorites() {
 }
 
 // -----------------------
+#if USE_SD
+bool startOutAnimation(const String& fileName) {
+  if (!sdEnabled) return false;
+  if (outFile) {
+    outFile.close();
+    outAnimationActive = false;
+  }
+  outFile = openEffectFile(fileName);
+  if (!outFile) return false;
+
+  size_t fileSize = outFile.size();
+  size_t frameSize = usedLeds * 3 + 1;
+
+  if (fileSize < frameSize) {
+    outFile.close();
+    return false;
+  }
+
+  outFile.seek(0);
+
+  uint8_t delayByte = outFile.read();
+  uint16_t outSpeedFactor = jsonReadtoInt(configSetup, "out_factor", 40);
+  outFrameDelay = delayByte * outSpeedFactor;
+  if (outFrameDelay < 10) outFrameDelay = 10;
+
+  for (uint16_t i = 0; i < usedLeds; i++) {
+    int r = outFile.read();
+    int g = outFile.read();
+    int b = outFile.read();
+    if (r == -1 || g == -1 || b == -1) {
+      outFile.close();
+      return false;
+    }
+    uint8_t fileX = i % matrixWidth;
+    uint8_t fileY = i / matrixWidth;
+    uint8_t lampY = matrixHeight - 1 - fileY;
+    drawPixelXY(fileX, lampY, CRGB(g, r, b)); // GRB (+ инверсия Y)
+  }
+
+  outLastFrameTime = millis();
+  outAnimationActive = true;
+  outEffectActive = true;
+  FastLED.show();
+  return true;
+}
+
+fs::File openEffectFile(const String& filename) {
+  String sizeFolder = String(matrixWidth) + "x" + String(matrixHeight);
+  String path = "/effects/" + sizeFolder + "/" + filename;
+
+#if SD_LOG
+  SYSLOG.add("openEffectFile: path = %s", path.c_str());
+#endif
+
+  if (sdType == 1) {
+    // эмуляция в LittleFS
+    File f = LittleFS.open(path, "r");
+    if (!f) {
+      path = "/effects/" + filename;
+      f = LittleFS.open(path, "r");
+    }
+    return f;
+  } else {
+    // физическая SD
+    File f = SD.open(path, "r");
+    if (!f) {
+      path = "/effects/" + filename;
+      f = SD.open(path, "r");
+    }
+    return f;
+  }
+}
+
+static inline bool sdFileExists(const String& path) {
+  return (sdType == 1) ? LittleFS.exists(path) : SD.exists(path);
+}
+
+#endif // USE_SD
+
+// -----------------------
 #if USE_TM1637
 void handleTM1637() {
   if (!tm1637Enabled) return;
@@ -521,15 +841,19 @@ void handleTM1637() {
     Display_Timer();
   }
   static uint32_t lastBlink = 0;
+#if USE_DAWN || USE_SUNSET
   if ((dawnFlag == 1 || sunsetFlag == 1) && (millis() - lastBlink >= 250)) {
     lastBlink = millis();
     clockTicker_blink();
   }
+#endif // USE_DAWN || USE_SUNSET
 }
-#endif
+#endif // USE_TM1637
 
 // -----------------------
 void handleRunningText() {
+  if (outEffectActive) return;
+
 #if LED_PANEL || USE_TM1637 || USE_ST7789
   if (!runTextEnabled || !textIsRunning || !ONflag) return;
 
@@ -578,12 +902,11 @@ void handleDawnMp3() {
       return;
     }
 
-    // Отправляем команду паузы только если плеер включён
     if (mp3Enabled) {
       send_command(0x0E, FEEDBACK, 0, 0);
       mp3_stop = true;
     } else {
-      mp3_stop = true; // просто сбросим флаг
+      mp3_stop = true;
     }
     dawnflag_sound = 1;
 
@@ -608,7 +931,6 @@ void handleDawnMp3() {
       mp3_stop = true;
       delay(mp3_delay);
     } else {
-      // Плеер выключен – только сбрасываем флаги, без команд
       alarm_sound_flag = false;
       dawnflag_sound = 0;
       mp3_stop = true;
@@ -680,7 +1002,7 @@ void printIPInfo() {
   auto& wifi = Wifi::instance();
   Serial.println("=== ЛАМПА ГОТОВА ===");
   Serial.printf("Точка доступа: %s   IP: %s\n", AP_NAME.c_str(), wifi.apIP().toString().c_str());
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     Serial.printf("WiFi подключён: %s IP: %s RSSI: %d dBm\n", wifi.getSSID().c_str(), wifi.localIP().toString().c_str(), wifi.getRSSI());
   } else {

@@ -188,5 +188,11 @@ uint8_t validMinMax(float val, uint8_t minV, uint32_t maxV);
 void drawRecCHSV(uint8_t startX, uint8_t startY, uint8_t endX, uint8_t endY, CHSV color);
 void drawRec(uint8_t startX, uint8_t startY, uint8_t endX, uint8_t endY, uint32_t color);
 void espModeState(uint8_t color);
+// ------------------------------------------------------
+int CountTokens(const char* str, char delimiter);
+uint32_t gammaCorrection(uint32_t color);
+String GetToken(const char* str, int index, char delimiter);
+void writeDebugLog(const String& msg);
+void handlePendingOutEffect();
 
 // ******************************************************************************************************************************************************

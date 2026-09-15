@@ -7,6 +7,17 @@
 #include "IRManager.h"
 // ---------------------
 
+extern bool sd_card_present;
+extern uint8_t effSdIndex;
+extern bool outEffectActive;
+extern const uint8_t PROGMEM gammaR[];
+extern const uint8_t PROGMEM gammaG[];
+extern const uint8_t PROGMEM gammaB[];
+extern String animations_list;
+extern uint8_t max_image_num;
+extern uint8_t* use_animations;
+extern uint8_t lastNonAnimSel;
+extern int8_t specialTextEffectParam;
 extern bool configChanged;
 extern volatile bool systemShuttingDown;
 extern volatile bool isPrintingMessage;
@@ -104,6 +115,9 @@ extern bool rfEnabled;
 extern bool tm1637Enabled;
 extern bool st7789Enabled;
 extern bool mp3Enabled;
+extern bool sdEnabled;
+extern uint8_t sdType;
+
 // ------------------------------------------------------------------------------
 #if LED_PANEL
 extern unsigned long lastClockFixedSwitch;
@@ -184,6 +198,14 @@ extern int night_weather_desc_on;
 extern bool time_always;
 extern bool weather_always;
 #endif // USE_MP3_PLAYER
+// ------------------------------------------------------------------------------
+#if USE_SD
+extern fs::File outFile;
+extern uint32_t outLastFrameTime;
+extern uint16_t outFrameDelay;
+extern bool outAnimationActive;
+extern String lastOutFileName;
+#endif
 // ------------------------------------------------------------------------------
 #if USE_ST7789
 extern String configST7789;
