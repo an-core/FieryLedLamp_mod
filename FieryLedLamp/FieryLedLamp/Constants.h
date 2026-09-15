@@ -33,14 +33,14 @@
 #define USE_DAWN 1                  // Использовать Будильник "Рассвет": 0 - нет, 1 - да
 #define USE_SUNSET 1                // Использовать режим "Закат": 0 - нет, 1 - да
 #define USE_SCHEDULE 1              // Использовать Расписание лампы: 0 - нет, 1 - да
-#define USE_MULTILAMP 0             // Использовать режим "Мультилампа" (Синхронное управление несколькими лампами): 0 - нет, 1 - да
+#define USE_MULTILAMP 1             // Использовать режим "Мультилампа" (Синхронное управление несколькими лампами): 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-#define USE_MQTT 0                  // Использовать MQTT: 0 - нет, 1 - да (доп. настройки см. ниже)
+#define USE_MQTT 1                  // Использовать MQTT: 0 - нет, 1 - да (доп. настройки см. ниже)
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-#define USE_OTA 1                   // Использовать обновление прошивки по воздуху: 0 - нет, 1 - да
+#define USE_OTA 0                   // Использовать обновление прошивки по воздуху: 0 - нет, 1 - да
 #define BACKUP_CFG_FILES 1          // Использовать резервное копирование настроек: 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-#define USE_ANIMATIONS 1            // Использовать встроенные анимационные эффекты: 0 - нет, 1 - да
+#define USE_ANIMATIONS 0            // Использовать встроенные анимационные эффекты: 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 #define STATUS_DEVICE 1             // Включить модальное окно Статусы устройств: 0 - нет, 1 - да
 #define SOFT_INFO 1                 // Включить модальное окно Информация о ПО (в т.ч. информация о памяти): 0 - нет, 1 - да
@@ -53,84 +53,107 @@
 // -------------------------------------------------------------
 #ifdef ESP32_S3_USED
 // Пины ESP32-S3
-#define LED_PIN (14U)            // DIN Пин матрицы 
-#define CLK_PIN (13U)            // CLK Пин для APA102
-#define BTN_PIN (7U)             // Пин кнопки   
-#define MOSFET_PIN (6U)          // Пин MOSFET транзистора
+#define LED_PIN (14U)   // DIN Пин матрицы 
+#define CLK_PIN (13U)   // CLK (для чипа APA102)
+#define BTN_PIN (7U)    // Пин кнопки   
+#define MOSFET_PIN (6U)
 #define MOSFET_LEVEL (HIGH)
+
 #if USE_TM1637
   #define DIO (18U)
   #define CLK (21U)
 #endif
+
 #if USE_ST7789
-  #define TFT_SCLK (12U)         // SCL (SCLK)
-  #define TFT_MOSI (11U)         // SDA (MOSI)
-  #define TFT_CS (10U)           // CS (Chip Select)
-  #define TFT_DC (13U)           // DC (Data/Command)
-  #define TFT_RST (5U)           // RES (reset)
-  #define TFT_BL (4U)            // управление яркостью
+  #define TFT_SCLK (12U)  // SCL (SCLK)
+  #define TFT_MOSI (11U)  // SDA (MOSI)
+  #define TFT_CS (10U)    // CS (Chip Select)
+  #define TFT_DC (9U)     // DC (Data/Command)
+  #define TFT_RST (5U)    // RES (reset)
+  #define TFT_BL (4U)     // управление яркостью
 #endif
+
+#if USE_SD
+  #define SD_CS_PIN (15U)
+  #define SD_SCK_PIN (12U)
+  #define SD_MOSI_PIN (11U)
+  #define SD_MISO_PIN (2U)
+#endif
+
 #if USE_MP3_PLAYER
-  #define MP3_TX_PIN (17U)       // TX -> RX на плеере
-  #define MP3_RX_PIN (16U)       // RX -> TX на плеере
+  #define MP3_TX_PIN (17U) // TX -> RX на плеере
+  #define MP3_RX_PIN (16U) // RX -> TX на плеере
 #endif
+
 #if USE_IR_RECEIVER
-  #define IR_RECEIVER_PIN (8U)   // Пин ИК сенсора
+  #define IR_RECEIVER_PIN (8U) // Пин ИК сенсора
 #endif
+
 #if USE_RF_RECEIVER
-  #define RF_RECEIVER_PIN (19U)  // Пин радиоприемника 433 МГц
+  #define RF_RECEIVER_PIN (19U) // Пин радиоприемника 433 МГц
 #endif
-  #define SD_CS_PIN (5U)
 // --------------------------------------------------------------
 #else
 // Пины ESP32
-#define LED_PIN (13U)            // DIN Пин матрицы
-#define CLK_PIN (12U)            // CLK Пин для APA102
-#define BTN_PIN (35U)            // Пин кнопки
-#define MOSFET_PIN (33U)         // Пин MOSFET транзистора
+#define LED_PIN (13U)
+#define CLK_PIN (12U)
+#define BTN_PIN (35U)
+#define MOSFET_PIN (33U)
 #define MOSFET_LEVEL (HIGH)
+
 #if USE_TM1637
   #define DIO (21U)
   #define CLK (22U)
 #endif
+
 #if USE_ST7789
-  #define TFT_SCLK (18U)         // SCL (SCLK)
-  #define TFT_MOSI (23U)         // SDA (MOSI)
-  #define TFT_CS (5U)            // CS (Chip Select)
-  #define TFT_DC (19U)           // DC (Data/Command)
-  #define TFT_RST (4U)           // RES (reset)
-  #define TFT_BL (27U)           // управление яркостью
+  #define TFT_SCLK (18U)
+  #define TFT_MOSI (23U)
+  #define TFT_CS (17U)
+  #define TFT_DC (32U)
+  #define TFT_RST (4U)
+  #define TFT_BL (27U)
 #endif
+
+#if USE_SD
+  #define SD_CS_PIN (5U)
+  #define SD_SCK_PIN (18U)
+  #define SD_MISO_PIN (19U)
+  #define SD_MOSI_PIN (23U)
+#endif
+
 #if USE_MP3_PLAYER
-  #define MP3_TX_PIN (25U)       // TX -> RX на плеере
-  #define MP3_RX_PIN (26U)       // RX -> TX на плеере
+  #define MP3_TX_PIN (25U)
+  #define MP3_RX_PIN (26U)
 #endif
+
 #if USE_IR_RECEIVER
-  #define IR_RECEIVER_PIN (34U)  // Пин ИК сенсора
+  #define IR_RECEIVER_PIN (34U)
 #endif
+
 #if USE_RF_RECEIVER
-  #define RF_RECEIVER_PIN (3U)   // Пин радиоприемника 433 МГц
+  #define RF_RECEIVER_PIN (3U)
 #endif
-  #define SD_CS_PIN (5U)         // SD-карта: CS: GPIO5 (VSPI CS), MOSI: GPIO23 (VSPI MOSI), MISO: GPIO19 (VSPI MISO), SCK: GPIO18 (VSPI SCK)
+
 #endif // ESP32_S3_USED
 #endif // ESP32_USED
 
 // ----------------------------------------------------------------- ДОПОЛНИТЕЛЬНЫЕ НАСТРОЙКИ ----------------------------------------------------------
 // Настройка кнопки
 #if USE_BUTTON
-  #define BUTTON_LOCK_ON_START 1                 // Блокировка кнопки при старте
-  #define BUTTON_STEP_TIMEOUT (100U)             // Таймаут удержания кнопки (мс)
-  #define BUTTON_CLICK_TIMEOUT (500U)            // Таймаут между нажатиями (мс)
-  #define BUTTON_SET_DEBOUNCE_SENSORY (10U)      // Время антидребезга (мс) для сенсорной кнопки
-  #define BUTTON_SET_DEBOUNCE_MECHANICAL (60U)   // Время антидребезга (мс) для механической кнопки
+  #define BUTTON_LOCK_ON_START 1 // Блокировка кнопки при старте
+  #define BUTTON_STEP_TIMEOUT (100U)  // Таймаут удержания кнопки (мс)
+  #define BUTTON_CLICK_TIMEOUT (500U) // Таймаут между нажатиями (мс)
+  #define BUTTON_SET_DEBOUNCE_SENSORY (10U) // Время антидребезга (мс) для сенсорной кнопки
+  #define BUTTON_SET_DEBOUNCE_MECHANICAL (60U) // Время антидребезга (мс) для механической кнопки
 #endif
 // --------------------------------------------------------------------------------------------------
 // Настройка ИК пульта
 #if USE_IR_RECEIVER
-  #define USE_2_PULTS 0              // Использовать второй пульт: 0 - нет, 1 - да
-  #define IR_REPEAT_TIMER 500        // Время ожидания повтора
-  #define IR_TICK_TIMER 100          // Время между автоповтором
-  #define IR_DIGIT_ENTER_TIMER 2000  // Время для ввода второй цифры номера эффекта
+  #define USE_2_PULTS 0 // Использовать второй пульт: 0 - нет, 1 - да
+  #define IR_REPEAT_TIMER 500 // Время ожидания повтора
+  #define IR_TICK_TIMER 100 // Время между автоповтором
+  #define IR_DIGIT_ENTER_TIMER 2000 // Время для ввода второй цифры номера эффекта
 #endif
 // --------------------------------------------------------------------------------------------------
 // Настройка мп3 плеера
@@ -154,9 +177,9 @@
 // --------------------------------------------------------------------------------------------------
 // Настройка дисплея ST7789
 #if USE_ST7789
-  #define TFT_BL_CH 7       // Канал подсветки
-  #define TFT_BL_FREQ 5000  // Частота подсветки
-  #define TFT_BL_BITS 8     // Разрядность
+  #define TFT_BL_CH 7 // Канал подсветки
+  #define TFT_BL_FREQ 5000 // Частота подсветки
+  #define TFT_BL_BITS 8 // Разрядность
 #endif
 // --------------------------------------------------------------------------------------------------
 // Настройка дисплея TM1637
@@ -181,7 +204,7 @@
 #define _GNU_SOURCE
 #define myTime Time::instance()
 #ifndef TZONE
- #define TZONE "GMT0"
+  #define TZONE "GMT0"
 #endif
 // --------------------------------------------------------------------------------------------------
 // Mqtt
@@ -190,53 +213,53 @@
 #endif
 // --------------------------------------------------------------------------------------------------
 // Blynk
-#define USE_BLYNK 0                  // Использовать BLYNK: 0 - нет, 1 - да
+#define USE_BLYNK 0 // Использовать BLYNK: 0 - нет, 1 - да
 #if USE_BLYNK
   #define CYCLE_LAST_EFFECT (MODE_AMOUNT - 1)
-  #define BLYNK_AUTH_TOKEN "token"   // Вставьте токен
-  #define CYCLE_DONT_OFF (1U)        // Не отключать режим Цикл при выключении лампы = 1U, отключать = 0U
-  #define CYCLE_TIMER (60U)          // Интервал смены эффектов
-  #define CYCLE_TIMER_PLUS (0U)      // + случайное время от нуля до 0U секунд
-  #define CYCLE_1ST_EFFECT (0U)      // С какого эффекта будет начинаться демонстрирация
+  #define BLYNK_AUTH_TOKEN "token" // Вставьте токен
+  #define CYCLE_DONT_OFF (1U) // Не отключать режим Цикл при выключении лампы = 1U, отключать = 0U
+  #define CYCLE_TIMER (60U) // Интервал смены эффектов
+  #define CYCLE_TIMER_PLUS (0U) // + случайное время от нуля до 0U секунд
+  #define CYCLE_1ST_EFFECT (0U) // С какого эффекта будет начинаться демонстрирация
 #endif
 // --------------------------------------------------------------------------------------------------
 // Переключение избранных эффектов
-#define DEFAULT_FAVORITES_INTERVAL (300U)  // значение по умолчанию для интервала переключения избранных эффектов в секундах
-#define DEFAULT_FAVORITES_DISPERSION (0U)  // значение по умолчанию для разброса интервала переключения избранных эффектов в секундах
+#define DEFAULT_FAVORITES_INTERVAL (300U) // значение по умолчанию для интервала переключения избранных эффектов в секундах
+#define DEFAULT_FAVORITES_DISPERSION (0U) // значение по умолчанию для разброса интервала переключения избранных эффектов в секундах
 // --------------------------------------------------------------------------------------------------
 // Настройки текста
-#define TEXT_DIRECTION (1U)            // 1 - по горизонтали, 0 - по вертикали
-#define MIRR_V (0U)                    // отразить текст по вертикали
-#define MIRR_H (0U)                    // отразить текст по горизонтали
-#define SPACE (1U)                     // пробел между символами
+#define TEXT_DIRECTION (1U) // 1 - по горизонтали, 0 - по вертикали
+#define MIRR_V (0U) // отразить текст по вертикали
+#define MIRR_H (0U) // отразить текст по горизонтали
+#define SPACE (1U) // пробел между символами
 #define LETTER_COLOR (CRGB::Blue)
-#define FONT_SMALL 0                   // Маленький шрифт (5x8)
-#define FONT_MEDIUM 1                  // Средний шрифт (8x13)
-#define FONT_LARGE 2                   // Крупный шрифт (10x16)
+#define FONT_SMALL 0 // Маленький шрифт (5x8)
+#define FONT_MEDIUM 1 // Средний шрифт (8x13)
+#define FONT_LARGE 2 // Крупный шрифт (10x16)
 // --------------------------------------------------------------------------------------------------
-#define ESP_HTTP_PORT (80U)            // Для WiFi клиента
-#define ESP_UDP_PORT (8888U)           // Для UDP сервера
+#define ESP_HTTP_PORT (80U) // Для WiFi клиента
+#define ESP_UDP_PORT (8888U) // Для UDP сервера
 #if USE_OTA
-  #define ESP_OTA_PORT (8266U)         // Для обновления по воздуху
-  #define ESP_CONF_TIMEOUT 420         // Таймаут OTA режима (7 минут)
+  #define ESP_OTA_PORT (8266U) // Для обновления по воздуху
+  #define ESP_CONF_TIMEOUT 420 // Таймаут OTA режима (7 минут)
 #endif
-#define USE_DEFAULT_SETTINGS_RESET 1   // Сброс настроек эффектов: 0 - откл, 1 - вкл
-#define HEAP_SIZE_PRINT 0              // Вывод размера свободного ОЗУ: 0 - откл, 1 - вкл
-#define MAIN_CYCLES_PER_SECOND 0       // Вывод FPS: 0 - откл, 1 - вкл
-#define USE_LittleFS                   // Закомментируйте, если используете SPIFFS
+#define USE_DEFAULT_SETTINGS_RESET 1 // Сброс настроек эффектов: 0 - откл, 1 - вкл
+#define HEAP_SIZE_PRINT 0 // Вывод размера свободного ОЗУ: 0 - откл, 1 - вкл
+#define MAIN_CYCLES_PER_SECOND 0 // Вывод FPS: 0 - откл, 1 - вкл
+#define USE_LittleFS // Закомментируйте, если используете SPIFFS
 #define TIMER_DISABLED 999999999UL
 // --------------------------------------------------------------------------------------------------
-#define SAVE_CONFIG_BIT 0x01           // Отложенное сохранение config.json
-#define SAVE_ALARMS_BIT 0x02           // Отложенное сохранение config_alarm.json и config_sunset.json
-#define SAVE_CYCLE_BIT 0x04            // Отложенное сохранение cycle.json
-#define SAVE_MULTILAMP_BIT 0x08        // Отложенное сохранение config_multilamp.json
-#define SAVE_SCHEDULE_BIT 0x10         // Отложенное сохранение config_schedule.json
+#define SAVE_CONFIG_BIT 0x01 // Отложенное сохранение config.json
+#define SAVE_ALARMS_BIT 0x02 // Отложенное сохранение config_alarm.json и config_sunset.json
+#define SAVE_CYCLE_BIT 0x04 // Отложенное сохранение cycle.json
+#define SAVE_MULTILAMP_BIT 0x08 // Отложенное сохранение config_multilamp.json
+#define SAVE_SCHEDULE_BIT 0x10 // Отложенное сохранение config_schedule.json
 // --------------------------------------------------------------------------------------------------
 #define countof(a) (sizeof(a) / sizeof(a[0]))
-#define USE_RANDOM_SETS_IN_APP  // Совместимость с приложением FireLamp
+#define USE_RANDOM_SETS_IN_APP // Совместимость с приложением FireLamp
 // --------------------------------------------------------------------------------------------------
 #define FASTLED_INTERRUPT_RETRY_COUNT (0) // Количество попыток повторной передачи кадра
-// #define FASTLED_ESP32_RMT 0              // отключает RMT на ESP32 и S3
+// #define FASTLED_ESP32_RMT 0 // отключает RMT на ESP32 и S3
 #define FASTLED_ESP32_RAW_PIN_ORDER
 // --------------------------------------------------------------------------------------------------
 #define LED_PANEL 1             // Включить опцию: 0 - нет, 1 - да (все настройки матрицы находятся тут)
