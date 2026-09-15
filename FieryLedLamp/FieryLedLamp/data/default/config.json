@@ -19,6 +19,8 @@
 	"night_bright": 5,
 	"effect_always": 0,
 	"eff_sel": 1,
+	"anim_sel": 0,
+    "out_sel": 0, 	
 	"br": 10,
 	"sp": 130,
 	"sc": 80,
@@ -42,5 +44,6 @@
     "rf_enabled": 0,
     "tm1637_enabled": 0,
     "st7789_enabled": 0,
-    "mp3_enabled": 0
+    "mp3_enabled": 0,
+	"sd_enabled": 0
 }
