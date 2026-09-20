@@ -1,5 +1,8 @@
 <p align="center">WEB</p>
 <p align="center">
+<img width="266" height="698" alt="menu" src="https://github.com/user-attachments/assets/83a0fd6e-4b8a-434f-bc16-f3d9d32ed26a" />
+</p>
+<p align="center">
 <img width="618" height="712" alt="index setup0" src="https://github.com/user-attachments/assets/2d6f87ec-b94e-4302-8893-ebd65f7cf08a" />
 </p>
 <p align="center">
