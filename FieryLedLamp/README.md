@@ -3,6 +3,9 @@
 <img width="1366" height="605" alt="constants" src="https://github.com/user-attachments/assets/1d1c243c-87ac-4876-8af7-dad6a1a6953e" />
 </p>
 <p align="center">
+<img width="585" height="673" alt="hardware" src="https://github.com/user-attachments/assets/73b1bddc-40c0-4cde-bafc-8aeac83cabb8" />
+</p>
+<p align="center">
 <img width="266" height="698" alt="menu" src="https://github.com/user-attachments/assets/83a0fd6e-4b8a-434f-bc16-f3d9d32ed26a" />
 </p>
 <p align="center">
@@ -19,9 +22,6 @@
 </p>
 <p align="center">
 <img width="642" height="696" alt="weather" src="https://github.com/user-attachments/assets/b5dc3a36-5908-4fdd-acf0-56e8208ec065" />
-</p>
-<p align="center">
-<img width="585" height="673" alt="hardware" src="https://github.com/user-attachments/assets/73b1bddc-40c0-4cde-bafc-8aeac83cabb8" />
 </p>
 <p align="center">
 <img width="590" height="719" alt="led_panel" src="https://github.com/user-attachments/assets/b3ff27d7-11b1-4f69-8002-d27ce366e0cb" />
