@@ -4,22 +4,69 @@
 #include "Prototypes.h"
 // -------------------------
 
+// буфер для кадров .out (выделяется один раз при запуске эффекта)
+#if USE_SD
+static uint8_t* outFrameBuffer = nullptr;
+static size_t outFrameBufferSize = 0;
+static bool outStartFailed = false;  // это защита от бесконечного рестарта
+
+static bool ensureOutFrameBuffer(size_t needed) {
+  if (needed <= outFrameBufferSize) return true;
+  if (outFrameBuffer) {
+    free(outFrameBuffer);
+    outFrameBuffer = nullptr;
+  }
+  outFrameBuffer = (uint8_t*)malloc(needed);
+  if (!outFrameBuffer) {
+#if EFF_LOG
+    SYSLOG.add("EFF_SD: не удалось выделить outFrameBuffer (%u байт)", (unsigned)needed);
+#endif
+    outFrameBufferSize = 0;
+    return false;
+  }
+  outFrameBufferSize = needed;
+  return true;
+}
+#endif // USE_SD
+
 void effectsTick() {
   if (systemShuttingDown || !ONflag) return;
 #if USE_SD
   if (currentMode == EFF_SD) {
     loadingFlag = false;
 
+    if (outStartFailed) {
+      FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+    }
+
     if (!outAnimationActive || !outFile) {
       if (lastOutFileName.length() > 0) {
-        startOutAnimation(lastOutFileName);
+        if (!startOutAnimation(lastOutFileName)) {
+#if EFF_LOG
+          SYSLOG.add("EFF_SD: не удалось запустить %s, откат на EFF_RAINBOW_VER", lastOutFileName.c_str());
+#endif
+          outStartFailed = true;
+          outAnimationActive = false;
+          currentMode = EFF_RAINBOW_VER;
+          for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+            if (eff_num_correct[i] == currentMode) {
+              jsonWrite(configSetup, "eff_sel", i);
+              break;
+            }
+          }
+          saveConfig("setup");
+          loadingFlag = true;
+          FastLED.clear(); FastLED.show(); Eff_Tick();
+          return;
+        }
+        outStartFailed = false;
       } else {
         FastLED.clear(); FastLED.show(); Eff_Tick(); return;
       }
     }
 
+    // расчёт задержки
     uint32_t baseDelay = outFrameDelay;
-
     uint32_t speedNum = modes[currentMode].Speed;
     if (speedNum < 1) speedNum = 128;
     uint32_t currentDelay = baseDelay * 128 / speedNum;
@@ -29,47 +76,53 @@ void effectsTick() {
     if (now - outLastFrameTime >= currentDelay) {
       outLastFrameTime = now;
 
+      // блочное чтение кадра: [delayByte] + [usedLeds * 3 байт GRB] (первый байт кадра (delay) пропустить - outFrameDelay уже посчитан при старте)
+      size_t frameSize = (size_t)usedLeds * 3;
+      if (!ensureOutFrameBuffer(frameSize)) {
+        outFile.close();
+        outAnimationActive = false;
+        FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+      }
+
       int delayByte = outFile.read();
       if (delayByte == -1) {
         outFile.seek(0);
         outFile.read();
       }
 
-      for (uint16_t i = 0; i < usedLeds; i++) {
-        int r = outFile.read();
-        int g = outFile.read();
-        int b = outFile.read();
-
-        if (r == -1 || g == -1 || b == -1) {
-          outFile.seek(0);
-          outFile.read();
-          for (uint16_t j = 0; j < usedLeds; j++) {
-            r = outFile.read(); g = outFile.read(); b = outFile.read();
-            if (r == -1 || g == -1 || b == -1) {
-              outFile.close();
-              outAnimationActive = false;
-              FastLED.clear(); FastLED.show();
-              Eff_Tick(); return;
-            }
-            uint8_t fileX = j % matrixWidth;
-            uint8_t fileY = j / matrixWidth;
-            uint8_t lampY = matrixHeight - 1 - fileY;
-            drawPixelXY(fileX, lampY, CRGB(g, r, b));
-          }
-          break;
+      size_t bytesRead = outFile.read(outFrameBuffer, frameSize);
+      if (bytesRead < frameSize) {
+        outFile.seek(0);
+        outFile.read();
+        bytesRead = outFile.read(outFrameBuffer, frameSize);
+        if (bytesRead < frameSize) {
+          outFile.close();
+          outAnimationActive = false;
+#if EFF_LOG
+          SYSLOG.add("EFF_SD: файл %s не содержит полного кадра", lastOutFileName.c_str());
+#endif
+          FastLED.clear(); FastLED.show(); Eff_Tick(); return;
         }
+      }
+
+      for (uint16_t i = 0; i < usedLeds; i++) {
+        uint8_t r = outFrameBuffer[i * 3];
+        uint8_t g = outFrameBuffer[i * 3 + 1];
+        uint8_t b = outFrameBuffer[i * 3 + 2];
 
         uint8_t fileX = i % matrixWidth;
         uint8_t fileY = i / matrixWidth;
         uint8_t lampY = matrixHeight - 1 - fileY;
-        drawPixelXY(fileX, lampY, CRGB(g, r, b));
+        drawPixelXY(fileX, lampY, CRGB(g, r, b)); // GRB + инверсия Y
       }
+
       FastLED.show();
     }
+
     Eff_Tick();
     return;
   }
-#endif
+#endif // USE_SD
 
 #if USE_DAWN && USE_SUNSET
   if (!dawnFlag && !sunsetFlag && ONflag) {
@@ -287,7 +340,7 @@ void changePower() {
 #endif
 
 #if USE_SUNSET
-  else if (sunsetFlag == 2) {
+  if (sunsetFlag == 2) {
     sunsetFlag = 0;
     ONflag = false;
 #if USE_MP3_PLAYER
@@ -342,7 +395,7 @@ void changePower() {
     effectsTick();
     FastLED.show();
 
-  } // if (ONflag) {
+  } // if (ONflag) { // включение
   else { // выключение
     if (leds != nullptr) {
       FastLED.setBrightness(0);
@@ -354,7 +407,6 @@ void changePower() {
 #endif
 
     timeout_save_file_changes = 0;
-    save_file_changes = 0;
     manualOverride = true;
     manualOverrideUntil = millis() + 300000UL;
 
@@ -383,6 +435,10 @@ void changePower() {
     runTextOver = false;
     resetTimerState();
     systemShuttingDown = false;
+
+#if USE_SD
+    outStartFailed = false;
+#endif
   } // else { // выключение
 
 #if USE_MQTT
@@ -395,9 +451,7 @@ void changePower() {
 // ----------------------------------------------------------------------------------------
 void Eff_Tick() {
   if (systemShuttingDown) return;
-  if (leds == nullptr) {
-    return;
-  }
+  if (leds == nullptr) return;
 
   if (!ONflag) {
     FastLED.clear();
@@ -422,7 +476,6 @@ void Eff_Tick() {
   if (runTextEnabled) {
     if (!textIsRunning && (IntervalrunText == 0 || runningTextTimer.isReady())) {
       textIsRunning = true;
-
     }
   }
 
@@ -433,11 +486,9 @@ void Eff_Tick() {
     lastBlinkTimer = now;
 
     if (nightModeBrightness > 0) {
-      // в ночном режиме точки в дате и знак ° в погоде не мигают
       globalPointBrightness = 255;
       globalDegBrightness = 255;
     } else {
-      // обычный режим (мигание в зависимости от чекбоксов)
       uint32_t phaseLong = now % 2000UL;
       uint8_t brLong = (phaseLong < 1000) ? map(phaseLong, 0, 1000, 10, 255) : map(phaseLong - 1000, 0, 1000, 255, 10);
 
@@ -448,7 +499,6 @@ void Eff_Tick() {
 #endif
     }
 
-    // мигание двоеточия в часах всегда (независимо от ночного режима)
     uint32_t phaseColon = now % 1000UL;
     uint8_t brColon;
     if (phaseColon < 250) brColon = 255;
@@ -471,4 +521,4 @@ void Eff_Tick() {
   }
 } // void Eff_Tick()
 
-// ******************************************************************************************************************************************************
+// ****************************************************************************************************************************************************

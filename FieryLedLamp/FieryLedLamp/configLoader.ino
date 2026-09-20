@@ -705,59 +705,35 @@ void loadUserBrightness() {
 }
 // ============================================================================ МАТРИЦА ===============================================================
 void loadMatrixAndInitLEDs() {
-  bool localChanged = false;
+  bool configNeedsSave = false;
 
-  if (jsonRead(configLED, "width") == "") {
-    jsonWrite(configLED, "width", String(WIDTH));
-    localChanged = true;
-  }
-  if (jsonRead(configLED, "height") == "") {
-    jsonWrite(configLED, "height", String(HEIGHT));
-    localChanged = true;
-  }
-  if (jsonRead(configLED, "m_t") == "") {
-    jsonWrite(configLED, "m_t", String(MATRIX_TYPE));
-    localChanged = true;
-  }
-  if (jsonRead(configLED, "m_o") == "") {
-    jsonWrite(configLED, "m_o", String(MATRIX_ORIENTATION));
-    localChanged = true;
-  }
-  if (jsonRead(configLED, "cur_lim") == "") {
-    jsonWrite(configLED, "cur_lim", String(CURRENT_LIMIT));
-    localChanged = true;
-  }
+  // дефолты для отсутствующих/нулевых ключей
+  auto ensureKey = [&](const char* key, const String & defVal) {
+    String v = jsonRead(configLED, key);
+    if (v == "" || v == "null") {
+      jsonWrite(configLED, key, defVal);
+      configNeedsSave = true;
+    }
+  };
 
+  ensureKey("width", String(WIDTH));
+  ensureKey("height", String(HEIGHT));
+  ensureKey("m_t", String(MATRIX_TYPE));
+  ensureKey("m_o", String(MATRIX_ORIENTATION));
+  ensureKey("cur_lim", String(CURRENT_LIMIT));
 #if MULTI_MATRIX
-  if (jsonRead(configLED, "panel_flip") == "") {
-    jsonWrite(configLED, "panel_flip", "0");
-    localChanged = true;
-  }
-  if (jsonRead(configLED, "segMatrix_w") == "") {
-    jsonWrite(configLED, "segMatrix_w", String(SEG_MATRIX_W));
-    localChanged = true;
-  }
-  if (jsonRead(configLED, "segMatrix_h") == "") {
-    jsonWrite(configLED, "segMatrix_h", String(SEG_MATRIX_H));
-    localChanged = true;
-  }
+  ensureKey("panel_flip", "0");
+  ensureKey("segMatrix_w", String(SEG_MATRIX_W));
+  ensureKey("segMatrix_h", String(SEG_MATRIX_H));
 #endif
 
-  if (localChanged) {
-    configChanged = true;
-  }
-
-  MatrixType = jsonReadtoInt(configLED, "m_t", MATRIX_TYPE);
-  MatrixOrientation = jsonReadtoInt(configLED, "m_o", MATRIX_ORIENTATION);
-  current_limit = jsonReadtoInt(configLED, "cur_lim", CURRENT_LIMIT);
-
-  uint16_t newSegWidth = jsonReadtoInt(configLED, "width", WIDTH);
+  uint16_t newSegWidth = jsonReadtoInt(configLED, "width",  WIDTH);
   uint16_t newSegHeight = jsonReadtoInt(configLED, "height", HEIGHT);
-  uint8_t newMatrixType = jsonReadtoInt(configLED, "m_t", MATRIX_TYPE);
-  uint8_t newMatrixOrientation = jsonReadtoInt(configLED, "m_o", MATRIX_ORIENTATION);
+  uint8_t  newMatrixType = jsonReadtoInt(configLED, "m_t", MATRIX_TYPE);
+  uint8_t  newMatrixOrientation = jsonReadtoInt(configLED, "m_o", MATRIX_ORIENTATION);
   uint16_t newCurrentLimit = jsonReadtoInt(configLED, "cur_lim", CURRENT_LIMIT);
 
-  if (newSegWidth < 1 || newSegWidth > MAX_MATRIX_WIDTH) newSegWidth = WIDTH;
+  if (newSegWidth < 1 || newSegWidth > MAX_MATRIX_WIDTH) newSegWidth  = WIDTH;
   if (newSegHeight < 1 || newSegHeight > MAX_MATRIX_HEIGHT) newSegHeight = HEIGHT;
   if (newMatrixType > 1) newMatrixType = MATRIX_TYPE;
   if (newMatrixOrientation > 7) newMatrixOrientation = MATRIX_ORIENTATION;
@@ -769,53 +745,66 @@ void loadMatrixAndInitLEDs() {
   if (newSegW < 1) newSegW = 1;
   if (newSegH < 1) newSegH = 1;
   bool newPanelFlip = (jsonReadtoInt(configLED, "panel_flip", 0) == 1);
-  panelFlip = newPanelFlip;
 #else
   const uint8_t newSegW = 1, newSegH = 1;
+  const bool newPanelFlip = false;
 #endif
 
-  uint16_t newMatrixWidth = newSegWidth * newSegW;
-  uint16_t newMatrixHeight = newSegHeight * newSegH;
-  if (newMatrixWidth > MAX_MATRIX_WIDTH) newMatrixWidth = MAX_MATRIX_WIDTH;
-  if (newMatrixHeight > MAX_MATRIX_HEIGHT) newMatrixHeight = MAX_MATRIX_HEIGHT;
-  uint16_t newUsedLeds = newMatrixWidth * newMatrixHeight * SEGMENTS;
-  if (newUsedLeds > MAX_LEDS) newUsedLeds = MAX_LEDS;
+  // расчёт итоговых размеров
+  if ((uint32_t)newSegWidth * newSegW > MAX_MATRIX_WIDTH) {
+    newSegWidth = MAX_MATRIX_WIDTH / newSegW;
+    if (newSegWidth < 1) newSegWidth = 1;
+  }
+  if ((uint32_t)newSegHeight * newSegH > MAX_MATRIX_HEIGHT) {
+    newSegHeight = MAX_MATRIX_HEIGHT / newSegH;
+    if (newSegHeight < 1) newSegHeight = 1;
+  }
 
+  uint16_t newMatrixWidth  = newSegWidth  * newSegW;
+  uint16_t newMatrixHeight = newSegHeight * newSegH;
+  uint32_t newUsedLeds32 = (uint32_t)newMatrixWidth * newMatrixHeight * SEGMENTS;
+  if (newUsedLeds32 > MAX_LEDS) newUsedLeds32 = MAX_LEDS;
+  uint16_t newUsedLeds = (uint16_t)newUsedLeds32;
+
+  // сохранение «старых» размеров для reconfigure
   uint16_t oldWidth = matrixWidth;
   uint16_t oldHeight = matrixHeight;
   bool buffersExist = (leds != nullptr);
 
-  if (newMatrixWidth != oldWidth || newMatrixHeight != oldHeight) {
-    if (buffersExist) {
-      if (reconfigureMatrix(newMatrixWidth, newMatrixHeight, newUsedLeds, oldWidth, oldHeight)) {
-        segWidth = newSegWidth;
-        segHeight = newSegHeight;
-        MatrixType = newMatrixType;
-        MatrixOrientation = newMatrixOrientation;
-        current_limit = newCurrentLimit;
+  // для применения новой конфигурации
+  auto applyMatrixConfig = [&]() {
+    segWidth = newSegWidth;
+    segHeight = newSegHeight;
+    MatrixType = newMatrixType;
+    MatrixOrientation = newMatrixOrientation;
+    current_limit = newCurrentLimit;
 #if MULTI_MATRIX
-        panelFlip = newPanelFlip;
-        segMatrix_w = newSegW;
-        segMatrix_h = newSegH;
+    panelFlip = newPanelFlip;
+    segMatrix_w = newSegW;
+    segMatrix_h = newSegH;
 #endif
-        matrixWidth = newMatrixWidth;
-        matrixHeight = newMatrixHeight;
-        usedLeds = newUsedLeds;
+    matrixWidth = newMatrixWidth;
+    matrixHeight = newMatrixHeight;
+    usedLeds = newUsedLeds;
+  };
 
-        if (localChanged) {
-          saveConfig();
-          localChanged = false;
-        }
-#if MATRIX_LOG
-        SYSLOG.add("Матрица изменена, перезагрузка...");
-#endif
-        ESP.restart();
-      } else {
+  bool sizeChanged = (newMatrixWidth != oldWidth || newMatrixHeight != oldHeight);
+
+  if (sizeChanged) {
+    if (buffersExist) {
+      if (!reconfigureMatrix(newMatrixWidth, newMatrixHeight, newUsedLeds, oldWidth, oldHeight)) {
 #if MATRIX_LOG
         SYSLOG.add("Не удалось переконфигурировать матрицу, будут задействованы старые настройки");
 #endif
         return;
       }
+      applyMatrixConfig();
+
+#if MATRIX_LOG
+      SYSLOG.add("Матрица изменена, перезагрузка...");
+#endif
+      if (configNeedsSave) saveConfig();
+      ESP.restart();
     } else {
       if (!reconfigureMatrix(newMatrixWidth, newMatrixHeight, newUsedLeds, oldWidth, oldHeight)) {
 #if MATRIX_LOG
@@ -823,24 +812,7 @@ void loadMatrixAndInitLEDs() {
 #endif
         return;
       }
-      segWidth = newSegWidth;
-      segHeight = newSegHeight;
-      MatrixType = newMatrixType;
-      MatrixOrientation = newMatrixOrientation;
-      current_limit = newCurrentLimit;
-#if MULTI_MATRIX
-      panelFlip = newPanelFlip;
-      segMatrix_w = newSegW;
-      segMatrix_h = newSegH;
-#endif
-      matrixWidth = newMatrixWidth;
-      matrixHeight = newMatrixHeight;
-      usedLeds = newUsedLeds;
-
-      if (localChanged) {
-        saveConfig();
-        localChanged = false;
-      }
+      applyMatrixConfig();
     }
   } else {
     if (!buffersExist) {
@@ -850,55 +822,30 @@ void loadMatrixAndInitLEDs() {
 #endif
         return;
       }
-      segWidth = newSegWidth;
-      segHeight = newSegHeight;
-      MatrixType = newMatrixType;
-      MatrixOrientation = newMatrixOrientation;
-      current_limit = newCurrentLimit;
-#if MULTI_MATRIX
-      panelFlip = newPanelFlip;
-      segMatrix_w = newSegW;
-      segMatrix_h = newSegH;
-#endif
-      matrixWidth = newMatrixWidth;
-      matrixHeight = newMatrixHeight;
-      usedLeds = newUsedLeds;
-      if (localChanged) {
-        saveConfig();
-        localChanged = false;
-      }
+      applyMatrixConfig();
     } else {
-      segWidth = newSegWidth;
-      segHeight = newSegHeight;
-      MatrixType = newMatrixType;
-      MatrixOrientation = newMatrixOrientation;
-      current_limit = newCurrentLimit;
-#if MULTI_MATRIX
-      panelFlip = newPanelFlip;
-      segMatrix_w = newSegW;
-      segMatrix_h = newSegH;
-#endif
+      applyMatrixConfig();
     }
   }
 
   // ----------------------- Инициализация FastLED ---------------------------
   {
     bool ledConfigChanged = false;
-    if (jsonRead(configLED, "led_chip") == "") {
+    String chipStr = jsonRead(configLED, "led_chip");
+    String orderStr = jsonRead(configLED, "color_order");
+    if (chipStr == "" || chipStr == "null") {
       jsonWrite(configLED, "led_chip", String(LED_CHIP));
       ledConfigChanged = true;
     }
-    if (jsonRead(configLED, "color_order") == "") {
+    if (orderStr == "" || orderStr == "null") {
       jsonWrite(configLED, "color_order", String(COLOR_ORDER));
       ledConfigChanged = true;
     }
-    if (ledConfigChanged) {
-      configChanged = true;
-      localChanged = true;
-    }
+    if (ledConfigChanged) configNeedsSave = true;
 
     uint8_t ledChipType = jsonReadtoInt(configLED, "led_chip", LED_CHIP);
     uint8_t webColorOrder = jsonReadtoInt(configLED, "color_order", COLOR_ORDER);
+
     uint8_t colorOrder = GRB;
     switch (webColorOrder) {
       case 0: colorOrder = GRB; break;
@@ -932,6 +879,7 @@ void loadMatrixAndInitLEDs() {
     }
 
     FastLED.setCorrection(TypicalLEDStrip);
+
     uint8_t savedBrightness = jsonReadtoInt(configSetup, "br");
     if (savedBrightness < 1 || savedBrightness > 255) savedBrightness = BRIGHTNESS;
 
@@ -953,9 +901,9 @@ void loadMatrixAndInitLEDs() {
     FastLED.clear();
     FastLED.setBrightness(savedBrightness);
     FastLED.show();
-
   }
 
+  // папка /effects/ для эмуляции SD
 #if USE_SD
   if (sdType == 1) {
     String sizeFolder = String(matrixWidth) + "x" + String(matrixHeight);
@@ -973,6 +921,11 @@ void loadMatrixAndInitLEDs() {
     }
   }
 #endif
+
+  if (configNeedsSave) {
+    saveConfig();
+  }
+
   printFreeHeap("После выделения матрицы");
 }
 

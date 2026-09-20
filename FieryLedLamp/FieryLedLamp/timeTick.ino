@@ -175,6 +175,21 @@ static uint32_t lastScheduleCheck = 0;
 if (millis() - lastScheduleCheck >= 1000UL) {
   lastScheduleCheck = millis();
 
+  static bool scheduleInitialized = false;
+  if (!scheduleInitialized) {
+    scheduleInitialized = true;
+    uint16_t currentMinutes = myTime.hour() * 60 + myTime.minute();
+    for (uint8_t i = 0; i < MAX_SCHEDULE_ENTRIES; i++) {
+      if (schedule[i].State == 0) continue;
+      if (currentMinutes >= schedule[i].Time) {
+        lastExecutedMinute[i] = schedule[i].Time;
+#if SCHEDULE_LOG
+        SYSLOG.add("Расписание: пропуск прошедшего задания i=%u (time=%u, now=%u)", i, schedule[i].Time, currentMinutes);
+#endif
+      }
+    }
+  }
+
   uint16_t currentMinutes = myTime.hour() * 60 + myTime.minute();
 
   if (manualOverride && millis() < manualOverrideUntil) {

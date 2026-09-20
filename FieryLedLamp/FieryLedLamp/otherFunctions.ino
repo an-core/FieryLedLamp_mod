@@ -35,15 +35,18 @@ bool FileCopy(const String& SourceFile, const String& TargetFile) {
   File t = LittleFS.open(TargetFile, "w");
   if (!s || !t) {
     if (s) s.close();
+    if (t) t.close();
     return false;
   }
   uint8_t buf[512];
   while (s.available()) {
     size_t len = s.read(buf, sizeof(buf));
+    if (len == 0) break;
     t.write(buf, len);
     yield();
   }
-  s.close(); t.close();
+  s.close();
+  t.close();
   return true;
 }
 
@@ -213,6 +216,11 @@ String formatDateTimeForDisplay(String dateTime) {
 }
 
 // ----------------------------------------------------------------------
+// Таймауты HTTPS-запросов (снижены с 10-15 сек до 3-5 сек, чтобы не блокировать loop)
+static const uint16_t HTTPS_TIMEOUT_CHANGELOG_MS = 3000;
+static const uint16_t HTTPS_TIMEOUT_PLANNED_MS   = 3000;
+static const uint16_t HTTPS_TIMEOUT_COMMIT_MS    = 5000;
+
 void performUpdateCheck() {
   if (!Wifi::instance().isConnected()) {
     DynamicJsonDocument doc(256);
@@ -226,7 +234,7 @@ void performUpdateCheck() {
     return;
   }
 
-  DynamicJsonDocument doc(8192);
+  DynamicJsonDocument doc(4096);
   String resp;
   String buildDateTime = buildDateTimeString();
 
@@ -235,134 +243,144 @@ void performUpdateCheck() {
   doc["folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/FieryLedLamp_mod";
   doc["update_folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/update";
 
-  String changelogUrl = "https://gist.githubusercontent.com/an-core/76efbb63916515dda1843a5574208b8d/raw/changelog.json";
-  bool changelogLoaded = false;
+  // ---------------------- Changelog ----------------------
+  {
+    String changelogUrl = "https://gist.githubusercontent.com/an-core/76efbb63916515dda1843a5574208b8d/raw/changelog.json";
+    bool changelogLoaded = false;
 
-  WiFiClientSecure clientChangelog;
-  clientChangelog.setInsecure();
-  clientChangelog.setTimeout(10000);
-  HTTPClient httpChangelog;
-  httpChangelog.setTimeout(10000);
+    WiFiClientSecure clientChangelog;
+    clientChangelog.setInsecure();
+    clientChangelog.setTimeout(HTTPS_TIMEOUT_CHANGELOG_MS);
+    HTTPClient httpChangelog;
+    httpChangelog.setTimeout(HTTPS_TIMEOUT_CHANGELOG_MS);
 
-  if (httpChangelog.begin(clientChangelog, changelogUrl)) {
-    httpChangelog.addHeader("User-Agent", "FieryLedLamp");
-    int httpCodeChangelog = httpChangelog.GET();
+    if (httpChangelog.begin(clientChangelog, changelogUrl)) {
+      httpChangelog.addHeader("User-Agent", "FieryLedLamp");
+      int httpCodeChangelog = httpChangelog.GET();
 
-    if (httpCodeChangelog == HTTP_CODE_OK) {
-      String content = httpChangelog.getString();
-      DynamicJsonDocument changelogJson(16384);
-      DeserializationError error = deserializeJson(changelogJson, content);
+      if (httpCodeChangelog == HTTP_CODE_OK) {
+        String content = httpChangelog.getString();
+        DynamicJsonDocument changelogJson(4096);
+        DeserializationError error = deserializeJson(changelogJson, content);
 
-      if (!error && changelogJson.containsKey("changes")) {
-        JsonArray changes = changelogJson["changes"];
-        if (changes && changes.size() > 0) {
-          JsonArray changelog = doc.createNestedArray("changelog");
-          for (JsonVariant item : changes) {
-            changelog.add(item.as<JsonVariant>());
+        if (!error && changelogJson.containsKey("changes")) {
+          JsonArray changes = changelogJson["changes"];
+          if (changes && changes.size() > 0) {
+            JsonArray changelog = doc.createNestedArray("changelog");
+            for (JsonVariant item : changes) {
+              changelog.add(item.as<JsonVariant>());
+            }
+            changelogLoaded = true;
           }
+        } else if (!error) {
+          JsonArray changelog = doc.createNestedArray("changelog");
+          changelog.add("Список изменений пуст");
           changelogLoaded = true;
         }
-      } else if (!error) {
-        JsonArray changelog = doc.createNestedArray("changelog");
-        changelog.add("Список изменений пуст");
-        changelogLoaded = true;
       }
+      httpChangelog.end();
     }
-    httpChangelog.end();
-  }
-  clientChangelog.stop();
+    clientChangelog.stop();
 
-  if (!changelogLoaded) {
-    JsonArray changelog = doc.createNestedArray("changelog");
-    changelog.add("Список изменений временно недоступен");
-    changelog.add("Попробуйте обновить страницу позже");
-  }
-
-  String plannedUrl = "https://gist.githubusercontent.com/an-core/2af384f891752661d020ae354274bc08/raw/planned.json";
-  bool plannedLoaded = false;
-
-  WiFiClientSecure clientPlanned;
-  clientPlanned.setInsecure();
-  clientPlanned.setTimeout(10000);
-  HTTPClient httpPlanned;
-  httpPlanned.setTimeout(10000);
-
-  if (httpPlanned.begin(clientPlanned, plannedUrl)) {
-    httpPlanned.addHeader("User-Agent", "FieryLedLamp");
-    int httpCodePlanned = httpPlanned.GET();
-
-    if (httpCodePlanned == HTTP_CODE_OK) {
-      String contentPlanned = httpPlanned.getString();
-      DynamicJsonDocument plannedJson(4096);
-      DeserializationError errorPlanned = deserializeJson(plannedJson, contentPlanned);
-
-      if (!errorPlanned && plannedJson.containsKey("planned")) {
-        JsonArray planned = plannedJson["planned"];
-        if (planned && planned.size() > 0) {
-          JsonArray plannedList = doc.createNestedArray("planned");
-          for (JsonVariant item : planned) {
-            plannedList.add(item.as<JsonVariant>());
-          }
-          plannedLoaded = true;
-        }
-      }
+    if (!changelogLoaded) {
+      JsonArray changelog = doc.createNestedArray("changelog");
+      changelog.add("Список изменений временно недоступен");
+      changelog.add("Попробуйте обновить страницу позже");
     }
-    httpPlanned.end();
-  }
-  clientPlanned.stop();
-
-  if (!plannedLoaded) {
-    JsonArray plannedList = doc.createNestedArray("planned");
-    plannedList.add("Список планов временно недоступен");
   }
 
-  String fileName = "bin_ESP32_ESP32S3.zip";
-  String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
+  // ---------------------- Planned ----------------------
+  {
+    String plannedUrl = "https://gist.githubusercontent.com/an-core/2af384f891752661d020ae354274bc08/raw/planned.json";
+    bool plannedLoaded = false;
 
-  WiFiClientSecure client;
-  client.setInsecure();
-  client.setTimeout(15000);
+    WiFiClientSecure clientPlanned;
+    clientPlanned.setInsecure();
+    clientPlanned.setTimeout(HTTPS_TIMEOUT_PLANNED_MS);
+    HTTPClient httpPlanned;
+    httpPlanned.setTimeout(HTTPS_TIMEOUT_PLANNED_MS);
 
-  HTTPClient http;
-  http.setTimeout(15000);
+    if (httpPlanned.begin(clientPlanned, plannedUrl)) {
+      httpPlanned.addHeader("User-Agent", "FieryLedLamp");
+      int httpCodePlanned = httpPlanned.GET();
 
-  bool hasUpdate = false;
-  String updateVersion = "";
-  String fullDateTimeForDisplay = "";
+      if (httpCodePlanned == HTTP_CODE_OK) {
+        String contentPlanned = httpPlanned.getString();
+        DynamicJsonDocument plannedJson(2048);
+        DeserializationError errorPlanned = deserializeJson(plannedJson, contentPlanned);
 
-  if (http.begin(client, commitUrl)) {
-    http.addHeader("User-Agent", "FieryLedLamp");
-    http.addHeader("Accept", "application/vnd.github.v3+json");
-
-    if (http.GET() == HTTP_CODE_OK) {
-      String payload = http.getString();
-      DynamicJsonDocument commitDoc(16384);
-
-      if (!deserializeJson(commitDoc, payload)) {
-        String commitDate = commitDoc[0]["commit"]["author"]["date"].as<String>();
-        if (commitDate.length() > 0) {
-          String fileDateTimeMSK = convertUTCtoMSK(commitDate.substring(0, 19) + "+00:00");
-          String buildDateTimeMSK = buildDateTimeString();
-
-          hasUpdate = (fileDateTimeMSK > buildDateTimeMSK);
-
-          if (hasUpdate) {
-            updateVersion = fileName;
-            fullDateTimeForDisplay = formatDateTimeForDisplay(fileDateTimeMSK);
+        if (!errorPlanned && plannedJson.containsKey("planned")) {
+          JsonArray planned = plannedJson["planned"];
+          if (planned && planned.size() > 0) {
+            JsonArray plannedList = doc.createNestedArray("planned");
+            for (JsonVariant item : planned) {
+              plannedList.add(item.as<JsonVariant>());
+            }
+            plannedLoaded = true;
           }
         }
       }
+      httpPlanned.end();
     }
-    http.end();
-  }
-  client.stop();
+    clientPlanned.stop();
 
-  doc["has_update"] = hasUpdate;
-  if (hasUpdate) {
-    doc["update_version"] = updateVersion;
-    doc["update_datetime"] = fullDateTimeForDisplay;
-    doc["update_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/update";
+    if (!plannedLoaded) {
+      JsonArray plannedList = doc.createNestedArray("planned");
+      plannedList.add("Список планов временно недоступен");
+    }
   }
+
+  // ---------------------- Проверка обновления ----------------------
+  {
+    String fileName = "bin_ESP32_ESP32S3.zip";
+    String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
+
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(HTTPS_TIMEOUT_COMMIT_MS);
+
+    HTTPClient http;
+    http.setTimeout(HTTPS_TIMEOUT_COMMIT_MS);
+
+    bool hasUpdate = false;
+    String updateVersion = "";
+    String fullDateTimeForDisplay = "";
+
+    if (http.begin(client, commitUrl)) {
+      http.addHeader("User-Agent", "FieryLedLamp");
+      http.addHeader("Accept", "application/vnd.github.v3+json");
+
+      if (http.GET() == HTTP_CODE_OK) {
+        String payload = http.getString();
+        DynamicJsonDocument commitDoc(2048);
+
+        if (!deserializeJson(commitDoc, payload)) {
+          String commitDate = commitDoc[0]["commit"]["author"]["date"].as<String>();
+          if (commitDate.length() > 0) {
+            String fileDateTimeMSK = convertUTCtoMSK(commitDate.substring(0, 19) + "+00:00");
+            String buildDateTimeMSK = buildDateTimeString();
+
+            hasUpdate = (fileDateTimeMSK > buildDateTimeMSK);
+
+            if (hasUpdate) {
+              updateVersion = fileName;
+              fullDateTimeForDisplay = formatDateTimeForDisplay(fileDateTimeMSK);
+            }
+          }
+        }
+      }
+      http.end();
+    }
+    client.stop();
+
+    doc["has_update"] = hasUpdate;
+    if (hasUpdate) {
+      doc["update_version"] = updateVersion;
+      doc["update_datetime"] = fullDateTimeForDisplay;
+      doc["update_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/update";
+    }
+  }
+
   serializeJson(doc, resp);
 
   updateCache.response = resp;
@@ -372,18 +390,7 @@ void performUpdateCheck() {
 
 // ----------------------------------------------------------------------
 #if USE_DAWN
-void saveAlarmConfig(const String & data) {
-  File file = LittleFS.open(F("/config_alarm.json"), "w");
-  if (!file) {
-    return;
-  }
-  file.print(data);
-  file.flush();
-  delay(5);
-  file.close();
-}
-// ---------------------------------------
-// сохранение
+// save_alarms использует общий writeFile из ArduinoJson.ino
 void save_alarms() {
   if (configAlarm.isEmpty()) configAlarm = "{}";
 
@@ -410,7 +417,7 @@ void save_alarms() {
       char buf[3];
       sprintf(buf, "%02d", alarms[i].Time / 60);
       jsonWrite(configAlarm, key_h, String(buf));
-      sprintf(buf, "%02d", alarms[i]. Time % 60);
+      sprintf(buf, "%02d", alarms[i].Time % 60);
       jsonWrite(configAlarm, key_m, String(buf));
     }
   }
@@ -429,15 +436,13 @@ void save_alarms() {
   }
 
   if (changed) {
-    saveAlarmConfig(configAlarm);
-    configAlarm = readFile(F("config_alarm.json"), 2048);
+    writeFile(F("config_alarm.json"), configAlarm);
   }
 }
 #endif // USE_DAWN
 
 // ----------------------------------------------------------------------
 #if USE_SUNSET
-// сохранение
 void save_sunsets() {
   if (configSunset.isEmpty() || configSunset == "null") {
     configSunset = "{}";
@@ -481,14 +486,12 @@ void save_sunsets() {
 
   if (saveNeeded) {
     writeFile(F("config_sunset.json"), configSunset);
-    configSunset = readFile(F("config_sunset.json"), 512);
   }
 }
 #endif // USE_SUNSET
 
 // ----------------------------------------------------------------------
 #if USE_SCHEDULE
-// загрузка расписания
 void load_schedule() {
   if (configSchedule.isEmpty() || configSchedule == "null") {
     configSchedule = "{}";
@@ -540,14 +543,11 @@ void load_schedule() {
     schedule[timerIndex].Action = action;
 
     if (slot == 3 && action == 3) {
-      // включить указанный эффект
       schedule[timerIndex].EffectNum = effectNum;
     } else if (slot == 5) {
-      // обычные часы
       schedule[timerIndex].EffectNum = EFF_CLOCK;
       schedule[timerIndex].Action = 4;
     } else if (slot == 6) {
-      // ночные часы
       schedule[timerIndex].EffectNum = EFF_CLOCK;
       schedule[timerIndex].Action = 7;
     } else {
@@ -563,7 +563,7 @@ void load_schedule() {
 void Save_File_Changes() {
   if (save_file_changes && millis() - timeout_save_file_changes >= SAVE_FILE_DELAY_TIMEOUT) {
     if (save_file_changes & SAVE_CONFIG_BIT) {
-      writeFile(F("config.json"), configSetup);
+      saveConfig("setup");
     }
     if (save_file_changes & SAVE_ALARMS_BIT) {
 #if USE_DAWN
@@ -574,16 +574,16 @@ void Save_File_Changes() {
 #endif
     }
     if (save_file_changes & SAVE_CYCLE_BIT) {
-      cycle_get();
+      saveConfig("cycle");
     }
 #if USE_SCHEDULE
     if (save_file_changes & SAVE_SCHEDULE_BIT) {
-      writeFile(F("config_schedule.json"), configSchedule);
+      saveConfig("schedule");
     }
 #endif
 #if USE_MULTILAMP
     if (save_file_changes & SAVE_MULTILAMP_BIT) {
-      writeFile(F("config_multilamp.json"), configMultilamp);
+      saveConfig("multilamp");
     }
 #endif
 
@@ -607,35 +607,38 @@ void publishMqttState() {
     Mqtt::instance().publishState(0);
 #endif
 
-    String MqttSnd = "{\"power\":\"ON\"}";
-    jsonWrite(MqttSnd, "power", ONflag ? "ON" : "OFF");
-    jsonWrite(MqttSnd, "cycle", Favorites::instance().FavoritesRunning ? "ON" : "OFF");
-
+    // UI-индекс текущего эффекта
+    String effectIdxStr = "";
     for (uint8_t n = 0; n < MODE_AMOUNT; n++) {
       if (eff_num_correct[n] == currentMode) {
-        jsonWrite(MqttSnd, "effect", String(n));
+        effectIdxStr = String(n);
         break;
       }
     }
 
-    jsonWrite(MqttSnd, "bri", String(modes[currentMode].Brightness));
-    jsonWrite(MqttSnd, "spd", String(modes[currentMode].Speed));
-    jsonWrite(MqttSnd, "sca", String(modes[currentMode].Scale));
-
+    // Формирование JSON одним пакетным вызовом - один парсинг + одна сериализация
+    String MqttSnd;
+    jsonWriteMultiple(MqttSnd, {
+      {"power", ONflag ? "ON" : "OFF"},
+      {"cycle", Favorites::instance().FavoritesRunning ? "ON" : "OFF"},
+      {"effect", effectIdxStr},
+      {"bri",   String(modes[currentMode].Brightness)},
+      {"spd",   String(modes[currentMode].Speed)},
+      {"sca",   String(modes[currentMode].Scale)},
 #if USE_MP3_PLAYER
-    jsonWrite(MqttSnd, "sound", eff_sound_on ? "ON" : "OFF");
-    jsonWrite(MqttSnd, "vol", String(eff_volume));
+      {"sound", eff_sound_on ? "ON" : "OFF"},
+      {"vol",   String(eff_volume)},
 #endif
+      {"runt",  String(RuninTextOverEffects)},
+      {"runc",  String(ColorRunningText)},
+      {"runf",  String(ColorTextFon)},
+      {"runs",  String(SpeedRunningText)},
+      {"rnde",  String(Favorites::instance().rndCycle)},
+      {"rndc",  String(random_on)},
+      {"rndf",  String(selectedSettings)},
+    });
 
-    jsonWrite(MqttSnd, "runt", String(RuninTextOverEffects));
-    jsonWrite(MqttSnd, "runc", String(ColorRunningText));
-    jsonWrite(MqttSnd, "runf", String(ColorTextFon));
-    jsonWrite(MqttSnd, "runs", String(SpeedRunningText));
-    jsonWrite(MqttSnd, "rnde", String(Favorites::instance().rndCycle));
-    jsonWrite(MqttSnd, "rndс", String(random_on));
-    jsonWrite(MqttSnd, "rndf", String(selectedSettings));
-
-    MqttSnd.toCharArray(Mqtt::instance().mqttBuffer, MqttSnd.length() + 1);
+    MqttSnd.toCharArray(Mqtt::instance().mqttBuffer, sizeof(Mqtt::instance().mqttBuffer));
     Mqtt::instance().publishState(1);
   }
 #endif
@@ -698,10 +701,15 @@ void handleSlowTasks() {
 }
 
 // -----------------------
+// для интервалов
+static const uint32_t MQTT_PUBLISH_INTERVAL_MS = 900;
+static const uint32_t HEAP_MONITOR_INTERVAL_MS = 10000;
+static const uint32_t FAVORITES_CHECK_INTERVAL_MS = 100;
+
 void handleMqttPublish() {
 #if USE_MQTT
   static uint32_t lastMqttPublish = 0;
-  if (millis() - lastMqttPublish >= 900) {
+  if (millis() - lastMqttPublish >= MQTT_PUBLISH_INTERVAL_MS) {
     lastMqttPublish = millis();
     publishMqttState();
   }
@@ -712,12 +720,10 @@ void handleMqttPublish() {
 void handleHeapMonitor() {
 #if HEAP_SIZE_PRINT
   static uint32_t mem_timer = 0;
-  if (millis() - mem_timer >= 10000UL) {
+  if (millis() - mem_timer >= HEAP_MONITOR_INTERVAL_MS) {
     mem_timer = millis();
 #if GENERAL_LOG
-    SYSLOG.add("Heap Size = ");
-    SYSLOG.add(ESP.getFreeHeap());
-    SYSLOG.add("\n");
+    SYSLOG.add("Heap Size = %u", (unsigned)ESP.getFreeHeap());
 #endif
   }
 #endif // HEAP_SIZE_PRINT
@@ -727,7 +733,7 @@ void handleHeapMonitor() {
 void handleFavorites() {
   if (outEffectActive) return;
   static uint32_t lastFav = 0;
-  if (millis() - lastFav >= 100) {
+  if (millis() - lastFav >= FAVORITES_CHECK_INTERVAL_MS) {
     lastFav = millis();
     if (Favorites::instance().HandleFavorites(&ONflag, &currentMode, &loadingFlag,
 #if USE_DAWN
@@ -757,7 +763,7 @@ bool startOutAnimation(const String& fileName) {
   if (!outFile) return false;
 
   size_t fileSize = outFile.size();
-  size_t frameSize = usedLeds * 3 + 1;
+  size_t frameSize = (size_t)usedLeds * 3 + 1;
 
   if (fileSize < frameSize) {
     outFile.close();
@@ -1041,4 +1047,4 @@ void finalizeSetup() {
 #endif
 }
 
-// ******************************************************************************************************************************************************
+// ****************************************************************************************************************************************************
