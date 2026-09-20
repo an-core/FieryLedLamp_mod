@@ -21,7 +21,7 @@
 <img width="586" height="705" alt="clock" src="https://github.com/user-attachments/assets/1e8b582c-c85f-4a17-9b9e-f4a853bfdf7c" />
 </p>
 <p align="center">
-<img width="642" height="696" alt="weather" src="https://github.com/user-attachments/assets/b5dc3a36-5908-4fdd-acf0-56e8208ec065" />
+<img width="585" height="696" alt="weather" src="https://github.com/user-attachments/assets/566218b6-c06c-4e7c-9f1f-a681eeb0f2ec" />
 </p>
 <p align="center">
 <img width="590" height="719" alt="led_panel" src="https://github.com/user-attachments/assets/b3ff27d7-11b1-4f69-8002-d27ce366e0cb" />
