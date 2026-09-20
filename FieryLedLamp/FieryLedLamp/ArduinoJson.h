@@ -132,27 +132,6 @@ String safeReadFile(const String& fileName, size_t maxSize) {
 
 // ======================================================================== СОХРАНЕНИЕ КОНФИГОВ =========================================================
 
-// Адресное сохранение: если which == nullptr - сохранить все
-// Если which задан - сохранить только соответствующий файл
-//
-//   "setup" - config.json
-//   "wifi" - config_wifi.json
-//   "ledpanel" - config_led_panel.json
-//   "ledinter" - config_led_interval.json
-//   "ledmatr" - config_led_matrix.json
-//   "cycle" - config_cycle.json
-//   "button" - config_button.json
-//   "mqtt" - config_mqtt.json
-//   "weather" - config_weather.json
-//   "mp3" - config_mp3.json
-//   "st7789" - config_st7789.json
-//   "multilamp" - config_multilamp.json
-//   "alarm" - config_alarm.json
-//   "sunset" - config_sunset.json
-//   "schedule" - config_schedule.json
-//
-// sound_list.json здесь НЕ сохраняется - он пишется в handle_sound_set
-
 bool saveConfig(const char* which = nullptr) {
   auto match = [&](const char* name) -> bool {
     return (which == nullptr) || (strcmp(which, name) == 0);
