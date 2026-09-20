@@ -3,6 +3,15 @@
 <img width="1366" height="605" alt="constants" src="https://github.com/user-attachments/assets/1d1c243c-87ac-4876-8af7-dad6a1a6953e" />
 </p>
 <p align="center">
+<img width="266" height="698" alt="menu" src="https://github.com/user-attachments/assets/83a0fd6e-4b8a-434f-bc16-f3d9d32ed26a" />
+</p>
+<p align="center">
+<img width="618" height="712" alt="index setup0" src="https://github.com/user-attachments/assets/2d6f87ec-b94e-4302-8893-ebd65f7cf08a" />
+</p>
+<p align="center">
+<img width="609" height="710" alt="index setup" src="https://github.com/user-attachments/assets/e664ebbf-c567-4cc1-b37c-e2b9615312a0" />
+</p>
+<p align="center">
 <img width="670" height="694" alt="wifi" src="https://github.com/user-attachments/assets/0b90b19d-1cc0-4d22-91cf-7149b8dd090d" />
 </p>
 <p align="center">
@@ -28,16 +37,4 @@
 </p>
 <p align="center">
 <img width="641" height="696" alt="schedule" src="https://github.com/user-attachments/assets/ab531047-ca00-462d-94e8-bba578ea5cc9" />
-</p>
-
-
-
-<p align="center">
-<img width="266" height="698" alt="menu" src="https://github.com/user-attachments/assets/83a0fd6e-4b8a-434f-bc16-f3d9d32ed26a" />
-</p>
-<p align="center">
-<img width="618" height="712" alt="index setup0" src="https://github.com/user-attachments/assets/2d6f87ec-b94e-4302-8893-ebd65f7cf08a" />
-</p>
-<p align="center">
-<img width="609" height="710" alt="index setup" src="https://github.com/user-attachments/assets/e664ebbf-c567-4cc1-b37c-e2b9615312a0" />
 </p>
