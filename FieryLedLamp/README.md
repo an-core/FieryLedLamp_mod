@@ -9,10 +9,10 @@
 <img width="585" height="673" alt="hardware" src="https://github.com/user-attachments/assets/73b1bddc-40c0-4cde-bafc-8aeac83cabb8" />
 </p>
 <p align="center">
-<img width="594" height="711" alt="index setup0" src="https://github.com/user-attachments/assets/fd1a02b9-f0d8-45c7-adae-2e54d07e01c9" />
+<img width="586" height="715" alt="index setup0" src="https://github.com/user-attachments/assets/941f7d06-985b-4036-ab19-cbe1caefa196" />
 </p>
 <p align="center">
-<img width="593" height="710" alt="index setup" src="https://github.com/user-attachments/assets/5485c972-4c29-454d-96c2-69f133c57e4a" />
+<img width="593" height="709" alt="index setup" src="https://github.com/user-attachments/assets/0e883504-6d0a-4061-afdd-229ac462ba00" />
 </p>
 <p align="center">
 <img width="591" height="694" alt="wifi" src="https://github.com/user-attachments/assets/afdab61f-9ca8-4342-811b-57f33818c761" />
