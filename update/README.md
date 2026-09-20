@@ -6,6 +6,6 @@
 <img width="669" height="708" alt="esp32s3" src="https://github.com/user-attachments/assets/5393c8e2-3cc8-4a80-a1d7-b99227fdfec0" />
 </p>
 <p align="center">
-<img width="1330" height="277" alt="jinx_out" src="https://github.com/user-attachments/assets/a6f7abdc-6e97-40c1-a0ab-064090edc441" />
+<img width="1329" height="275" alt="jinx_out" src="https://github.com/user-attachments/assets/3f5b05d1-6f21-4daa-b54f-dfa5dd222806" />
 </p>
 
