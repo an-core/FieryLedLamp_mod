@@ -13,6 +13,7 @@ static uint8_t tftDispBrightness = 255;
 static bool tftBreathDir = true;
 static uint32_t tftBlinkTmr = 0;
 static void tftBrightnessTick();
+
 #if USE_WEATHER
 static uint32_t weatherErrBlinkTimer = 0;
 static bool weatherErrBlinkState = false;
@@ -21,8 +22,11 @@ static bool weatherErrBlinkState = false;
 static TFT_eSPI tft = TFT_eSPI();
 
 #if USE_WEATHER
-const uint32_t WEATHER_ERR_BLINK = 500;       // Интервал мигания погоды при ошибке
+const uint32_t WEATHER_ERR_BLINK = 500;
 #endif
+
+// лимит размера стартовой картинки
+static const size_t MAX_JPG_SIZE = 256 * 1024; // 256 КБ
 
 static inline uint16_t tftColorFromId(uint8_t id) {
   switch (id) {
@@ -55,24 +59,16 @@ static inline void tftBacklightWrite(uint8_t val) {
   ledcWrite(TFT_BL_CH, val);
 }
 
-void TFT_PowerOff() {
-  if (tftInited) {
-    tft.fillScreen(TFT_BLACK);
-  }
-  pinMode(TFT_BL, OUTPUT);
-  digitalWrite(TFT_BL, LOW);
-  tftBacklightWrite(0);
-  tftInited = false;
-}
-
+// ----------------------------------------------------------------------------------------
+// Переменные состояния дисплея
 static TFT_View lastView = TFT_VIEW_DASH;
 static uint32_t lastDraw = 0;
 static int lastMinuteTFT = -1;
 static int lastHourTFT = -1;
 static int lastTempTFT = 1000;
 static bool tftColonState = true;
-static bool lastColonTFT  = true;
-static uint32_t tftColonTmr   = 0;
+static bool lastColonTFT = true;
+static uint32_t tftColonTmr = 0;
 static uint16_t lastEffTFT = 0xFFFF;
 static uint8_t lastArgTFT = 0xFF;
 static DisplayMode lastDisplayMode = DISP_MODE_CLOCK;
@@ -83,10 +79,10 @@ static uint32_t tftIPShowTmr = 0;
 static char tftIPBuf[24] = {0};
 
 // ----------------------------------------------------------------------------------------
-// Бегущая строка
-static constexpr uint8_t  TFT_TICKER_FONT = 1;
-static constexpr uint8_t  TFT_TICKER_SIZE = 9;
-static constexpr int16_t  TFT_TICKER_SPR_H = (int16_t)(8 * TFT_TICKER_SIZE + 2);
+// Бегущая строка — объявления
+static constexpr uint8_t TFT_TICKER_FONT = 1;
+static constexpr uint8_t TFT_TICKER_SIZE = 9;
+static constexpr int16_t TFT_TICKER_SPR_H = (int16_t)(8 * TFT_TICKER_SIZE + 2);
 static bool tftTickerActive = false;
 static uint32_t tftTickerNextStart = 0;
 static int16_t tftTickerX = 0;
@@ -96,6 +92,24 @@ static uint32_t tftTickerAccPxUs = 0;
 static constexpr uint32_t TFT_TICKER_FRAME_US = 100;
 static TFT_eSprite tftTickerSpr(&tft);
 static bool tftTickerSprReady = false;
+
+// --- TFT_PowerOff перенесено сюда, чтобы видеть tftTickerSpr и tftBacklightWrite ---
+void TFT_PowerOff() {
+  if (tftInited) {
+    tft.fillScreen(TFT_BLACK);
+  }
+  if (tftTickerSprReady) {
+    tftTickerSpr.deleteSprite();
+    tftTickerSprReady = false;
+  }
+  pinMode(TFT_BL, OUTPUT);
+  digitalWrite(TFT_BL, LOW);
+  tftBacklightWrite(0);
+  tftInited = false;
+}
+
+// ----------------------------------------------------------------------------------------
+// Бегущая строка — функции
 static inline uint16_t clampU16(uint16_t v, uint16_t lo, uint16_t hi) {
   if (v < lo) return lo;
   if (v > hi) return hi;
@@ -119,7 +133,11 @@ static void tftTickerEnsureSprite() {
   if (tftTickerSprReady) return;
 
   tftTickerSpr.setColorDepth(16);
-  tftTickerSprReady = tftTickerSpr.createSprite(tft.width(), TFT_TICKER_SPR_H);
+  bool ok = (tftTickerSpr.createSprite(tft.width(), TFT_TICKER_SPR_H) != nullptr);
+  if (!ok) {
+    return;
+  }
+  tftTickerSprReady = true;
 }
 
 static void tftTickerApplyTextStyle() {
@@ -131,6 +149,7 @@ static void tftTickerApplyTextStyle() {
 static void tftTickerStart() {
   if (!tftTickerEnabled()) return;
   tftTickerEnsureSprite();
+  if (!tftTickerSprReady) return;
   tftTickerSpr.fillSprite(TFT_BLACK);
   tftTickerApplyTextStyle();
   tftTickerW = tftTickerSpr.textWidth(TFTTickerText);
@@ -179,7 +198,7 @@ static void tftTickerTick() {
   }
 
   uint32_t nowUs = micros();
-  uint32_t dtUs  = nowUs - tftTickerLastUs;
+  uint32_t dtUs = nowUs - tftTickerLastUs;
   if (dtUs < TFT_TICKER_FRAME_US) return;
   tftTickerLastUs = nowUs;
 
@@ -200,6 +219,8 @@ static void tftTickerTick() {
   }
 }
 
+// ----------------------------------------------------------------------------------------
+// Отрисовка видов
 static void tftClear() {
   tft.fillScreen(TFT_BLACK);
 }
@@ -233,7 +254,7 @@ static void tftDrawClock(bool colonOn) {
   tft.setTextSize(2);
   int w = tft.textWidth(s);
   int h = tft.fontHeight();
-  int x = (tft.width()  - w) / 2;
+  int x = (tft.width() - w) / 2;
   int y = (tft.height() - h) / 2 - 8;
   tft.setCursor(x, y);
   tft.print(s);
@@ -246,7 +267,7 @@ static void tftDrawDashes() {
   tft.setTextSize(2);
   int w = tft.textWidth(s);
   int h = tft.fontHeight();
-  int x = (tft.width()  - w) / 2;
+  int x = (tft.width() - w) / 2;
   int y = (tft.height() - h) / 2;
   tft.setCursor(x, y);
   tft.print(s);
@@ -257,7 +278,7 @@ static void tftDrawWeather() {
   float temp = Weather::instance().getTemperature();
   int t = (int)round(temp);
   if (t < -99) t = -99;
-  if (t >  99) t =  99;
+  if (t > 99) t = 99;
 
   String tempStr = String(t);
   const char* unitStr = "°C";
@@ -297,12 +318,19 @@ static void tftDrawWeatherErr(bool blinkOn) {
     tft.setTextFont(1);
     tft.setTextSize(6);
     tft.setTextColor(TFT_RED, TFT_BLACK);
-    tft.setCursor(115, 25);
-    tft.print("Нет");
-    tft.setCursor(65, 90);
-    tft.print("данных");
+
+    String s = "Нет данных";
+    int textW = tft.textWidth(s);
+    int textH = tft.fontHeight();
+    int x = (tft.width()  - textW) / 2;
+    int y = (tft.height() - textH) / 2;
+    if (x < 0) x = 2;
+    if (y < 0) y = 2;
+
+    tft.setCursor(x, y);
+    tft.print(s);
   } else {
-    tft.fillRect(0, 10, tft.width(), 150, TFT_BLACK);
+    tft.fillRect(0, 0, tft.width(), tft.height(), TFT_BLACK);
   }
 }
 #endif // USE_WEATHER
@@ -311,14 +339,20 @@ static void tftDrawEffect(uint16_t effIndex) {
   tft.setTextFont(1);
   tft.setTextSize(3);
   tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-  tft.setCursor(115, 5);
-  tft.print("ЭФФЕКТ");
+
+  String header = "ЭФФЕКТ";
+  int hx = (tft.width() - tft.textWidth(header)) / 2;
+  if (hx < 0) hx = 2;
+  tft.setCursor(hx, 5);
+  tft.print(header);
+
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextFont(6);
   tft.setTextSize(2);
   String s = String((int)effIndex);
   int x = (tft.width() - tft.textWidth(s)) / 2;
-  tft.setCursor(x, 55);
+  int y = tft.height() / 2 - 10;
+  tft.setCursor(x, y);
   tft.print(s);
 }
 
@@ -338,17 +372,25 @@ static void tftDrawIP(const char* ip) {
   tft.setTextFont(1);
   tft.setTextSize(3);
   tft.setTextColor(TFT_CYAN, TFT_BLACK);
-  tft.setCursor(90, 15);
-  tft.print("IP адрес");
+
+  String header = "IP адрес";
+  int hx = (tft.width() - tft.textWidth(header)) / 2;
+  if (hx < 0) hx = 2;
+  tft.setCursor(hx, 15);
+  tft.print(header);
+
   tft.setTextFont(6);
   tft.setTextSize(1);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   String ipStr = String(ip);
   int ipX = (tft.width() - tft.textWidth(ipStr)) / 2;
+  if (ipX < 0) ipX = 2;
   tft.setCursor(ipX, 85);
   tft.print(ipStr);
 }
 
+// ----------------------------------------------------------------------------------------
+// JPEG
 static bool tftJpgOutput(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *bitmap) {
   if (!tftInited) return false;
   tft.pushImage(x, y, w, h, bitmap);
@@ -359,8 +401,9 @@ static bool tftDrawJpgFromFS(const char* path) {
   if (!tftInited || !path || !path[0]) return false;
   File f = LittleFS.open(path, "r");
   if (!f) return false;
+
   size_t sz = f.size();
-  if (!sz) {
+  if (!sz || sz > MAX_JPG_SIZE) {
     f.close();
     return false;
   }
@@ -386,34 +429,40 @@ static bool tftDrawJpgFromFS(const char* path) {
 
 void tftShowStartText() {
   if (tftDrawJpgFromFS("/start.jpg")) return;
+
   tft.fillScreen(TFT_BLACK);
   tft.setTextFont(2);
   tft.setTextSize(3);
   tft.setTextColor(TFT_GOLD);
+
   String s = "Fiery Led Lamp";
-  int x = (tft.width()  - tft.textWidth(s)) / 2;
+  int x = (tft.width() - tft.textWidth(s)) / 2;
   int y = (tft.height() - tft.fontHeight()) / 2;
   tft.setCursor(x, y);
   tft.print(s);
 }
 
 // ----------------------------------------------------------------------------------------
-
+// Инициализация и публичные функции
 void TFT_Init() {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW);
+
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
   tft.setSwapBytes(true);
   TJpgDec.setJpgScale(1);
   TJpgDec.setCallback(tftJpgOutput);
+
   ledcSetup(TFT_BL_CH, TFT_BL_FREQ, TFT_BL_BITS);
   ledcAttachPin(TFT_BL, TFT_BL_CH);
   tftBacklightWrite(255);
+
   tftDispBrightness = 255;
   tftBreathDir = true;
   tftBlinkTmr = millis();
+
   lastView = TFT_VIEW_DASH;
   lastDraw = 0;
   lastMinuteTFT = -1;
@@ -427,7 +476,14 @@ void TFT_Init() {
   tftColonState = true;
   lastColonTFT = true;
   tftColonTmr = millis();
+
+  // сброс состояния бегущей строки
+  tftTickerSprReady = false;
+  tftTickerActive = false;
+  tftTickerNextStart = 0;
+
   tftInited = true;
+
   TFT_SetBrightness(tft_brightness);
   TFT_SetAutoBrightness(tft_auto_brightness);
 }
@@ -435,8 +491,10 @@ void TFT_Init() {
 void TFT_ShowIP(const char* ip) {
   if (!tftInited) return;
   if (!ip) ip = "";
+
   strncpy(tftIPBuf, ip, sizeof(tftIPBuf) - 1);
   tftIPBuf[sizeof(tftIPBuf) - 1] = 0;
+
   tftShowIP = true;
   tftIPShowTmr = millis();
   tftClear();
@@ -446,6 +504,7 @@ void TFT_ShowIP(const char* ip) {
 
 void TFT_HideIP() {
   if (!tftInited) return;
+
   tft.fillScreen(TFT_BLACK);
   tftShowIP = false;
   tftTickerNextStart = millis() + tftTickerPeriodMs();
@@ -455,12 +514,12 @@ void TFT_HideIP() {
 
 void TFT_Display_Timer(uint8_t argument) {
   if (!tftInited) return;
+
   static uint16_t tftLastMode = 0xFFFF;
   static uint32_t tftEffectShowTmr = 0;
   static bool tftShowEffect = false;
   static uint16_t tftEffIndex = 0;
 
-  tftTickerTick();
   if (tftTickerActive) return;
 
   if (tftShowIP) {
@@ -469,6 +528,7 @@ void TFT_Display_Timer(uint8_t argument) {
       TFT_HideIP();
     }
   }
+
   if (!tftShowEffect && tftLastMode != currentMode) {
     tftLastMode = currentMode;
     uint8_t n;
@@ -634,21 +694,21 @@ void TFT_Display_Timer(uint8_t argument) {
   }
 
   switch (view) {
-    case TFT_VIEW_CLOCK:        tftDrawClock(tftColonState); break;
+    case TFT_VIEW_CLOCK: tftDrawClock(tftColonState); break;
 #if USE_WEATHER
-    case TFT_VIEW_WEATHER:      tftDrawWeather(); break;
-    case TFT_VIEW_WEATHER_ERR:  tftDrawWeatherErr(needBlinkErr); break;
+    case TFT_VIEW_WEATHER: tftDrawWeather(); break;
+    case TFT_VIEW_WEATHER_ERR: tftDrawWeatherErr(needBlinkErr); break;
 #endif
-    case TFT_VIEW_DATE:         tftDrawDate(); break;
-    case TFT_VIEW_EFFECT:       tftDrawEffect(tftEffIndex); break;
-    case TFT_VIEW_VALUE:        tftDrawValue(argument); break;
-    case TFT_VIEW_IP:           tftDrawIP(tftIPBuf); break;
-    default:                    tftDrawDashes(); break;
+    case TFT_VIEW_DATE: tftDrawDate(); break;
+    case TFT_VIEW_EFFECT: tftDrawEffect(tftEffIndex); break;
+    case TFT_VIEW_VALUE: tftDrawValue(argument); break;
+    case TFT_VIEW_IP: tftDrawIP(tftIPBuf); break;
+    default: tftDrawDashes(); break;
   }
 
   lastView = view;
-  lastMinuteTFT = last_minute;
-  lastHourTFT = hours;
+  lastMinuteTFT = drawMinuteTFT;
+  lastHourTFT = drawHourTFT;
 #if USE_WEATHER
   lastTempTFT = (int)round(Weather::instance().getTemperature());
 #endif
@@ -730,6 +790,7 @@ static void tftBrightnessTick() {
 
 void TFT_LoopTick() {
   if (!tftInited) return;
+
   tftBrightnessTick();
   tftTickerTick();
 
@@ -757,4 +818,4 @@ void TFT_SetAutoBrightness(bool enable) {
 
 #endif // USE_ST7789
 
-// ******************************************************************************************************************************************************
+// ****************************************************************************************************************************************************

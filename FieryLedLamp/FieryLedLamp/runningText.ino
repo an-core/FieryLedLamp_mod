@@ -4,7 +4,7 @@
 #include "Time.h"
 // ------------------------
 
-// =============================================================== ШРИФТ и ОТРИСОВКА СИМВОЛА НА МАТРИЦЕ ================================================
+// ================================================================ ШРИФТ и ОТРИСОВКА СИМВОЛА НА МАТРИЦЕ ================================================
 const FontDesc fontTable[3] PROGMEM = {
   {5,  8,  8, false, font5x8},
   {8, 13, 13, true, font8x13},
@@ -481,7 +481,7 @@ void drawDegreeSymbol(int16_t xPos, CRGB letterColor) {
   }
 }
 
-// ============================================================================ ЯРКОСТЬ ================================================================
+// ============================================================================= ЯРКОСТЬ ================================================================
 uint8_t getBrightnessForPrintTime() {
   if (!myTime.isTimeSet()) {
     return modes[currentMode].Brightness; // если время не синхронизировано - возвращаем текущую яркость эффекта
@@ -494,7 +494,7 @@ uint8_t getBrightnessForPrintTime() {
   return isNight ? NIGHT_HOURS_BRIGHTNESS : DAY_HOURS_BRIGHTNESS;
 }
 
-// ======================================================================= БЕГУЩАЯ СТРОКА ==============================================================
+// ======================================================================== БЕГУЩАЯ СТРОКА ==============================================================
 boolean fillString(const char* text, CRGB letterColor, boolean itsText) {
   if (!text || text[0] == '\0') return true;
 
@@ -538,7 +538,7 @@ boolean fillString(const char* text, CRGB letterColor, boolean itsText) {
         FastLED.clear();
       } else {
         int y_start = textBaseY + textYOffset - 1;
-        int y_end   = y_start + LET_HEIGHT + 2;
+        int y_end = y_start + LET_HEIGHT + 2;
         for (int y = max(0, y_start); y <= min((int)matrixHeight - 1, y_end); y++) {
           for (int x = 0; x < matrixWidth; x++) {
             leds[XY(x, y)] = CRGB::Black;
@@ -563,7 +563,7 @@ boolean fillString(const char* text, CRGB letterColor, boolean itsText) {
     FastLED.clear();
   } else {
     int y_start = textBaseY + textYOffset - 1;
-    int y_end   = y_start + LET_HEIGHT + 2;
+    int y_end = y_start + LET_HEIGHT + 2;
     for (int y = max(0, y_start); y <= min((int)matrixHeight - 1, y_end); y++) {
       for (int x = 0; x < matrixWidth; x++) {
         leds[XY(x, y)] = CRGB::Black;
@@ -650,7 +650,7 @@ uint32_t getRunningTextDelayMs() {
   return map(constrain(SpeedRunningText, 20, 220), 20, 220, 250, 15);
 }
 
-// ======================================================================== ВЫВОД ВРЕМЕНИ ==============================================================
+// ========================================================================= ВЫВОД ВРЕМЕНИ ==============================================================
 // возвращает цвет для текста часов из настроек clock_hue
 CRGB getClockTextColor() {
   if (rainbowClock) {
@@ -757,7 +757,7 @@ void printTime(bool onDemand) {
   FastLED.clear();
   if (runTextOver) {
     int y_start = textBaseY + textYOffset - 1;
-    int y_end   = y_start + LET_HEIGHT + 2;
+    int y_end = y_start + LET_HEIGHT + 2;
     for (int y = max(0, y_start); y <= min((int)matrixHeight - 1, y_end); y++) {
       for (int x = 0; x < matrixWidth; x++) {
         leds[XY(x, y)] = CRGB::Black;
@@ -800,7 +800,7 @@ void printTime(bool onDemand) {
   isPrintingMessage = false;
 }
 
-// =========================================================================== ВЫВОД ПОГОДЫ ============================================================
+// ============================================================================ ВЫВОД ПОГОДЫ ============================================================
 #if LED_PANEL && USE_WEATHER
 // возвращает цвет для текста погоды из настроек weather_hue
 CRGB getWeatherTextColor() {
