@@ -60,7 +60,7 @@ static inline void tftBacklightWrite(uint8_t val) {
 }
 
 // ----------------------------------------------------------------------------------------
-// Переменные состояния дисплея
+// состояние дисплея
 static TFT_View lastView = TFT_VIEW_DASH;
 static uint32_t lastDraw = 0;
 static int lastMinuteTFT = -1;
@@ -79,7 +79,7 @@ static uint32_t tftIPShowTmr = 0;
 static char tftIPBuf[24] = {0};
 
 // ----------------------------------------------------------------------------------------
-// Бегущая строка — объявления
+// Бегущая строка
 static constexpr uint8_t TFT_TICKER_FONT = 1;
 static constexpr uint8_t TFT_TICKER_SIZE = 9;
 static constexpr int16_t TFT_TICKER_SPR_H = (int16_t)(8 * TFT_TICKER_SIZE + 2);
@@ -93,7 +93,6 @@ static constexpr uint32_t TFT_TICKER_FRAME_US = 100;
 static TFT_eSprite tftTickerSpr(&tft);
 static bool tftTickerSprReady = false;
 
-// --- TFT_PowerOff перенесено сюда, чтобы видеть tftTickerSpr и tftBacklightWrite ---
 void TFT_PowerOff() {
   if (tftInited) {
     tft.fillScreen(TFT_BLACK);
@@ -109,7 +108,7 @@ void TFT_PowerOff() {
 }
 
 // ----------------------------------------------------------------------------------------
-// Бегущая строка — функции
+// Бегущая строка
 static inline uint16_t clampU16(uint16_t v, uint16_t lo, uint16_t hi) {
   if (v < lo) return lo;
   if (v > hi) return hi;
