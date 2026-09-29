@@ -24,6 +24,9 @@
 <img width="585" height="696" alt="weather" src="https://github.com/user-attachments/assets/566218b6-c06c-4e7c-9f1f-a681eeb0f2ec" />
 </p>
 <p align="center">
+<img width="584" height="565" alt="tm1637" src="https://github.com/user-attachments/assets/84180f58-3f8e-4033-b257-5297d6e4cdde" />
+</p>
+<p align="center">
 <img width="590" height="719" alt="led_panel" src="https://github.com/user-attachments/assets/b3ff27d7-11b1-4f69-8002-d27ce366e0cb" />
 </p>
 <p align="center">
