@@ -15,7 +15,7 @@
 <img width="593" height="709" alt="index setup" src="https://github.com/user-attachments/assets/0e883504-6d0a-4061-afdd-229ac462ba00" />
 </p>
 <p align="center">
-<img width="591" height="694" alt="wifi" src="https://github.com/user-attachments/assets/afdab61f-9ca8-4342-811b-57f33818c761" />
+<img width="594" height="716" alt="wifi" src="https://github.com/user-attachments/assets/887986fc-d086-4657-9413-26a54a2a8dc8" />
 </p>
 <p align="center">
 <img width="586" height="705" alt="clock" src="https://github.com/user-attachments/assets/1e8b582c-c85f-4a17-9b9e-f4a853bfdf7c" />
