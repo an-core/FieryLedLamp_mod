@@ -426,10 +426,13 @@
     </div>
     <script>
         let isLoading = false;
-        let isLearning = false;
-        let learnedCodes = {};
-        let learnKeys = [];
-        let currentKeyIndex = 0;
+let isLearning = false;
+let learnedCodes = {};
+let currentKeyIndex = 0;
+
+let lastAcceptedCode = null;
+let ignoreUntil = 0;
+let irTimer = null;
 
         // список всех кнопок
         const ALL_KEYS = [
@@ -564,8 +567,9 @@
         // обучение
         function startLearning() {
             if (isLearning) return;
-            
             isLearning = true;
+			lastAcceptedCode = null;
+            ignoreUntil = 0;
             learnedCodes = {};
             currentKeyIndex = 0;
             
@@ -579,6 +583,7 @@
             status.className = 'status active info';
             
             updateLearnUI();
+			startIRListener();
         }
 
         function stopLearning() {
@@ -597,6 +602,7 @@
             setTimeout(() => {
                 status.classList.remove('active');
             }, 3000);
+			 stopIRListener();
         }
 
         function updateLearnUI() {
@@ -685,53 +691,48 @@
             document.getElementById('stopBtn').style.display = 'none';
             document.getElementById('learnProgress').classList.remove('active');
         }
-
+         
         function onIRCodeReceived(code) {
-            if (!isLearning) return;
-            
-            if (currentKeyIndex >= ALL_KEYS.length) return;
-            
-            const key = ALL_KEYS[currentKeyIndex];
-            
-            if (code === '0' || code === '0x0' || code === '0x00000000') {
-                document.getElementById('learnStatus').textContent = 'Неверный код, попробуйте ещё раз для: ' + key;
-                return;
-            }
-            
-            learnedCodes[key] = code;
-            document.getElementById('learnStatus').textContent = 'Получен код для ' + key + ': ' + code;
-            
-            currentKeyIndex++;
-            updateLearnUI();
-        }
+    if (!isLearning) return;
+    if (Date.now() < ignoreUntil) return;
+    if (currentKeyIndex >= ALL_KEYS.length) return;
+    if (!code || code === '0' || code === '0x0' || code === '00000000') return;
+    if (code === lastAcceptedCode) return;
 
-        function initIRListener() {
-            setInterval(async () => {
-                if (!isLearning) return;
-                
-                try {
-                    const response = await fetch('/api/ir/last_code?t=' + Date.now());
-                    if (response.ok) {
-                        const data = await response.json();
-                        if (data.code && data.code !== '0' && data.code !== '0x0') {
-                            onIRCodeReceived(data.code);
-                        }
-                    }
-                } catch (error) {
-              }
-            }, 300);
-        }
+    lastAcceptedCode = code;
+    ignoreUntil = Date.now() + 700;
+
+    const key = ALL_KEYS[currentKeyIndex];
+    learnedCodes[key] = code;
+    document.getElementById('learnStatus').textContent =
+        'Получен код для ' + key + ': ' + code;
+    currentKeyIndex++;
+    updateLearnUI();
+}
+
+        function startIRListener() {
+    if (irTimer) return;
+    irTimer = setInterval(async () => {
+        try {
+            const r = await fetch('/api/ir/last_code?t=' + Date.now());
+            if (r.ok) {
+                const d = await r.json();
+                onIRCodeReceived(d.code);
+            }
+        } catch (e) {}
+    }, 300);
+}
+
+function stopIRListener() {
+    if (irTimer) { clearInterval(irTimer); irTimer = null; }
+}
 
         document.addEventListener('DOMContentLoaded', () => {
-            loadRemotes();
-            initIRListener();
-            
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) {
-                    loadCurrentRemote();
-                }
-            });
-        });
+    loadRemotes();
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) loadCurrentRemote();
+    });
+});
     </script>
 </body>
 </html>
