@@ -14,28 +14,51 @@ static void displayDate() {
   uint8_t day = tm->tm_mday;
   uint8_t month = tm->tm_mon + 1;
 
-  uint8_t d1 = day / 10;
-  uint8_t d2 = day % 10;
-  uint8_t m1 = month / 10;
-  uint8_t m2 = month % 10;
+  uint8_t buf[4];
+  buf[0] = display.encodeDigit(day / 10);
+  buf[1] = display.encodeDigit(day % 10);
+  buf[2] = 0b01000000;  // тире
 
-  uint8_t seg1 = display.encodeDigit(d1);
-  uint8_t seg2 = display.encodeDigit(d2);
-  uint8_t seg3 = display.encodeDigit(m1);
-  uint8_t seg4 = display.encodeDigit(m2);
+  if (month < 10) {
+    buf[3] = display.encodeDigit(month);
+  } else {
+    // месяц 10, 11, 12 - не влезает в 4 разряда с тире
+    // вариант: показать 25-1 (первая цифра месяца) или переключиться на формат без тире
+    buf[3] = display.encodeDigit(month / 10);  // покажет 25-1 для 10-12
+  }
 
-  seg2 |= 0b10000000;
-
-  display.displayByte(seg1, seg2, seg3, seg4);
+  display.setSegments(buf, 4, 0);
 }
 
 static void displayClock() {
+  static uint32_t callCount = 0;
+  callCount++;
+  static uint32_t lastLog = 0;
+  if (millis() - lastLog > 1000) {
+#if TM1637_LOG
+    SYSLOG.add("CLOCK calls/sec: %u", callCount);
+#endif
+    callCount = 0;
+    lastLog = millis();
+  }
   clockTicker_blink();
 }
 
 static void displayWeather() {
-  display.point(false);
+  static uint32_t callCount = 0;
+  callCount++;
+  static uint32_t lastLog = 0;
+  if (millis() - lastLog > 1000) {
+#if TM1637_LOG
+    SYSLOG.add("WEATHER calls/sec: %u", callCount);
+#endif
+    callCount = 0;
+    lastLog = millis();
+  }
+  display.resetPoints();
   float temp = Weather::instance().getTemperature();
+  uint8_t buf[4];
+
   if (temp > -50) {
     int8_t t = round(temp);
     bool neg = t < 0;
@@ -46,24 +69,39 @@ static void displayWeather() {
 
     if (neg) {
       if (abs_t == 0) {
-        display.displayByte(_empty, display.encodeDigit(0), _deg, _C);
+        buf[0] = _empty; buf[1] = display.encodeDigit(0); buf[2] = _deg; buf[3] = _C;
       } else if (abs_t < 10) {
-        display.displayByte(_dash, display.encodeDigit(d1), _deg, _C);
+        buf[0] = _dash; buf[1] = display.encodeDigit(d1); buf[2] = _deg; buf[3] = _C;
       } else {
-        display.displayByte(_dash, display.encodeDigit(d10), display.encodeDigit(d1), _deg);
+        buf[0] = _dash; buf[1] = display.encodeDigit(d10); buf[2] = display.encodeDigit(d1); buf[3] = _deg;
       }
     } else {
       if (abs_t == 0) {
-        display.displayByte(_empty, display.encodeDigit(0), _deg, _C);
+        buf[0] = _empty; buf[1] = display.encodeDigit(0); buf[2] = _deg; buf[3] = _C;
       } else if (abs_t < 10) {
-        display.displayByte(_empty, display.encodeDigit(d1), _deg, _C);
+        buf[0] = _empty; buf[1] = display.encodeDigit(d1); buf[2] = _deg; buf[3] = _C;
       } else {
-        display.displayByte(display.encodeDigit(d10), display.encodeDigit(d1), _deg, _C);
+        buf[0] = display.encodeDigit(d10); buf[1] = display.encodeDigit(d1); buf[2] = _deg; buf[3] = _C;
       }
     }
   } else {
-    display.displayByte(_empty, _empty, _empty, _E_);
+    buf[0] = _empty; buf[1] = _empty; buf[2] = _empty; buf[3] = _E;
   }
+
+  display.setSegments(buf, 4, 0);
+}
+
+static DisplayMode activeModes[3];
+static uint8_t activeModeCount = 0;
+static uint8_t activeModeIndex = 0;
+
+static void rebuildActiveModes() {
+  activeModeCount = 0;
+  activeModes[activeModeCount++] = DISP_MODE_CLOCK;  // часы всегда
+  if (weatherSwitchEnabled) activeModes[activeModeCount++] = DISP_MODE_WEATHER;
+  if (dateSwitchEnabled)    activeModes[activeModeCount++] = DISP_MODE_DATE;
+
+  if (activeModeIndex >= activeModeCount) activeModeIndex = 0;
 }
 
 void Display_Timer(uint8_t argument) {
@@ -91,7 +129,7 @@ void Display_Timer(uint8_t argument) {
     DisplayFlag = 0;
     display.point(false);
   }
-  
+
 #if USE_MP3_PLAYER && USE_TM1637
   // Отображение номера папки только если и MP3, и TM1637 включены в прошивку
   if (mp3Enabled && tm1637Enabled) {
@@ -125,37 +163,52 @@ void Display_Timer(uint8_t argument) {
   if (DisplayFlag == 4 && (millis() - DisplayTimer > 3000)) {
     DisplayFlag = 0;
   }
-
   // переключение Часы / Погода / Дата
   if (DisplayFlag == 0) {
-    if (inClockWeatherMode) {
-      if (millis() - displaySwitchTimer >= DISPLAY_SWITCH_INTERVAL) {
-        displaySwitchTimer = millis();
-        displayMode = (DisplayMode)((displayMode + 1) % 3);
-      }
+#if USE_DAWN || USE_SUNSET
+    bool blinkActive =
+#if USE_DAWN
+      (dawnFlag == 1)
+#endif
+#if USE_DAWN && USE_SUNSET
+      ||
+#endif
+#if USE_SUNSET
+      (sunsetFlag == 1)
+#endif
+      ;
 
-      if (displayMode == DISP_MODE_WEATHER && weatherErrActive) {
-        if (millis() - weatherErrTimer >= WEATHER_ERR_TIME) {
-          weatherErrActive = false;
-          displayMode = DISP_MODE_CLOCK;
+    if (blinkActive) {
+      // во время рассвета/заката будут только часы, без переключения на погоду и дату
+      displayMode = DISP_MODE_CLOCK;
+      displayClock();
+    } else
+#endif
+      if (inClockWeatherMode && DISPLAY_SWITCH_INTERVAL > 0) {
+        if (millis() - displaySwitchTimer >= DISPLAY_SWITCH_INTERVAL) {
           displaySwitchTimer = millis();
+          activeModeIndex = (activeModeIndex + 1) % activeModeCount;
+          displayMode = activeModes[activeModeIndex];
         }
-      }
 
-      switch (displayMode) {
-        case DISP_MODE_CLOCK:
-          displayClock();
-          break;
-        case DISP_MODE_WEATHER:
-          displayWeather();
-          break;
-        case DISP_MODE_DATE:
-          displayDate();
-          break;
+        if (displayMode == DISP_MODE_WEATHER && weatherErrActive) {
+          if (millis() - weatherErrTimer >= WEATHER_ERR_TIME) {
+            weatherErrActive = false;
+            activeModeIndex = 0; // вернуться на часы
+            displayMode = activeModes[0];
+            displaySwitchTimer = millis();
+          }
+        }
+
+        switch (displayMode) {
+          case DISP_MODE_CLOCK: displayClock(); break;
+          case DISP_MODE_WEATHER: displayWeather(); break;
+          case DISP_MODE_DATE: displayDate(); break;
+        }
+      } else {
+        displayMode = DISP_MODE_CLOCK;
+        displayClock();
       }
-    } else {
-      displayClock(); // если режим переключения выключен (т.е. интервал переключения установлен 0), то всегда часы
-    }
   }
 } // void Display_Timer(uint8_t argument
 
@@ -163,48 +216,63 @@ void Display_Timer(uint8_t argument) {
 void clockTicker_blink() {
   if (!tm1637Enabled) return;
   if (myTime.isTimeSet() && !DisplayFlag) {
-
     time_t t = getCurrentLocalTime();
     struct tm *ti = localtime(&t);
-
     uint8_t h = ti->tm_hour;
     uint8_t m = ti->tm_min;
-    #if USE_DAWN
-    if (dawnFlag == 1) { // если рассвет - мигаем дисплеем
-      display.displayClock(h, m);
-      if (millis() - tmr_blink > 100) {
-        tmr_blink = millis();
-        display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
-        if (DispBrightness >= 204) aDirection = false;
-        if (DispBrightness < 51U) {
-          if (!DispBrightness) DispBrightness = 1;
-          aDirection = true;
-        }
-        if (aDirection) DispBrightness += 51U;
-        else DispBrightness -= 51U;
-      }
-    } 
-    #endif
 
-      tm1637_brightness();
-      display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
-      display.displayClock(h, m);
+#if USE_DAWN || USE_SUNSET
+    bool blinkActive =
+#if USE_DAWN
+      (dawnFlag == 1)
+#endif
+#if USE_DAWN && USE_SUNSET
+      ||
+#endif
+#if USE_SUNSET
+      (sunsetFlag == 1)
+#endif
+      ;
+
+    if (blinkActive) {
+  display.displayClock(h, m);
+  if (millis() - tmr_blink > 100) {
+    tmr_blink = millis();
+    display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
+    if (DispBrightness >= 204) aDirection = false;
+    if (DispBrightness < 51U) {
+      if (!DispBrightness) DispBrightness = 1;
+      aDirection = true;
     }
+    if (aDirection) DispBrightness += 51U;
+    else DispBrightness -= 51U;
   }
+  boolean points[4] = {0, 0, 0, 0};
+  points[1] = true;
+  display.setSegmentPoints(points);
+  return;
+}
+#endif
+
+    tm1637_brightness();
+    display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
+    display.displayClock(h, m);
+  }
+}
 
 void tm1637_brightness() {
   if (NIGHT_HOURS_START >= NIGHT_HOURS_STOP) { // переход через полночь
     if (thisTime >= NIGHT_HOURS_START || thisTime <= NIGHT_HOURS_STOP) {
       DispBrightness = NIGHT_HOURS_BRIGHTNESS ? NIGHT_HOURS_BRIGHTNESS : 0;
-    } 
+    }
     else {
       DispBrightness = DAY_HOURS_BRIGHTNESS ? DAY_HOURS_BRIGHTNESS : 0;
     }
-  } 
+  }
   else {
     if (thisTime >= NIGHT_HOURS_START && thisTime <= NIGHT_HOURS_STOP) {
       DispBrightness = NIGHT_HOURS_BRIGHTNESS ? NIGHT_HOURS_BRIGHTNESS : 0;
-    } 
+    }
     else {
       DispBrightness = DAY_HOURS_BRIGHTNESS ? DAY_HOURS_BRIGHTNESS : 0;
     }

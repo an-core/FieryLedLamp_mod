@@ -5,6 +5,7 @@
 // ---------------------
 
 // ==================================================================== ЗАГРУЗКА КОНФИГОВ =============================================================
+
 void loadAllConfigs() {
   configSetup = safeReadFile("config.json", 2048);
   configLedPanel = safeReadFile("config_led_panel.json", 2048);
@@ -56,6 +57,7 @@ void loadAllConfigs() {
 } // loadAllConfigs()
 
 // ===================================================================== БАЗОВЫЕ НАСТРОЙКИ ============================================================
+
 void loadBasicSettings() {
   bool needSave = false;
   LAMP_NAME = jsonRead(configSetup, "ssdp");
@@ -188,9 +190,18 @@ void loadBasicSettings() {
     configChanged = true;
   }
 
+  if (jsonRead(configSetup, "display_ip").length() == 0) {
+    displayIpAtStart = true;
+    jsonWrite(configSetup, "display_ip", 1);
+    needSave = true;
+  } else {
+    displayIpAtStart = (jsonReadtoInt(configSetup, "display_ip") == 1);
+  }
+
 } // void loadBasicSettings()
 
 // ======================================================================== ДИСПЛЕЙ ST7789 ============================================================
+
 void loadST7789Settings() {
 #if USE_ST7789
   if (jsonRead(configST7789, "tft_clock_color") == "") {
@@ -259,16 +270,30 @@ void loadST7789Settings() {
 }
 
 // ======================================= ОБЩАЯ НАСТРОЙКА ПЕРЕКЛЮЧЕНИЯ ЧАСЫ/ПОГОДА/ДАТА (ДЛЯ ДИСПЛЕЕВ TM1637/ST7789) ==================================
+
 void loadDisplaySwitchSettings() {
 #if (USE_TM1637 || USE_ST7789)
   uint32_t tmp = jsonReadtoInt(configSetup, "disp_switch");
-  if (tmp < 5) tmp = 10;
+  if (tmp != 0 && tmp < 5) tmp = 10;
   DISPLAY_SWITCH_INTERVAL = tmp * 1000UL;
   displaySwitchTimer = millis();
+
+  dateSwitchEnabled = (jsonReadtoInt(configSetup, "date_switch", 1) == 1);
+  weatherSwitchEnabled = (jsonReadtoInt(configSetup, "weather_switch", 1) == 1);
+
+  if (jsonRead(configSetup, "date_switch") == "null") {
+    jsonWrite(configSetup, "date_switch", dateSwitchEnabled ? 1 : 0);
+  }
+  if (jsonRead(configSetup, "weather_switch") == "null") {
+    jsonWrite(configSetup, "weather_switch", weatherSwitchEnabled ? 1 : 0);
+  }
+  saveConfig();
+  rebuildActiveModes();
 #endif
 }
 
 // =========================================================================== КНОПКА =================================================================
+
 void loadButtonSettings() {
 #if USE_BUTTON
   bool buttonChanged = false;
@@ -338,6 +363,7 @@ void loadButtonSettings() {
 }
 
 // ============================================================================ МП3 ПЛЕЕР =============================================================
+
 void loadMP3Settings() {
 #if USE_MP3_PLAYER
   eff_volume = constrain(jsonReadtoInt(configMP3, "vol", 10), 0, 30);
@@ -396,6 +422,7 @@ void loadMP3Settings() {
 }
 
 // ========================================================== СИНХРОННОЕ УПРАВЛЕНИЕ ЛАМПАМИ (до 5 штук) ===============================================
+
 #if USE_MULTILAMP
 void loadMultilampSettings() {
   ml1 = jsonReadtoInt(configMultilamp, "ml1");
@@ -418,6 +445,7 @@ void loadMultilampSettings() {
 #endif
 
 // ============================================================================= MQTT =================================================================
+
 void loadMQTTSettings() {
 #if USE_MQTT
   bool mqttChanged = false;
@@ -457,7 +485,6 @@ void loadMQTTSettings() {
   }
 
   if (mqttChanged) {
-    //writeFile(F("config_mqtt.json"), configMQTT);
     configChanged = true;
   }
 
@@ -495,6 +522,7 @@ void loadMQTTSettings() {
 }
 
 // =========================================================================== РАССВЕТ ================================================================
+
 #if USE_DAWN
 void loadAlarmSettings() {
   if (configAlarm.isEmpty() || configAlarm == "Failed" || configAlarm == "Large") {
@@ -525,7 +553,6 @@ void loadAlarmSettings() {
     alarms[i].Time = hours * 60 + minutes;
   }
 
-  // Режим "Рассвет", таймаут (после будильника), яркость
   dawnMode = jsonReadtoInt(configAlarm, "t", 1) - 1;
   DAWN_TIMEOUT = jsonReadtoInt(configAlarm, "after", 10);
   DAWN_BRIGHT = jsonReadtoInt(configAlarm, "a_br", 100);
@@ -537,6 +564,7 @@ void loadAlarmSettings() {
 #endif // USE_DAWN
 
 // =========================================================================== ЗАКАТ ==================================================================
+
 #if USE_SUNSET
 void loadSunsetSettings() {
   if (configSunset.isEmpty() || configSunset == "Failed" || configSunset == "Large") {
@@ -576,6 +604,7 @@ void loadSunsetSettings() {
 #endif // USE_SUNSET
 
 // =========================================================================== РАСПИСАНИЕ =============================================================
+
 #if USE_SCHEDULE
 void loadScheduleSettings() {
   if (configSchedule.isEmpty() || configSchedule == "Failed" || configSchedule == "Large") {
@@ -660,6 +689,7 @@ void loadScheduleSettings() {
 #endif // USE_SCHEDULE
 
 // ============================================================================= ЯРКОСТЬ ==============================================================
+
 void loadBrightness() {
   DynamicJsonDocument doc(4096);
   deserializeJson(doc, configSetup);
@@ -677,20 +707,6 @@ void loadBrightness() {
   }
 }
 
-// ---------------------------------------
-//дефолтная яркость Рассвета и Заката
-void loadDawnSunsetSettings() {
-#if USE_DAWN
-  DAWN_BRIGHT = jsonReadtoInt(configSetup, "dawnBright");
-  if (DAWN_BRIGHT == 0 || DAWN_BRIGHT > 255) DAWN_BRIGHT = 100;
-#endif // USE_DAWN
-
-#if USE_SUNSET
-  SUNSET_BRIGHT = jsonReadtoInt(configSetup, "sunsetBright");
-  if (SUNSET_BRIGHT == 0 || SUNSET_BRIGHT > 255) SUNSET_BRIGHT = 100;
-#endif // USE_SUNSET
-}
-
 // ----------------------------------------
 // пользовательская яркость часов
 void loadUserBrightness() {
@@ -704,6 +720,7 @@ void loadUserBrightness() {
 #endif
 }
 // ============================================================================ МАТРИЦА ===============================================================
+
 void loadMatrixAndInitLEDs() {
   bool configNeedsSave = false;
 
@@ -930,6 +947,7 @@ void loadMatrixAndInitLEDs() {
 }
 
 // ============================================================ НАСТРОЙКИ ОТОБРАЖЕНИЯ ЧАСОВ НА МАТРИЦЕ ================================================
+
 void loadClockSettings() {
 #if LED_PANEL
   if (jsonRead(configLedPanel, "clock_hue").isEmpty()) {
@@ -1000,6 +1018,7 @@ void loadClockSettings() {
 }
 
 // ======================================================== НАСТРОЙКИ ОТОБРАЖЕНИЯ ДАТЫ НА МАТРИЦЕ =====================================================
+
 void loadDateSettings() {
 #if LED_PANEL
   if (jsonRead(configLedPanel, "date_hue").isEmpty()) {
@@ -1052,6 +1071,7 @@ void loadDateSettings() {
 }
 
 // =========================================================== НАСТРОЙКИ ОТОБРАЖЕНИЯ ПОГОДЫ НА МАТРИЦЕ ================================================
+
 void loadWeatherSettings() {
 #if LED_PANEL && USE_WEATHER
   if (jsonRead(configLedPanel, "weather_cycle").isEmpty()) {
@@ -1156,7 +1176,7 @@ void loadTimerSettings() {
   interval_c_d = constrain(jsonReadtoInt(configLedInterval, "interval_c_d", 10), 5, 600);
 
 #if USE_WEATHER
-  // Взаимоисключаемость таймеров (активен может быть только один)
+  // взаимоисключаемость таймеров (активен может быть только один)
   if (timer_clock_fixed) {
     timer_c_w = timer_c_d = timer_d_w = timer_c_d_w = false;
     jsonWrite(configLedInterval, "timer_c_w", "0");
@@ -1198,10 +1218,9 @@ void loadTimerSettings() {
 }
 
 // ============================================= НАСТРОЙКИ ИНТЕРВАЛОВ ВЫВОДА БЕГУЩЕЙ СТРОКОЙ ЧАСОВ и ПОГОДЫ ===========================================
-void loadClockAndWeatherIntervals() {
-  //bool configChanged = false;
 
-  // Интервал вывода времени (минуты)
+void loadClockAndWeatherIntervals() {
+  // интервал вывода времени (минуты)
   int printTimeTmp = jsonReadtoInt(configLedInterval, "print_time", 30);
   if (printTimeTmp < 1 || printTimeTmp > 60) {
     printTimeTmp = 30;
@@ -1223,6 +1242,7 @@ void loadClockAndWeatherIntervals() {
 }
 
 // ==================================================================== НАСТРОЙКИ БЕГУЩЕЙ СТРОКИ ======================================================
+
 void loadRunningTextSettings() {
   if (jsonRead(configLedPanel, "spt").isEmpty()) {
     jsonWrite(configLedPanel, "spt", "118");
@@ -1266,7 +1286,7 @@ void loadRunningTextSettings() {
   if (SpeedRunningText < 20 || SpeedRunningText > 220) {
     SpeedRunningText = 80;
     jsonWrite(configLedPanel, "spt", SpeedRunningText);
-    configChanged = true;          // вместо saveConfig()
+    configChanged = true;
   }
 
   ColorTextFon = jsonReadtoInt(configLedPanel, "ctf", 0);
@@ -1346,6 +1366,7 @@ void loadRunningTextSettings() {
 }
 
 // ======================================================================== НАСТРОЙКИ ШРИФТА ==========================================================
+
 void loadFontSettings() {
 #if LED_PANEL
   String fontStr = jsonRead(configLedPanel, "font_size");
@@ -1365,7 +1386,7 @@ void loadFontSettings() {
 void loadStaticFontSettings() {
 #if LED_PANEL
   String fontStr = jsonRead(configLedPanel, "static_font");
-  int fontId = STATIC_FONT;   // значение по умолчанию из Constants.h
+  int fontId = STATIC_FONT;  // значение по умолчанию из Constants.h
   if (!fontStr.isEmpty() && fontStr != "null") {
     int val = fontStr.toInt();
     if (val >= 0 && val <= 3) {
@@ -1383,8 +1404,8 @@ void loadStaticFontSettings() {
 }
 
 // ================================================================= НАСТРОЙКИ ЭФФЕКТОВ и ЦИКЛОВ ======================================================
+
 void loadEffectsAndCycleSettings() {
-  // Корректировки эффектов
   {
     String Name = F("correct.");
     Name += jsonRead(configSetup, "lang");
@@ -1395,7 +1416,7 @@ void loadEffectsAndCycleSettings() {
     }
   }
 
-  // Вычисляем индекс EFF_SD в списке эффектов
+  // вычисление индекса EFF_SD в списке эффектов
   effSdIndex = 255;
   for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
     if (eff_num_correct[i] == EFF_SD) {
@@ -1453,6 +1474,7 @@ void loadEffectsAndCycleSettings() {
 }
 
 // ============================================================= ЗАГРУЗКА ДЕФОЛТНЫХ НАСТРОЕК ЭФФЕКТОВ =================================================
+
 void loadDefaultEffectSettings() {
   for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
     modes[i].Brightness = pgm_read_byte(&defaultSettings[i][0]);
@@ -1462,6 +1484,7 @@ void loadDefaultEffectSettings() {
 }
 
 // ================================================================== ЗАГРУЗКА НАСТРОЕК ЭФФЕКТОВ ======================================================
+
 void loadEffectSettings() {
   static bool initialized = false;
   if (!initialized) {
@@ -1479,6 +1502,7 @@ void loadEffectSettings() {
 }
 
 // ==================================================================== ЗАГРУЗКА МОДУЛЕЙ ==============================================================
+
 void loadModuleSettings() {
 #if USE_BUTTON
 #if defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)
@@ -1540,6 +1564,7 @@ void loadModuleSettings() {
 }
 
 // =================================================================== ЗАГРУЗКА ВСЕХ НАСТРОЕК =========================================================
+
 void loadAllSettings() {
   loadBasicSettings();            // Базовые настройки (LAMP_NAME, AP_NAME, AP_PASS, time_always, ночные/дневные режимы и т.д.)
   loadLocalAuthSettings();        // local_auth (установка пароля для редактора)
@@ -1554,7 +1579,6 @@ void loadAllSettings() {
   loadModuleSettings();           // Модули (плеер, диспле, пульт, кнопка, sd)
   loadFontSettings();             // Шрифт текста бегущей строки
   loadStaticFontSettings();       // загрузка шрифта для статики (часы, дата, погода)
-  loadDawnSunsetSettings();       // Яркость рассвета и заката
 #if USE_ST7789
   loadST7789Settings();           // Дисплей ST7789
 #endif

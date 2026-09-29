@@ -4,53 +4,108 @@
 
 // Вкл / Выкл лампы
 void IR_Power() {
-  #if USE_DAWN
+#if USE_DAWN
   if (dawnFlag == 1) {
+    manualOff = true;
+    dawnFlag = 0;
 #if USE_MP3_PLAYER
     if (mp3Enabled && alarm_sound_flag) {
       send_command(0x0E, 0, 0, 0);
       mp3_stop = true;
       alarm_sound_flag = false;
-    } else
-#endif // USE_MP3_PLAYER
-    {
-      manualOff = true;
-      dawnFlag = 2;
-#if USE_TM1637
-      if (tm1637Enabled) {
-        clockTicker_blink();
-      }
-#endif
-      SetBrightness(modes[currentMode].Brightness);
-      changePower();
     }
+#endif
+#if USE_TM1637
+    if (tm1637Enabled) {
+      DisplayFlag = 0;
+      clockTicker_blink();
+    }
+#endif
+
+    ONflag = false;
+    jsonWrite(configSetup, "Power", 0);
+
+    FastLED.clear();
+    FastLED.setBrightness(0);
+    FastLED.show();
+    yield();
+
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+    digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
+    saveConfig();
+    loadingFlag = false;
     return;
-  } 
-  #endif // USE_DAWN
+  }
+#endif
 
-    ONflag = !ONflag;
-jsonWrite(configSetup, "Power", ONflag);
+#if USE_SUNSET
+  if (sunsetFlag == 1) {
+    manualsOff = true;
+    sunsetFlag = 0;
+#if USE_MP3_PLAYER
+    if (mp3Enabled && sunset_sound_flag) {
+      send_command(0x0E, 0, 0, 0);
+      mp3_stop = true;
+      sunset_sound_flag = false;
+    }
+#endif
+#if USE_TM1637
+    if (tm1637Enabled) {
+      clockTicker_blink();
+    }
+#endif
 
-if (!ONflag && leds != nullptr) {
+    ONflag = false;
+    jsonWrite(configSetup, "Power", 0);
+
+    FastLED.clear();
+    FastLED.setBrightness(0);
+    FastLED.show();
+    yield();
+
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+    digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+    digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
+    saveConfig();
+    loadingFlag = false;
+    return;
+  }
+#endif
+
+  // обычное переключение Power
+  ONflag = !ONflag;
+  jsonWrite(configSetup, "Power", ONflag);
+
+  if (!ONflag && leds != nullptr) {
     FastLED.setBrightness(0);
     FastLED.clear();
     FastLED.show();
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
     digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
 #endif
-}
+  }
 
-saveConfig();
-changePower();
-    if (!ONflag) {
-      timeout_save_file_changes = millis() - SAVE_FILE_DELAY_TIMEOUT;
-      if (!Favorites::instance().FavoritesRunning) Eeprom::instance().EepromPut(modes);
-      save_file_changes = 7;
-      Save_File_Changes();
-    } else {
-      Eeprom::instance().EepromGet(modes);
-      timeout_save_file_changes = millis();
-      bitSet(save_file_changes, 0);
+  changePower();
+  saveConfig();
+
+  if (!ONflag) {
+    timeout_save_file_changes = millis() - SAVE_FILE_DELAY_TIMEOUT;
+    if (!Favorites::instance().FavoritesRunning) Eeprom::instance().EepromPut(modes);
+    save_file_changes = 7;
+    Save_File_Changes();
+  } else {
+    Eeprom::instance().EepromGet(modes);
+    timeout_save_file_changes = millis();
+    bitSet(save_file_changes, 0);
   }
   loadingFlag = true;
 
@@ -66,9 +121,9 @@ changePower();
   if (ONflag) {
     repeat_multiple_lamp_control = true;
   } else {
-    multiple_lamp_control ();
+    multiple_lamp_control();
   }
-#endif  // USE_MULTILAMP
+#endif
 }
 
 // Вкл / Выкл звука
@@ -92,7 +147,7 @@ void Mute() {
     SYSLOG.add("mp3 плеер не подключен");
 #endif
   }
-  jsonWrite(configSetup, "on_sound", eff_sound_on > 0 ? 1 : 0);
+  jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
 #if USE_MULTILAMP
@@ -148,6 +203,10 @@ void Prev_Next_eff(bool direction) {
       TFT_Display_Timer(0);
     }
 #endif
+
+    effectsTick();
+    FastLED.show();
+
     if (random_on && Favorites::instance().FavoritesRunning)
       selectedSettings = 1U;
 #if USE_MQTT
@@ -192,15 +251,15 @@ void Bright_Up_Down(bool direction) {
   SetBrightness(modes[currentMode].Brightness);
 #if USE_TM1637
   if (tm1637Enabled) {
-  DisplayFlag = 3;
-  Display_Timer(modes[currentMode].Brightness);
-}
+    DisplayFlag = 3;
+    Display_Timer(modes[currentMode].Brightness);
+  }
 #endif
 #if USE_ST7789
-   if (st7789Enabled) {
-  DisplayFlag = 3;
-  TFT_Display_Timer(modes[currentMode].Brightness);
- }
+  if (st7789Enabled) {
+    DisplayFlag = 3;
+    TFT_Display_Timer(modes[currentMode].Brightness);
+  }
 #endif
 
 #if USE_MULTILAMP
@@ -220,14 +279,14 @@ void Speed_Up_Down(bool direction) {
   loadingFlag = true; // без перезапуска эффекта ничего и не увидишь
 #if USE_TM1637
   if (tm1637Enabled) {
-  DisplayFlag = 3;
-  Display_Timer(modes[currentMode].Speed);
+    DisplayFlag = 3;
+    Display_Timer(modes[currentMode].Speed);
   }
 #endif
 #if USE_ST7789
   if (st7789Enabled) {
-  DisplayFlag = 3;
-  TFT_Display_Timer(modes[currentMode].Speed);
+    DisplayFlag = 3;
+    TFT_Display_Timer(modes[currentMode].Speed);
   }
 #endif
 
@@ -248,14 +307,14 @@ void Scale_Up_Down(bool direction) {
   loadingFlag = true; // без перезапуска эффекта ничего и не увидишь
 #if USE_TM1637
   if (tm1637Enabled) {
-  DisplayFlag = 3;
-  Display_Timer(modes[currentMode].Scale);
+    DisplayFlag = 3;
+    Display_Timer(modes[currentMode].Scale);
   }
 #endif
 #if USE_ST7789
   if (st7789Enabled) {
-  DisplayFlag = 3;
-  TFT_Display_Timer(modes[currentMode].Scale);
+    DisplayFlag = 3;
+    TFT_Display_Timer(modes[currentMode].Scale);
   }
 #endif
 
@@ -273,24 +332,24 @@ void Volum_Up_Down (bool direction) {
 #if USE_MP3_PLAYER
   if (mp3Enabled) {
     eff_volume = constrain(direction ? eff_volume + 1 : eff_volume - 1, 1, 30);
-    jsonWrite(configSetup, "vol", eff_volume);
+    jsonWrite(configMP3, "vol", eff_volume);
     if (!dawnflag_sound) send_command(6, FEEDBACK, 0, eff_volume); // Громкость
 
-    #if USE_TM1637
-      if (tm1637Enabled) {
-        DisplayFlag = 3;
-        Display_Timer(eff_volume);
-      }
-    #endif
-    #if USE_ST7789
-      if (st7789Enabled) {
-        DisplayFlag = 3;
-        TFT_Display_Timer(eff_volume);
-      }
-    #endif
-    #if USE_MULTILAMP
-      repeat_multiple_lamp_control = true;
-    #endif
+#if USE_TM1637
+    if (tm1637Enabled) {
+      DisplayFlag = 3;
+      Display_Timer(eff_volume);
+    }
+#endif
+#if USE_ST7789
+    if (st7789Enabled) {
+      DisplayFlag = 3;
+      TFT_Display_Timer(eff_volume);
+    }
+#endif
+#if USE_MULTILAMP
+    repeat_multiple_lamp_control = true;
+#endif
   }
 #endif
 }
@@ -315,60 +374,78 @@ void Print_IP() {
     }
     textToShow = "AP: " + apIP.toString();
   }
+
 #if USE_ST7789
   if (st7789Enabled) {
-  TFT_ShowIP(wifi.localIP().toString().c_str());
+    TFT_ShowIP(wifi.localIP().toString().c_str());
   }
 #endif
-  while (!fillString(textToShow.c_str(), textColor, false)) {
+
+  FastLED.clear();
+  FastLED.show();
+
+  bool oldRunTextOver = runTextOver;
+  runTextOver = false;
+
+  uint8_t savedBrightness = FastLED.getBrightness();
+  FastLED.setBrightness(20);
+
+  bool textEnded = false;
+  while (!textEnded) {
+    textEnded = fillString(textToShow.c_str(), textColor, false);
+    FastLED.show();
+    parseUDP();
+    HTTP.handleClient();
     delay(1);
     yield();
   }
+
+  FastLED.setBrightness(savedBrightness);
+  FastLED.clear();
+  FastLED.show();
+  runTextOver = oldRunTextOver;
+  textIsRunning = false;
+
 #if USE_ST7789
   if (st7789Enabled) {
-  TFT_HideIP();
+    TFT_HideIP();
   }
 #endif
-  if (ColorTextFon && (!ONflag || (currentMode == EFF_COLOR && modes[currentMode].Scale < 3))) {
-    FastLED.clear();
-    delay(1);
-    FastLED.show();
-  }
 
   loadingFlag = true;
 
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
-  #if USE_DAWN
-    digitalWrite(MOSFET_PIN, ONflag || (dawnFlag == 1 && !manualOff) ? MOSFET_LEVEL : !MOSFET_LEVEL);
-  #else
-    digitalWrite(MOSFET_PIN, ONflag ? MOSFET_LEVEL : !MOSFET_LEVEL);
-  #endif // USE_DAWN
+#if USE_DAWN
+  digitalWrite(MOSFET_PIN, ONflag || (dawnFlag == 1 && !manualOff) ? MOSFET_LEVEL : !MOSFET_LEVEL);
+#else
+  digitalWrite(MOSFET_PIN, ONflag ? MOSFET_LEVEL : !MOSFET_LEVEL);
+#endif
 #endif
 }
 
 void Folder_Next_Prev(bool direction) {
 #if USE_MP3_PLAYER
   if (mp3Enabled) {
-  if (true) { // (!pause_on && !mp3_stop && eff_sound_on) {
-    CurrentFolder = constrain(direction ? CurrentFolder + 1 : CurrentFolder - 1, 0, 99);
-    jsonWrite(configSetup, "fold_sel", CurrentFolder);
-    if (!pause_on && !mp3_stop && eff_sound_on) {
-      send_command(0x17, FEEDBACK, 0, CurrentFolder); // Включить непрерывное воспроизведение указанной папки
-      delay(mp3_delay);
+    if (true) { // (!pause_on && !mp3_stop && eff_sound_on) {
+      CurrentFolder = constrain(direction ? CurrentFolder + 1 : CurrentFolder - 1, 0, 99);
+      jsonWrite(configSetup, "fold_sel", CurrentFolder);
+      if (!pause_on && !mp3_stop && eff_sound_on) {
+        send_command(0x17, FEEDBACK, 0, CurrentFolder); // Включить непрерывное воспроизведение указанной папки
+        delay(mp3_delay);
+      }
     }
-  }
 
 #if USE_TM1637
-  if (tm1637Enabled) {
-  DisplayFlag = 0;
-  Display_Timer();
-  }
+    if (tm1637Enabled) {
+      DisplayFlag = 0;
+      Display_Timer();
+    }
 #endif
 #if USE_ST7789
-  if (st7789Enabled) {
-  DisplayFlag = 0;
-  TFT_Display_Timer(0);
-  }
+    if (st7789Enabled) {
+      DisplayFlag = 0;
+      TFT_Display_Timer(0);
+    }
 #endif
   }
 #if USE_MULTILAMP
@@ -397,25 +474,25 @@ void Current_Eff_Rnd_Def(bool direction) {
 void IR_Equalizer() {
 #if USE_MP3_PLAYER
   if (mp3Enabled) {
-  Equalizer++;
-  if (Equalizer > 5) Equalizer = 0;
-  jsonWrite(configSetup, "eq", Equalizer);
-  send_command(0x07, FEEDBACK, 0, Equalizer);
-  timeout_save_file_changes = millis();
-  bitSet (save_file_changes, 0);
+    Equalizer++;
+    if (Equalizer > 5) Equalizer = 0;
+    jsonWrite(configSetup, "eq", Equalizer);
+    send_command(0x07, FEEDBACK, 0, Equalizer);
+    timeout_save_file_changes = millis();
+    bitSet (save_file_changes, 0);
 #if USE_TM1637
-  if (tm1637Enabled) {
-  DisplayFlag = 3;
-  Display_Timer(Equalizer);
-  }
+    if (tm1637Enabled) {
+      DisplayFlag = 3;
+      Display_Timer(Equalizer);
+    }
 #endif
 #if USE_ST7789
-  if (st7789Enabled) {
-  DisplayFlag = 3;
-  TFT_Display_Timer(Equalizer);
-  }
+    if (st7789Enabled) {
+      DisplayFlag = 3;
+      TFT_Display_Timer(Equalizer);
+    }
 #endif
-}
+  }
 #endif  // USE_MP3_PLAYER
 }
 
@@ -430,21 +507,21 @@ void Favorit_Add_Del(bool direction) {
   else showWarning(CRGB::Red, 500, 250U); // мигание красным цветом 0.5 секунды
 }
 
-void Digit_Handle (uint8_t digit) {
+void Digit_Handle(uint8_t digit) {
   if (!Enter_Digit_1) {
     Enter_Digit_1 = 1;
     IR_Dgit_Enter_Timer = millis();
     Enter_Number = digit;
 #if USE_TM1637
     if (tm1637Enabled) {
-    DisplayFlag = 3;
-    Display_Timer(digit);
+      DisplayFlag = 3;
+      Display_Timer(digit);
     }
 #endif
 #if USE_ST7789
     if (st7789Enabled) {
-    DisplayFlag = 3;
-    TFT_Display_Timer(Enter_Number);
+      DisplayFlag = 3;
+      TFT_Display_Timer(Enter_Number);
     }
 #endif
   } else {
@@ -453,8 +530,8 @@ void Digit_Handle (uint8_t digit) {
     currentMode = eff_num_correct[Enter_Number];
 #if USE_TM1637
     if (tm1637Enabled) {
-    DisplayFlag = 3;
-    Display_Timer(Enter_Number);
+      DisplayFlag = 3;
+      Display_Timer(Enter_Number);
     }
 #endif
     jsonWrite(configSetup, "eff_sel", Enter_Number);
@@ -464,6 +541,18 @@ void Digit_Handle (uint8_t digit) {
     SetBrightness(modes[currentMode].Brightness);
     loadingFlag = true;
     if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
+
+    #if USE_MP3_PLAYER
+    if (mp3Enabled && mp3_player_connect == 4) {
+      uint8_t newFolder = effects_folders[currentMode];
+      if (mp3_folder != newFolder) {
+        mp3_folder = newFolder;
+        mp3_folder_last = mp3_folder;
+        mp3_pending_play = true;
+      }
+    }
+#endif
+
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;

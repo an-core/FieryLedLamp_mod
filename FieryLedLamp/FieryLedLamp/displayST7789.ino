@@ -442,7 +442,6 @@ void tftShowStartText() {
 }
 
 // ----------------------------------------------------------------------------------------
-// Инициализация и публичные функции
 void TFT_Init() {
   pinMode(TFT_BL, OUTPUT);
   digitalWrite(TFT_BL, LOW);
@@ -476,7 +475,6 @@ void TFT_Init() {
   lastColonTFT = true;
   tftColonTmr = millis();
 
-  // сброс состояния бегущей строки
   tftTickerSprReady = false;
   tftTickerActive = false;
   tftTickerNextStart = 0;
@@ -569,18 +567,43 @@ void TFT_Display_Timer(uint8_t argument) {
   // Переключение "Часы / Погода / Дата"
   if (!tftShowEffect && !tftShowArg) {
 #if (USE_WEATHER == 0)
-    displayMode = DISP_MODE_CLOCK;
-#else
-    if (inClockWeatherMode) {
+    if (inClockWeatherMode && DISPLAY_SWITCH_INTERVAL > 0) {
       if (millis() - displaySwitchTimer >= DISPLAY_SWITCH_INTERVAL) {
         displaySwitchTimer = millis();
-        displayMode = (DisplayMode)((displayMode + 1) % 3);
+        if (dateSwitchEnabled) {
+          displayMode = (displayMode == DISP_MODE_CLOCK) ? DISP_MODE_DATE : DISP_MODE_CLOCK;
+        } else {
+          displayMode = DISP_MODE_CLOCK;
+        }
+      }
+    } else {
+      displayMode = DISP_MODE_CLOCK;
+    }
+#else
+    if (inClockWeatherMode && DISPLAY_SWITCH_INTERVAL > 0) {
+      if (millis() - displaySwitchTimer >= DISPLAY_SWITCH_INTERVAL) {
+        displaySwitchTimer = millis();
+
+        uint8_t attempts = 0;
+        do {
+          displayMode = (DisplayMode)((displayMode + 1) % 3);
+          attempts++;
+          if (attempts > 3) break;
+        } while (
+          (displayMode == DISP_MODE_DATE && !dateSwitchEnabled) ||
+          (displayMode == DISP_MODE_WEATHER && !weatherSwitchEnabled)
+        );
       }
 
       if (displayMode == DISP_MODE_WEATHER && weatherErrActive) {
         if (millis() - weatherErrTimer >= WEATHER_ERR_TIME) {
           weatherErrActive = false;
-          displayMode = DISP_MODE_CLOCK;
+          do {
+            displayMode = (DisplayMode)((displayMode + 1) % 3);
+          } while (
+            (displayMode == DISP_MODE_DATE && !dateSwitchEnabled) ||
+            (displayMode == DISP_MODE_WEATHER && !weatherSwitchEnabled)
+          );
           displaySwitchTimer = millis();
         }
       }
@@ -613,6 +636,10 @@ void TFT_Display_Timer(uint8_t argument) {
           view = TFT_VIEW_CLOCK;
           break;
         case DISP_MODE_WEATHER:
+          if (!weatherSwitchEnabled) {
+            view = TFT_VIEW_CLOCK; // fallback
+            break;
+          }
           if (Weather::instance().getTemperature() > -998.0f) {
             view = TFT_VIEW_WEATHER;
           } else {
@@ -631,6 +658,10 @@ void TFT_Display_Timer(uint8_t argument) {
           }
           break;
         case DISP_MODE_DATE:
+          if (!dateSwitchEnabled) {
+            view = TFT_VIEW_CLOCK; // fallback
+            break;
+          }
           view = TFT_VIEW_DATE;
           break;
       }
@@ -743,12 +774,19 @@ static void tftBrightnessTick() {
   if (!tftInited) return;
   if (!tft_auto_brightness) return;
 
-  const uint8_t target = tftGetDayNightTarget();
-#if USE_DAWN || USE_SUNSET
-  const bool activeBreath = (dawnFlag == 1 || sunsetFlag == 1);
+ const uint8_t target = tftGetDayNightTarget();
+
+  const bool activeBreath =
+#if USE_DAWN && USE_SUNSET
+    (dawnFlag == 1 || sunsetFlag == 1)
+#elif USE_DAWN
+    (dawnFlag == 1)
+#elif USE_SUNSET
+    (sunsetFlag == 1)
 #else
-  const bool activeBreath = false;
+    false
 #endif
+    ;
 
   if (!activeBreath) {
     if (tftDispBrightness != target) {

@@ -46,6 +46,7 @@ bool FS_init(void) {
 }
 
 // =================================================================== АППАРАТНАЯ ИНИЦИАЛИЗАЦИЯ ========================================================
+
 void initHardware() {
   // мосфет
 #ifdef MOSFET_PIN
@@ -65,6 +66,7 @@ void initHardware() {
 }
 
 // ====================================================================== ИНИЦИАЛИЗАЦИЯ SD КАРТЫ =======================================================
+
 void initSD() {
 #if USE_SD
   if (!sdEnabled) return;
@@ -72,29 +74,17 @@ void initSD() {
   if (sdType == 0) {
     if (SD.begin(SD_CS_PIN)) {
       sd_card_present = true;
-#if SD_LOG
-      SYSLOG.add("SD-карта инициализирована");
-#endif
       for (uint8_t i = 0; i < MODE_AMOUNT; i++)
         effects_folders[i] = pgm_read_byte(&default_effects_folders[i]);
       jsonWrite(configSetup, "out_file", "");
     } else {
       sd_card_present = false;
-#if SD_LOG
-      SYSLOG.add("Ошибка инициализации SD-карты");
-#endif
     }
   } else {
     sd_card_present = true;
     if (!LittleFS.exists("/effects/")) {
       if (LittleFS.mkdir("/effects/")) {
-#if SD_LOG
-        SYSLOG.add("Папка /effects/ создана в LittleFS");
-#endif
       } else {
-#if SD_LOG
-        SYSLOG.add("Ошибка создания папки /effects/ в LittleFS");
-#endif
       }
     }
   }
@@ -102,6 +92,7 @@ void initSD() {
 }
 
 // ==================================================================== ИНИЦИАЛИЗАЦИЯ МП3 ПЛЕЕРА =======================================================
+
 void initMP3Hardware() {
 #if USE_MP3_PLAYER
   mp3.begin(9600, SERIAL_8N1, MP3_RX_PIN, MP3_TX_PIN);
@@ -113,8 +104,6 @@ void initMP3Hardware() {
 #if MP3_LOG
   SYSLOG.add("MP3: инициализация ...");
 #endif
-
-  mp3_setup();
 
   String configSound = readFile(F("sound_list.json"), 2048);
 
@@ -174,6 +163,7 @@ void initMP3Hardware() {
 }
 
 // ======================================================================= ИНИЦИАЛИЗАЦИЯ КНОПКИ ========================================================
+
 void initButtonHardware() {
 #if USE_BUTTON
   if (button_type) { // сенсорная
@@ -194,6 +184,7 @@ void initButtonHardware() {
 }
 
 // ============================================================== ИНИЦИАЛИЗАЦИЯ ДИСПЛЕЕВ TM1637 / ST7789 ===============================================
+
 void initST7789() {
 #if USE_ST7789
 #if ST7789_LOG
@@ -219,6 +210,7 @@ void initTM1637() {
 }
 
 // ========================================================================= ИНИЦИАЛИЗАЦИЯ IR / RF =====================================================
+
 void initIR() {
 #if USE_IR_RECEIVER
   irrecv.enableIRIn();
@@ -233,6 +225,7 @@ void initRF() {
 }
 
 // ======================================================== ИНИЦИАЛИЗАЦИЯ РАССВЕТА, ЗАКАТА, РАСПИСАНИЯ ЛАМПЫ ===========================================
+
 void initAlarm() {
 #if USE_DAWN
   first_entry = 1;
@@ -256,6 +249,7 @@ void initSchedule() {
 }
 
 // =================================================================== ИНИЦИАЛИЗАЦИЯ НОЧНЫХ ЧАСОВ ======================================================
+
 void initNightClockSettings() {
   nightClockEnabled = false;
   jsonWrite(configLedPanel, "night_clock_enabled", "0");
@@ -267,6 +261,7 @@ void initNightClockSettings() {
 }
 
 // ==================================================================== ИНИЦИАЛИЗАЦИЯ ТАЙМЕРОВ =========================================================
+
 void initSystemTimers() {
   uint32_t now = millis();
 #if USE_TM1637
@@ -283,6 +278,7 @@ void initSystemTimers() {
 }
 
 // ======================================================================= ИНИЦАЛИЗАЦИЯ MQTT ===========================================================
+
 void initMQTT() {
 #if USE_MQTT
   if (MqttOn && Wifi::instance().isConnected()) {
@@ -312,6 +308,7 @@ void initMQTT() {
 }
 
 // ==================================================================== ИНИЦИАЛИЗАЦИЯ TELNET ===========================================================
+
 void initTelnetDebug() {
 #if DEBUG_ENABLED && DEBUG_TELNET
   initTelnet();
@@ -319,6 +316,7 @@ void initTelnetDebug() {
 }
 
 // ===================================================================== ИНИЦИАЛИЗАЦИЯ SSDP ============================================================
+
 void SSDP_init(void) {
   HTTP.on(F("/description.xml"), HTTP_GET, []() {
     SSDP.schema(HTTP.client());
@@ -341,6 +339,7 @@ void SSDP_init(void) {
 }
 
 // =================================================================== ПЕРЕИНИЦИАЛИЗАЦИЯ SSDP ==========================================================
+
 void restartSSDP() {
   SSDP_init();
   ssdpInitialized = true;
@@ -353,6 +352,7 @@ void restartSSDP() {
 }
 
 // ====================================================================== ИНИЦИАЛИЗАЦИЯ WEB ============================================================
+
 void initWebServices() {
   SSDP_init();
   Udp.begin(localPort);

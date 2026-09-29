@@ -5,7 +5,7 @@
 #if USE_IR_RECEIVER
 
 uint32_t getIRCode(const String& key) {
-    return irManager.getCode(key);
+  return irManager.getCode(key);
 }
 
 void IR_Receive_Handle() {
@@ -34,7 +34,14 @@ void IR_Receive_Handle() {
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
 #if USE_MP3_PLAYER
-    mp3_folder = pgm_read_byte(&default_effects_folders[currentMode]);
+    if (mp3Enabled && mp3_player_connect == 4) {
+      uint8_t newFolder = effects_folders[currentMode];
+      if (mp3_folder != newFolder) {
+        mp3_folder = newFolder;
+        mp3_folder_last = mp3_folder;
+        mp3_pending_play = true;
+      }
+    }
 #endif
 
     SetBrightness(modes[currentMode].Brightness);
@@ -47,12 +54,15 @@ void IR_Receive_Handle() {
       Mqtt::instance().needToPublish = true;
     }
 #endif
+
 #if USE_BLYNK
     updateRemoteBlynkParams();
 #endif
+
 #if USE_MULTILAMP
     repeat_multiple_lamp_control = true;
 #endif
+
   }
 }
 
@@ -131,7 +141,7 @@ void IR_Receive_Button_Handle() {
           || IR_Code == IR2_PREV
 #endif
          ) {
-        Prev_Next_eff(false);
+        if (IR_Data_Ready != 2) Prev_Next_eff(false);
       }
       break;
 
@@ -144,7 +154,7 @@ void IR_Receive_Button_Handle() {
           || IR_Code == IR2_NEXT
 #endif
          ) {
-        Prev_Next_eff(true);
+        if (IR_Data_Ready != 2) Prev_Next_eff(true);
       }
       break;
 
@@ -278,14 +288,15 @@ void IR_Receive_Button_Handle() {
         if (IR_Data_Ready != 2) {
 #if USE_MP3_PLAYER
           if (mp3_player_connect == 4) {
-            play_time_ADVERT(true);
-          } else 
+            mp3_pending_time_advert = true;
+            mp3_pending_time_force = true;
+          } else
 #endif
-          if (myTime.isTimeSet()) {
-            printTime(true);
-          } else {
-            fillString("NO TIME", CRGB::Red, true);
-          }
+            if (myTime.isTimeSet()) {
+              printTime(true);
+            } else {
+              fillString("NO TIME", CRGB::Red, true);
+            }
         }
       }
       break;
@@ -304,7 +315,8 @@ void IR_Receive_Button_Handle() {
 #if USE_WEATHER
 #if USE_MP3_PLAYER
           if (mp3_player_connect == 4) {
-            play_weather(true);
+            mp3_pending_weather_advert = true;
+            mp3_pending_weather_force = true;
           } else {
             uint8_t old = PRINT_WEATHER;
             PRINT_WEATHER = 1;
@@ -646,14 +658,15 @@ void RF_Receive_Button_Handle() {
     case RF_TIME:
 #if USE_MP3_PLAYER
       if (mp3_player_connect == 4) {
-        play_time_ADVERT(true);
-      } else 
+        mp3_pending_time_advert = true;
+        mp3_pending_time_force = true;
+      } else
 #endif
-      if (myTime.isTimeSet()) {
-        printTime(true);
-      } else {
-        fillString("NO TIME", CRGB::Red, true);
-      }
+        if (myTime.isTimeSet()) {
+          printTime(true);
+        } else {
+          fillString("NO TIME", CRGB::Red, true);
+        }
       break;
 
     // погода
@@ -661,7 +674,8 @@ void RF_Receive_Button_Handle() {
 #if USE_WEATHER
 #if USE_MP3_PLAYER
       if (mp3_player_connect == 4) {
-        play_weather(true);
+        mp3_pending_weather_advert = true;
+        mp3_pending_weather_force = true;
       } else {
         uint8_t oldPrintWeather = PRINT_WEATHER;
         PRINT_WEATHER = 1;

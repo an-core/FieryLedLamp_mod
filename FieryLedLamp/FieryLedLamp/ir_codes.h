@@ -20,7 +20,7 @@
 #define IR_BR_UP       0xFFB04F    // "200+"          Увеличить яркость
 #define IR_IP          0xFF6897    // "0"             Показать IP адрес
 #define IR_1           0xFF30CF    // "1"             Номер эффекта
-#define IR_2           0xFF18E0    // "2"             Номер эффекта 
+#define IR_2           0xFF18E7    // "2"             Номер эффекта
 #define IR_3           0xFF7A85    // "3"             Номер эффекта
 #define IR_4           0xFF10EF    // "4"             Номер эффекта
 #define IR_5           0xFF38C7    // "5"             Номер эффекта

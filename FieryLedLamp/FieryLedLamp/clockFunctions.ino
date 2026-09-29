@@ -395,10 +395,14 @@ void autoDetectTimezone() {
 // -----------------------------------------
 void initTimeAndTimezone() {
   static uint32_t lastSyncAttempt = 0;
-  
-  if (myTime.isTimeSet() && (millis() - lastSyncAttempt < 300000UL)) return;
-  if (!myTime.isTimeSet() && (millis() - lastSyncAttempt < 5000UL)) return;
-  
+  static bool firstRun = true;
+
+  if (!firstRun) {
+    if (myTime.isTimeSet() && (millis() - lastSyncAttempt < 300000UL)) return;
+    if (!myTime.isTimeSet() && (millis() - lastSyncAttempt < 5000UL)) return;
+  }
+  firstRun = false;
+
   lastSyncAttempt = millis();
 
   String n1 = jsonRead(configSetup, "ntp1");

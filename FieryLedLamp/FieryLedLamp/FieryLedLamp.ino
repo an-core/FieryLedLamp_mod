@@ -41,6 +41,16 @@
 // *******************************************
 
 // ****************************************************************** FIERYLEDLAMP (modifications) ******************************************************
+// ОБНОВЛЕНИЕ от 29.09.2026. Что нового:
+//  - MP3-плеер вынесен на отдельное ядро ESP32S3 (Core 0)
+//    * переключение эффектов теперь происходит без «зависания» старого кадра (мгновенная смена)
+//    * MP3-команды отправляются пошагово, без блокирующих задержек (вместо блокирующих delay(), т.е. эффекты не останавливаются во время озвучки)
+//  - добавлено управление отображения IP адреса на матрице при старте устройства (находится на странице Настройки Wi-Fi)
+// -----------------------------------------------------------------------------------------------------------------------------------------------------
+// ОБНОВЛЕНИЕ от 22.09.2026. Что нового:
+//  - добавлено управление режимами переключения на дисплее: дата и погоду можно отключить и тогда на дисплее будут только часы (часы отключить нельзя)
+//  - исправлены ошибки, касательно инициализации плеера и пульта
+// -----------------------------------------------------------------------------------------------------------------------------------------------------
 // ОБНОВЛЕНИЕ от 15.09.2026. Что нового:
 //  - в список управления модулями на странице Настройки оборудования добавлена SD карта (эффекты .out)
 //    * для ESP32-S3: при включении чекбокса появится select с выбором типа SD карты (физическая / эмуляция в FS)
@@ -202,11 +212,11 @@
 // ESP32S3 - https://aliexpress.ru/item/1005005051294262.html?spm=a2g2w.orderdetail.0.0.7a2e4aa6XnDhBk&sku_id=12000049163334627
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-#define VERSION "FieryLedLamp_ver.8.1_mod"
+#define VERSION "FieryLedLamp_ver.8.3_mod"
 #define BUILD_DATE __DATE__
 #define BUILD_TIME __TIME__
 
-// =========================================================================== ПЛАТФОРМЫ ===============================================================
+// ======================================================================== ПЛАТФОРМЫ =================================================================
 #if defined(ESP32)
 #define ESP32_USED
 #if defined(BOARD_HAS_PSRAM)
@@ -330,6 +340,7 @@ bool waitingForWifi = false;                     // Флаг ожидания п
 static uint32_t lastStaConnectedTime = 0;        // Время последнего успешного STA-соединения
 uint32_t lastWifiCheckTime = 0;                  // Время последней проверки WiFi
 uint32_t lastReconnectAttempt = 0;               // Время последней попытки переподключения
+bool displayIpAtStart = true;                    // Чекбокс Показать IP адрес при старте
 uint8_t ip_brightness = 100;                     // Яркость при показе IP адреса бегущей строкой
 static bool ipShown = false;                     // Флаг, что IP уже показан при старте
 const uint8_t AP_STATIC_IP[] = {192, 168, 4, 1}; // Статический IP точки доступа
@@ -500,6 +511,8 @@ uint32_t displaySwitchTimer = 0;                 // Таймер переклю�
 DisplayMode displayMode = DISP_MODE_CLOCK;       // Текущий режим отображения
 uint32_t DISPLAY_SWITCH_INTERVAL = 10000;        // Интервал переключения
 uint8_t DisplayFlag = 0;                         // Флаг отображения
+bool dateSwitchEnabled = true;
+bool weatherSwitchEnabled = true;
 #endif
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 // кнопка
@@ -579,7 +592,7 @@ uint32_t sunset_timer = 0;                       // Таймер для мело
 uint32_t weather_advert_timer = 0;               // Таймер для озвучки погоды
 uint32_t mp3_timer = 0;
 uint32_t mp3_check_timer = 0;
-uint16_t mp3_delay = 10;                         // Пауза после отправки команды DFPlayer
+uint16_t mp3_delay = 30;                         // Пауза после отправки команды DFPlayer
 uint8_t  Equalizer = 0;                          // Эквалайзер (0-5)
 uint32_t ADVERT_TIMER_1 = 800UL;
 uint32_t ADVERT_TIMER_2 = 1400UL;
@@ -610,6 +623,16 @@ uint8_t mp3_receive_buf[10];                     // Буфер для приём
 bool wasPlayingBeforeAnnounce = false;           // Было ли воспроизведение перед озвучкой
 uint16_t saved_mp3_track = 0;                    // Сохранённый трек перед озвучкой
 uint8_t saved_mp3_folder = 0;                    // Сохранённая папка перед озвучкой
+static Mp3PlayState mp3PlayState = MP3_PLAY_IDLE;
+static uint32_t mp3PlayTimer = 0;
+static uint8_t mp3PlayPendingFolder = 0;
+static bool mp3PlayNeedPause = false;
+// флаги для межъядерной связи
+volatile bool mp3_pending_play = false;
+volatile bool mp3_pending_time_advert = false;
+volatile bool mp3_pending_weather_advert = false;
+volatile bool mp3_pending_weather_force = false;
+volatile bool mp3_pending_time_force = false;
 #endif
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 // LED Панель
@@ -877,6 +900,7 @@ void setup() {
   if (st7789Enabled) initST7789(); // Инициализация дисплея ST7789
 #endif
 // -------------------------------------------------------------------
+  Time::instance(); // Инициализация времени
   Wifi::instance().begin(); // Инициализация WiFi
 // -------------------------------------------------------------------
 #if USE_MQTT
@@ -896,7 +920,10 @@ void setup() {
 #endif
 // -------------------------------------------------------------------
 #if USE_MP3_PLAYER
-  if (mp3Enabled) initMP3Hardware(); // Инициализация MP3 плеера
+  if (mp3Enabled) {
+    initMP3Hardware(); // Инициализация MP3 плеера
+    xTaskCreatePinnedToCore(mp3Task, "mp3Task", 8192, NULL, 1, NULL, 0);
+  }
 #endif
 // -------------------------------------------------------------------
 #if USE_DAWN
@@ -930,22 +957,35 @@ void loop() {
 #if USE_OTA
   Ota::instance().HandleOtaUpdate();
 #endif
+
 #if USE_BUTTON
   if (buttonEnabled) {
     buttonTick();
   }
 #endif
+
   timeTick();
+  
 #if USE_IR_RECEIVER
   if (irEnabled) {
     IR_Receive_Handle();
+    if (IR_Data_Ready) {
+      IR_Receive_Button_Handle();
+      IR_Data_Ready = 0;
+    }
   }
 #endif
+
 #if USE_RF_RECEIVER
   if (rfEnabled) {
     RF_Receive_Handle();
+    if (RF_Data_Ready) {
+      RF_Receive_Button_Handle();
+      RF_Data_Ready = 0;
+    }
   }
 #endif
+
 // -------------------------------------------------------------------
   uint32_t now = millis();
   if (now - lastMedium >= MEDIUM_TASK_INTERVAL) {
@@ -963,30 +1003,23 @@ void loop() {
     Wifi::instance().loop();
   }
 // -------------------------------------------------------------------
+
 #if USE_TM1637
   if (tm1637Enabled) {
     handleTM1637();
   }
 #endif
 
+// --------------------
+
 #if USE_ST7789
   if (st7789Enabled) {
     TFT_LoopTick();
   }
 #endif
+
 // -------------------------------------------------------------------
-#if USE_MP3_PLAYER
-  if (mp3Enabled) {
-    if (!mp3Initialized) {
-      mp3_setup();
-      mp3Initialized = true;
-    }
-    mp3_loop();
-  } else {
-    mp3Initialized = false;
-  }
-#endif
-// -------------------------------------------------------------------
+
  bool needEffects = ONflag;
 #if USE_DAWN
   needEffects |= dawnFlag;
@@ -996,20 +1029,28 @@ void loop() {
 #endif
 
 if (needEffects && !systemShuttingDown) {
-    effectsTick();
+  effectsTick();
 } else if (!systemShuttingDown && leds != nullptr) {
-    FastLED.clear();
-    FastLED.show();
+  FastLED.clear();
+  FastLED.show();
 }
+
 // -------------------------------------------------------------------
+
   handleRunningText();
+  
 // -------------------------------------------------------------------
+
   handleFavorites();
+  
 // ------------------------------------------------------------------
+
   if (manualControlActive && (now - manualControlTimer >= 30000)) {
     manualControlActive = false;
   }
+  
 // -------------------------------------------------------------------
+
   bool shouldSleep = !ONflag;
 #if USE_DAWN && USE_SUNSET
   shouldSleep = shouldSleep && !dawnFlag && !sunsetFlag;
@@ -1018,7 +1059,8 @@ if (needEffects && !systemShuttingDown) {
 #elif USE_SUNSET
   shouldSleep = shouldSleep && !sunsetFlag;
 #else
-#endif
+#endif // USE_DAWN && USE_SUNSET
+
   shouldSleep = shouldSleep && !Favorites::instance().FavoritesRunning;
 
   if (shouldSleep) {

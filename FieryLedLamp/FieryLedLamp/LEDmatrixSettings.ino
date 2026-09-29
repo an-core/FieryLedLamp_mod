@@ -6,18 +6,25 @@
 //----------------------
 
 // ============================================================================= ЯРКОСТЬ ===============================================================
+
 // Применение настроек яркости
 void SetBrightness(uint8_t newBrightness) {
   uint8_t finalBrightness = newBrightness;
 
-  if (AutoBrightness && !ONflag) {
-    finalBrightness = getBrightnessForPrintTime();
-  }
 #if USE_DAWN
-  else if (dawnFlag == 1) {
+  if (dawnFlag == 1) {
     return;
   }
 #endif
+#if USE_SUNSET
+  if (sunsetFlag == 1) {
+    return;
+  }
+#endif
+
+  if (AutoBrightness && !ONflag) {
+    finalBrightness = getBrightnessForPrintTime();
+  }
 
 #if USE_DAWN
   if (AutoBrightness && !dawnFlag && !day_night) {
@@ -104,6 +111,7 @@ void loadBrightnessForMode(uint8_t mode) {
 } // void loadBrightnessForMode(uint8_t mode)
 
 // ============================================================================ LED_PANEL ==============================================================
+
 void handleTimerPhases(bool &showClock, bool &showDate, bool &showWeather) {
 #if LED_PANEL
   if (timer_clock_fixed) {
@@ -185,7 +193,7 @@ void clearTextAreaOnly() {
       leds[XY(x, y)] = CRGB::Black;
     }
   }
-}
+} // void clearTextAreaOnly()
 #endif
 
 // ------------------------------------------
@@ -224,6 +232,23 @@ void resetTimerState() {
 void led_panel(bool drawStringThisTick) {
 #if LED_PANEL
   if (!ONflag) {
+#if USE_DAWN || USE_SUNSET
+    if (dawnFlag == 1
+#if USE_SUNSET
+        || sunsetFlag == 1
+#endif
+       ) {
+      return;
+    }
+#endif
+
+    static uint32_t lastLog = 0;
+    if (millis() - lastLog > 5000) {
+      lastLog = millis();
+#if EFF_LOG
+      SYSLOG.add("led_panel: ONflag=false, clearing (dawn=%d sunset=%d)", dawnFlag, sunsetFlag);
+#endif
+    }
     FastLED.clear();
     FastLED.show();
     return;
@@ -232,6 +257,7 @@ void led_panel(bool drawStringThisTick) {
   static uint32_t lastShow = 0;
   const uint16_t FRAME_MS = 25;
   bool anyTimerActive = (currentMode == EFF_CLOCK) && (timer_c_w || timer_c_d || timer_d_w || timer_c_d_w || timer_clock_fixed);
+
   // бегущая строка
   if (runTextEnabled && textIsRunning) {
     CRGB textColor = CHSV(ColorRunningText, 255U, 255U);
@@ -290,21 +316,40 @@ void led_panel(bool drawStringThisTick) {
 #endif
     }
     else if (ONflag && Painting == 0 && isLampActive()) {
-      effectsTick();
+      // effectsTick();
     }
-  }
+  }  // обычный режим
 
   // вывод на матрицу
   bool needShow = loadingFlag || anyTimerActive || (millis() - lastShow >= FRAME_MS);
   if (needShow) {
+    #if EFF_LOG
+  uint32_t t0 = millis();
+#endif
     FastLED.show();
+    #if EFF_LOG
+  uint32_t dt = millis() - t0;
+  if (dt > 10) SYSLOG.add("show: %u ms", dt);
+#endif
     lastShow = millis();
     loadingFlag = false;
+
+    #if EFF_LOG
+    static uint32_t showCounter = 0;
+    static uint32_t showTimer = 0;
+    showCounter++;
+    if (millis() - showTimer >= 1000) {
+      SYSLOG.add("Show FPS: %u, mode=%u", showCounter, currentMode);
+      showCounter = 0;
+      showTimer = millis();
+    }
+#endif
   }
 #endif // LED_PANEL
 } // void led_panel(bool drawStringThisTick)
 
 // ====================================================== СМЕНА ЦВЕТА ЧАСОВ, ДАТЫ, ПОГОДЫ, ТЕКСТА (НА МАТРИЦЕ) =========================================
+
 void updateAutoHueModes() {
   static uint32_t prev = 0;
   const uint32_t interval = 80;
@@ -345,8 +390,9 @@ void updateAutoHueModes() {
 }
 
 // ======================================================================= IP-адрес НА МАТРИЦЕ =========================================================
+
 void showIPOnMatrix() {
-#if DISPLAY_IP_AT_START
+if (!displayIpAtStart) return;
   static bool ipShown = false;
   if (ipShown) return;
 
@@ -400,10 +446,10 @@ void showIPOnMatrix() {
 #endif
 
   loadingFlag = false;
-#endif
 }
 
 // ================================================================== РАБОТА С ПАМЯТЬЮ (буферы) ========================================================
+
 template<typename T>
 void safeDeleteArray(T*& ptr) {
   if (ptr) {
@@ -413,6 +459,7 @@ void safeDeleteArray(T*& ptr) {
 }
 
 // -------------------------------------------------------------------
+
 bool checkAlloc(void* ptr, const char* name) {
   if (!ptr) {
 #if MATRIX_LOG
@@ -424,6 +471,7 @@ bool checkAlloc(void* ptr, const char* name) {
 }
 
 // -------------------------------------------------------------------
+
 void printFreeHeap(const char* stage) {
 #if MEMORY_LOG
   SYSLOG.add("%s - свободно ОЗУ: %d байт", stage, ESP.getFreeHeap());
@@ -431,6 +479,7 @@ void printFreeHeap(const char* stage) {
 }
 
 // -------------------------------------------------------------------
+
 // освобождение 3D noise с указанием старой ширины матрицы
 void freeNoise3D(uint16_t oldWidth) {
   if (!noise3d) return;
@@ -448,6 +497,7 @@ void freeNoise3D(uint16_t oldWidth) {
 }
 
 // -------------------------------------------------------------------
+
 // освобождение всех буферов
 void freeOldBuffers(uint16_t oldWidth, uint16_t oldHeight) {
   safeDeleteArray(leds);
@@ -475,6 +525,7 @@ void freeOldBuffers(uint16_t oldWidth, uint16_t oldHeight) {
 }
 
 // -------------------------------------------------------------------
+
 // выделение всех буферов (под новые размеры)
 bool allocateAllBuffers(uint16_t width, uint16_t height, uint16_t used, MatrixBuffers& out) {
   out.leds = new (std::nothrow) CRGB[used];
@@ -494,31 +545,39 @@ bool allocateAllBuffers(uint16_t width, uint16_t height, uint16_t used, MatrixBu
   out.shiftValue = new (std::nothrow) uint8_t[height]();
   if (!out.shiftValue) goto cleanup;
 
+  // matrixValue
   out.matrixValue = new (std::nothrow) uint8_t*[height];
   if (!out.matrixValue) goto cleanup;
+  for (uint16_t y = 0; y < height; y++) out.matrixValue[y] = nullptr;
   for (uint16_t y = 0; y < height; y++) {
     out.matrixValue[y] = new (std::nothrow) uint8_t[width]();
     if (!out.matrixValue[y]) goto cleanup;
   }
 
+  // noise
   out.noiseDim = max(width, height);
   out.noise = new (std::nothrow) uint8_t*[out.noiseDim];
   if (!out.noise) goto cleanup;
+  for (uint16_t i = 0; i < out.noiseDim; i++) out.noise[i] = nullptr;
   for (uint16_t i = 0; i < out.noiseDim; i++) {
     out.noise[i] = new (std::nothrow) uint8_t[out.noiseDim]();
     if (!out.noise[i]) goto cleanup;
   }
 
+  // noise3d
   out.noise3d = new (std::nothrow) uint8_t**[NUM_LAYERSMAX];
   if (!out.noise3d) goto cleanup;
+  for (uint8_t l = 0; l < NUM_LAYERSMAX; l++) out.noise3d[l] = nullptr;
   for (uint8_t l = 0; l < NUM_LAYERSMAX; l++) {
     out.noise3d[l] = new (std::nothrow) uint8_t*[width];
     if (!out.noise3d[l]) goto cleanup;
+    for (uint16_t i = 0; i < width; i++) out.noise3d[l][i] = nullptr;
     for (uint16_t i = 0; i < width; i++) {
       out.noise3d[l][i] = new (std::nothrow) uint8_t[height]();
       if (!out.noise3d[l][i]) goto cleanup;
     }
   }
+
   return true;
 
 cleanup:
@@ -527,11 +586,10 @@ cleanup:
 }
 
 // -------------------------------------------------------------------
+
 // выделенные буферы
 void freeAllBuffers(MatrixBuffers& buf, uint16_t width, uint16_t height, uint16_t used) {
-  safeDeleteArray(buf.leds);
   safeDeleteArray(buf.ledsbuff);
-  safeDeleteArray(buf.effectBuffer);
   safeDeleteArray(buf.line);
   safeDeleteArray(buf.shiftHue);
   safeDeleteArray(buf.shiftValue);
@@ -559,6 +617,7 @@ void freeAllBuffers(MatrixBuffers& buf, uint16_t width, uint16_t height, uint16_
 }
 
 // -------------------------------------------------------------------
+
 bool reconfigureMatrix(uint16_t newWidth, uint16_t newHeight, uint16_t newUsed, uint16_t oldWidth, uint16_t oldHeight) {
   MatrixBuffers newBuf;
   if (!allocateAllBuffers(newWidth, newHeight, newUsed, newBuf)) {

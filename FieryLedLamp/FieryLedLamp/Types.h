@@ -90,6 +90,21 @@ enum LogLevel : uint8_t {
 #endif
 
 // -------------------------------
+#if USE_MP3_PLAYER
+// Состояния автомата
+enum Mp3PlayState {
+  MP3_PLAY_IDLE,
+  MP3_PLAY_SEND_PAUSE,
+  MP3_PLAY_WAIT_PAUSE,
+  MP3_PLAY_SEND_VOLUME,
+  MP3_PLAY_WAIT_VOLUME,
+  MP3_PLAY_SEND_FOLDER,
+  MP3_PLAY_WAIT_FOLDER,
+  MP3_PLAY_DONE
+};
+#endif
+
+// -------------------------------
 struct MatrixBuffers {
   CRGB* leds = nullptr;
   CRGB* ledsbuff = nullptr;
@@ -155,20 +170,20 @@ struct FontDesc {
 typedef struct {
   const uint16_t* frames[MAX_FRAMES_COUNT];
 
-  int8_t     start_x;
-  int8_t     start_y;
-  uint16_t   options;
-  uint8_t    frame_width;
-  uint8_t    frame_height;
-  uint8_t    row_draw_direction;
-  uint16_t   draw_frame_interval;
-  uint8_t    draw_row_interval;
-  uint16_t   move_x_interval;
-  uint16_t   move_y_interval;
-  uint16_t   move_type;
-  uint32_t   transparent_color;
-  uint32_t   background_first_color;
-  uint32_t   background_color;
+  int8_t start_x;
+  int8_t start_y;
+  uint16_t options;
+  uint8_t frame_width;
+  uint8_t frame_height;
+  uint8_t row_draw_direction;
+  uint16_t draw_frame_interval;
+  uint8_t draw_row_interval;
+  uint16_t move_x_interval;
+  uint16_t move_y_interval;
+  uint16_t move_type;
+  uint32_t transparent_color;
+  uint32_t background_first_color;
+  uint32_t background_color;
 } animation_t;
 #endif
 

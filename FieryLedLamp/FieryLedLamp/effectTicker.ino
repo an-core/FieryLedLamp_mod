@@ -8,7 +8,7 @@
 #if USE_SD
 static uint8_t* outFrameBuffer = nullptr;
 static size_t outFrameBufferSize = 0;
-static bool outStartFailed = false;  // это защита от бесконечного рестарта
+static bool outStartFailed = false;
 
 static bool ensureOutFrameBuffer(size_t needed) {
   if (needed <= outFrameBufferSize) return true;
@@ -18,9 +18,6 @@ static bool ensureOutFrameBuffer(size_t needed) {
   }
   outFrameBuffer = (uint8_t*)malloc(needed);
   if (!outFrameBuffer) {
-#if EFF_LOG
-    SYSLOG.add("EFF_SD: не удалось выделить outFrameBuffer (%u байт)", (unsigned)needed);
-#endif
     outFrameBufferSize = 0;
     return false;
   }
@@ -31,20 +28,29 @@ static bool ensureOutFrameBuffer(size_t needed) {
 
 void effectsTick() {
   if (systemShuttingDown || !ONflag) return;
+
+#if EFF_LOG
+  static uint32_t fpsTimer = 0;
+  static uint32_t fpsCounter = 0;
+  fpsCounter++;
+  if (millis() - fpsTimer >= 1000) {
+    fpsCounter = 0;
+    fpsTimer = millis();
+  }
+#endif
+
 #if USE_SD
   if (currentMode == EFF_SD) {
     loadingFlag = false;
 
     if (outStartFailed) {
-      FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+      FastLED.show();
+      Eff_Tick(); return;
     }
 
     if (!outAnimationActive || !outFile) {
       if (lastOutFileName.length() > 0) {
         if (!startOutAnimation(lastOutFileName)) {
-#if EFF_LOG
-          SYSLOG.add("EFF_SD: не удалось запустить %s, откат на EFF_RAINBOW_VER", lastOutFileName.c_str());
-#endif
           outStartFailed = true;
           outAnimationActive = false;
           currentMode = EFF_RAINBOW_VER;
@@ -56,12 +62,14 @@ void effectsTick() {
           }
           saveConfig("setup");
           loadingFlag = true;
-          FastLED.clear(); FastLED.show(); Eff_Tick();
+          FastLED.show();
+          Eff_Tick();
           return;
         }
         outStartFailed = false;
       } else {
-        FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+        FastLED.show();
+        Eff_Tick(); return;
       }
     }
 
@@ -81,7 +89,9 @@ void effectsTick() {
       if (!ensureOutFrameBuffer(frameSize)) {
         outFile.close();
         outAnimationActive = false;
-        FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+        FastLED.show();
+        Eff_Tick();
+        return;
       }
 
       int delayByte = outFile.read();
@@ -98,10 +108,9 @@ void effectsTick() {
         if (bytesRead < frameSize) {
           outFile.close();
           outAnimationActive = false;
-#if EFF_LOG
-          SYSLOG.add("EFF_SD: файл %s не содержит полного кадра", lastOutFileName.c_str());
-#endif
-          FastLED.clear(); FastLED.show(); Eff_Tick(); return;
+          FastLED.show();
+          Eff_Tick();
+          return;
         }
       }
 
@@ -135,8 +144,8 @@ void effectsTick() {
 #endif
     if (justPoweredOn) {
       justPoweredOn = false;
-      loadingFlag = true;
-      effTimer = millis();
+      //loadingFlag = true;
+      effTimer = millis() - 1000;
 #if LED_PANEL
       needFullRedraw = true;
 #endif
@@ -345,12 +354,11 @@ void changePower() {
     ONflag = false;
 #if USE_MP3_PLAYER
     if (mp3_player_connect == 4) {
-      send_command(0x0E, FEEDBACK, 0, 0);
-      delay(50);
+      mp3_send_command_nowait(0x0E, 0, 0, 0);
       mp3_stop = true;
       pause_on = true;
     }
-#endif
+#endif // USE_MP3_PLAYER
     FastLED.clear();
     FastLED.setBrightness(0);
     FastLED.show();
@@ -361,7 +369,7 @@ void changePower() {
     systemShuttingDown = false;
     return;
   }
-#endif
+#endif // USE_SUNSET
 
   if (ONflag) { // включение
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
@@ -387,7 +395,6 @@ void changePower() {
 #if USE_MP3_PLAYER
     if (mp3Enabled && eff_sound_on && mp3_player_connect == 4) {
       mp3_folder = effects_folders[currentMode];
-      play_sound();
     }
 #endif
 
@@ -412,8 +419,7 @@ void changePower() {
 
 #if USE_MP3_PLAYER
     if (mp3Enabled && mp3_player_connect == 4) {
-      send_command(0x0E, FEEDBACK, 0, 0);
-      delay(50);
+      mp3_send_command_nowait(0x0E, 0, 0, 0);
       mp3_stop = true;
       pause_on = true;
     }
@@ -422,9 +428,11 @@ void changePower() {
 #if USE_DAWN
     dawnFlag = 0;
 #endif
+
 #if USE_SUNSET
     sunsetFlag = 0;
 #endif
+
     Favorites::instance().FavoritesRunning = false;
 
     justPoweredOn = false;
@@ -445,6 +453,10 @@ void changePower() {
   if (Wifi::instance().isConnected()) {
     Mqtt::instance().needToPublish = true;
   }
+#endif
+
+#if EFF_LOG
+  SYSLOG.add("CP: end, systemShuttingDown=false, millis=%u", millis());
 #endif
 } // void changePower()
 
@@ -467,7 +479,7 @@ void Eff_Tick() {
   static uint8_t lastMode = 255;
   if (mp3Enabled && lastMode != currentMode && ONflag && eff_sound_on && mp3_player_connect == 4) {
     mp3_folder = effects_folders[currentMode];
-    play_sound();
+    mp3_pending_play = true;
     lastMode = currentMode;
   }
 #endif
@@ -511,9 +523,19 @@ void Eff_Tick() {
 
 #if LED_PANEL
   if (currentMode != EFF_SD) {
-    led_panel(textIsRunning);
+#if USE_DAWN || USE_SUNSET
+    if (dawnFlag == 1
+#if USE_SUNSET
+        || sunsetFlag == 1
+#endif // USE_SUNSET
+       ) {
+    } else
+#endif // USE_DAWN || USE_SUNSET
+    {
+      led_panel(textIsRunning);
+    }
   }
-#endif
+#endif // LED_PANEL
 
   // пропуск эффектов, когда бегущая строка в полноэкранном режиме
   if (runTextEnabled && textIsRunning && !runTextOver) {

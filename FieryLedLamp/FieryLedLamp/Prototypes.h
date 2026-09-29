@@ -34,10 +34,12 @@ int16_t send_command(int8_t cmd, uint8_t feedback, uint8_t dat1, uint8_t dat2);
 int16_t read_command (uint32_t mp3_read_timeout);
 void mp3_setup();
 void play_time_ADVERT(bool force = false);
-void play_sound();
 void mp3_loop();
 void start_weather_temp_ADVERT(int8_t temp, bool speakDescription);
 void mp3_restore_after_announce(bool restoreEffect = true);
+void play_sound_async(uint8_t folder);
+void mp3PlayTick();
+void mp3Task(void *pvParameters);
 #endif
 // ------------------------------------------------------
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)

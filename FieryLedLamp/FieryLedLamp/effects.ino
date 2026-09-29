@@ -1,5 +1,5 @@
 // *************************************************************************** effects.ino *************************************************************
-// (c) 2026 AnCore — all Effects corrected and adapted for the dynamic matrix
+// (c) 2026 AnCore - all Effects corrected and adapted for the dynamic matrix
 // ------------------------------------------------------------------------------------
 #include <algorithm>
 #include "Prototypes.h"
@@ -72,12 +72,10 @@ void fadePixel(uint8_t i, uint8_t j, uint8_t step) {
   int32_t pixelNum = XY(i, j);
   if (getPixColor(pixelNum) == 0U) return;
 
-  if (leds[pixelNum].r >= 30U || leds[pixelNum].g >= 30U || leds[pixelNum].b >= 30U)
-  {
+  if (leds[pixelNum].r >= 30U || leds[pixelNum].g >= 30U || leds[pixelNum].b >= 30U) {
     leds[pixelNum].fadeToBlackBy(step);
   }
-  else
-  {
+  else {
     leds[pixelNum] = 0U;
   }
 }
@@ -163,30 +161,28 @@ static const uint8_t hueMask[8][16] PROGMEM = {
 
 void fireRoutine() {
   static uint16_t lastWidth = 0, lastHeight = 0;
-  bool isColored = (modes[currentMode].Scale != 100);
+  bool sizeChanged = (lastWidth != matrixWidth || lastHeight != matrixHeight);
 
-  if (lastWidth != matrixWidth || lastHeight != matrixHeight) {
+  if (sizeChanged) {
     lastWidth = matrixWidth;
     lastHeight = matrixHeight;
     loadingFlag = true;
   }
 
+  bool isColored = (modes[currentMode].Scale != 100);
+
   if (loadingFlag) {
-#if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
-    if (selectedSettings) {
-      uint8_t scaleVal = random8(30) ? 1 + random8(99) : 100;
-      setModeSettings(scaleVal, 200 + random8(35));
-    }
-#endif
     loadingFlag = false;
 
     for (uint8_t x = 0; x < matrixWidth; x++) {
       line[x] = random(127, 255);
     }
 
-    for (uint8_t y = 0; y < matrixHeight; y++) {
-      for (uint8_t x = 0; x < matrixWidth; x++) {
-        matrixValue[y][x] = 0;
+    if (sizeChanged) {
+      for (uint8_t y = 0; y < matrixHeight; y++) {
+        for (uint8_t x = 0; x < matrixWidth; x++) {
+          matrixValue[y][x] = 0;
+        }
       }
     }
 
@@ -198,15 +194,15 @@ void fireRoutine() {
     pcnt = 0;
   }
 
-  uint8_t fireSpeed = map(modes[currentMode].Speed, 1, 255, 30, 5);
-  if (pcnt >= fireSpeed) {
+  uint8_t fireSpeed = map(modes[currentMode].Speed, 1, 255, 4, 30);
+  if (pcnt >= 100) {
     shiftUp();
     generateLine();
     pcnt = 0;
   }
 
   drawFrame(pcnt, isColored);
-  pcnt += 4;
+  pcnt += fireSpeed;
 }
 
 void generateLine() {
@@ -552,8 +548,7 @@ void Fire2021Routine() {
     if (modes[currentMode].Speed & 0x01) {
       ff_x = modes[currentMode].Speed;
       deltaHue2 = FIXED_SCALE_FOR_Y;
-    }
-    else {
+    } else {
       if (deltaValue > FIXED_SCALE_FOR_Y)
         speedfactor = .4 * (deltaValue - FIXED_SCALE_FOR_Y) + FIXED_SCALE_FOR_Y;
       else
@@ -678,12 +673,12 @@ void  FireSparks() {
 
 // ============================================================================== ПЛАМЯ ==============================================================
 void wu_pixel_maxV(int16_t item) {
-#define FLAME_MAX_DY 256                // Эффект Пламя
-#define FLAME_MIN_DY 128                // Эффект Пламя
-#define FLAME_MAX_DX 32                 // Эффект Пламя
-#define FLAME_MIN_DX -32                // Эффект Пламя
-#define FLAME_MAX_VALUE 255             // Эффект Пламя
-#define FLAME_MIN_VALUE 176             // Эффект Пламя
+#define FLAME_MAX_DY 256
+#define FLAME_MIN_DY 128
+#define FLAME_MAX_DX 32
+#define FLAME_MIN_DX -32
+#define FLAME_MAX_VALUE 255
+#define FLAME_MIN_VALUE 176
   if (!noise3d || !leds || matrixWidth == 0 || matrixHeight == 0) {
     FastLED.clear();
     FastLED.show();
@@ -753,10 +748,7 @@ void execStringsFlame() {
     hue2 = map8(myScale8(modes[currentMode].Scale + 3U), 6, 31); // max ttl
 
     for (i = 0; i < trackingOBJECT_MAX_COUNT; i++) {
-      if (trackingObjectState[i] > 30U ||
-          trackingObjectPosY[i] >= matrixHeight ||
-          trackingObjectPosX[i] >= matrixWidth ||
-          trackingObjectPosY[i] <= -1) {
+      if (trackingObjectState[i] > 30U || trackingObjectPosY[i] >= matrixHeight || trackingObjectPosX[i] >= matrixWidth || trackingObjectPosY[i] <= -1) {
         trackingObjectHue[i] = 0;
         trackingObjectState[i] = random8(20);
       }
@@ -803,8 +795,7 @@ void execStringsFlame() {
         trackingObjectPosX[i] += matrixWidth;
       else if (trackingObjectPosX[i] >= matrixWidth)
         trackingObjectPosX[i] -= matrixWidth;
-    }
-    else {
+    } else {
       trackingObjectState[i] = random8(hue, hue2 + 1);
       trackingObjectShift[i] = (uint8_t)(254U + modes[currentMode].Scale + random8(20U));
 
@@ -836,8 +827,7 @@ uint8_t wrapY(int16_t y) {
   return (y + matrixHeight) % matrixHeight;
 }
 
-void rain(uint8_t backgroundDepth, uint8_t maxBrightness, uint8_t spawnFreq,
-          uint8_t tailLength, CRGB rainColor, bool splashes, bool clouds, bool storm) {
+void rain(uint8_t backgroundDepth, uint8_t maxBrightness, uint8_t spawnFreq, uint8_t tailLength, CRGB rainColor, bool splashes, bool clouds, bool storm) {
   dimAll(tailLength);
 
   CRGBPalette16 rain_p(CRGB(0, 0, 0), rainColor);
@@ -948,16 +938,13 @@ void rain(uint8_t backgroundDepth, uint8_t maxBrightness, uint8_t spawnFreq,
           uint8_t noiseData = qsub8(inoise8(ff_x + xoffset, ff_y + yoffset, ff_z), 16);
           noiseData = qadd8(noiseData, scale8(noiseData, 39));
 
-          uint8_t smoothed = scale8(cloudNoise[x * cloudHeight + z], 192) +
-                             scale8(noiseData, 64);
+          uint8_t smoothed = scale8(cloudNoise[x * cloudHeight + z], 192) + scale8(noiseData, 64);
 
           cloudNoise[x * cloudHeight + z] = smoothed;
 
           uint16_t drawY = matrixHeight - z - 1;
           if (drawY < matrixHeight) {
-            nblend(leds[XY(x, drawY)],
-                   ColorFromPalette(rainClouds_p, smoothed),
-                   (cloudHeight - z) * 250U / cloudHeight);
+            nblend(leds[XY(x, drawY)], ColorFromPalette(rainClouds_p, smoothed), (cloudHeight - z) * 250U / cloudHeight);
           }
         }
         ff_z++;
@@ -1068,7 +1055,8 @@ void coloredRain() {
   if (modes[currentMode].Scale > 247U) {
     rain(60, 200, map8(42, 5, 100), scaleVal, solidRainColor, false, false, false);
   } else {
-    rain(60, 200, map8(42, 5, 100), scaleVal, CHSV(modes[currentMode].Scale, 255U, 255U), false, false, false);
+    uint8_t hue = (uint8_t)((float)(modes[currentMode].Scale - 1) * 2.6);
+    rain(60, 200, map8(42, 5, 100), scaleVal, CHSV(hue, 255U, 255U), false, false, false);
   }
 }
 
@@ -1103,10 +1091,9 @@ void stormyRain() {
 // =======================
 
 void twinklesRoutine() {
-#define TWINKLES_SPEEDS 4   // всего 4 варианта скоростей мерцания
+#define TWINKLES_SPEEDS 4 // всего 4 варианта скоростей мерцания
 #define TWINKLES_MULTIPLIER 6 // слишком медленно, если на самой медленной просто по единичке к яркости добавлять
-  if (loadingFlag)
-  {
+  if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
     if (selectedSettings) {
       setModeSettings(random8(8U) * 11U + 2U + random8(9U) , 180U + random8(69U));
@@ -1122,8 +1109,7 @@ void twinklesRoutine() {
         ledsbuff[idx].r = random8();
         ledsbuff[idx].g = random8(1, TWINKLES_SPEEDS * 2 + 1);
         ledsbuff[idx].b = random8();
-      }
-      else
+      } else
         ledsbuff[idx] = 0;
     }
   }
@@ -1135,21 +1121,17 @@ void twinklesRoutine() {
         ledsbuff[idx].b = ledsbuff[idx].g;
         hue--;
       }
-    }
-    else if (ledsbuff[idx].g <= TWINKLES_SPEEDS) {
+    } else if (ledsbuff[idx].g <= TWINKLES_SPEEDS) {
       if (ledsbuff[idx].b > 255U - ledsbuff[idx].g - TWINKLES_MULTIPLIER) {
         ledsbuff[idx].b = 255U;
         ledsbuff[idx].g = ledsbuff[idx].g + TWINKLES_SPEEDS;
-      }
-      else
+      } else
         ledsbuff[idx].b = ledsbuff[idx].b + ledsbuff[idx].g + TWINKLES_MULTIPLIER;
-    }
-    else {
+    } else {
       if (ledsbuff[idx].b <= ledsbuff[idx].g - TWINKLES_SPEEDS + TWINKLES_MULTIPLIER) {
         ledsbuff[idx].b = 0;
         hue++;
-      }
-      else
+      } else
         ledsbuff[idx].b = ledsbuff[idx].b - ledsbuff[idx].g + TWINKLES_SPEEDS - TWINKLES_MULTIPLIER;
     }
     if (ledsbuff[idx].b == 0)
@@ -1186,8 +1168,7 @@ void rainbowRoutine() {
     rainbowHorVertRoutine(true);
   else                                          // для масштабов посередине
     for (uint8_t i = 0U; i < matrixWidth; i++)
-      for (uint8_t j = 0U; j < matrixHeight; j++)
-      {
+      for (uint8_t j = 0U; j < matrixHeight; j++) {
         float twirlFactor = 9.0F * ((modes[currentMode].Scale - 33) / 100.0F);    // на сколько оборотов будет закручена матрица, [0..3]
         CRGB thisColor = CHSV((uint8_t)(hue + ((float)matrixWidth / (float)matrixHeight * i + j * twirlFactor) * ((float)255 / (float)maxDim)), 255U, 255U);
         drawPixelXY(i, j, thisColor);
@@ -1219,8 +1200,7 @@ void drawCircle(int x0, int y0, int radius, const CRGB &color) {
     b++;
     if (radiusError < 0)
       radiusError += 2 * b + 1;
-    else
-    {
+    else {
       a--;
       radiusError += 2 * (b - a + 1);
     }
@@ -1241,6 +1221,7 @@ void pulseRoutine(uint8_t PMode) {
   static uint8_t stepDelay = 0;
   uint8_t speedVal = modes[currentMode].Speed;
   uint8_t skipFrames = map(speedVal, 1, 255, 60, 1);
+
   if (stepDelay < skipFrames) {
     stepDelay++;
     return;
@@ -3257,8 +3238,7 @@ void BBallsRoutine() {
       bballsHi = 0; // If the ball crossed the threshold of the "ground," put it back on the ground
       trackingObjectSpeedY[i] = trackingObjectShift[i] * trackingObjectSpeedY[i] ; // and recalculate its new upward velocity as it's old velocity * COR
 
-      if ( trackingObjectSpeedY[i] < 0.01 ) // If the ball is barely moving, "pop" it back up at vImpact0
-      {
+      if ( trackingObjectSpeedY[i] < 0.01 ) { // If the ball is barely moving, "pop" it back up at vImpact0
         trackingObjectShift[i] = 0.90 - float(random8(9U)) / pow(random8(4U, 9U), 2); // сделал, чтобы мячики меняли свою прыгучесть каждый цикл
         trackingObjectIsShift[i] = trackingObjectShift[i] >= 0.89;                             // если мячик максимальной прыгучести, то разрешаем ему сдвинуться
         trackingObjectSpeedY[i] = bballsVImpact0;
@@ -3358,7 +3338,6 @@ void spiroRoutine() {
     if (x2 < matrixWidth && y2 < matrixHeight) {
       leds[XY(x2, y2)] += (CRGB)ColorFromPalette(*curPalette, hue + i * spirooffset);
     }
-
     if (x2 == spirocenterX && y2 == spirocenterY) change = true;
   }
 
@@ -3470,10 +3449,8 @@ void MetaBallsRoutine() {
 // 3rd proper by SottNick
 // =============================================================================
 
-void Sinusoid3Routine()
-{
-  if (loadingFlag)
-  {
+void Sinusoid3Routine() {
+  if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
     if (selectedSettings) {
       uint8_t tmp = random8(100U);
@@ -3783,26 +3760,20 @@ void RainRoutine()
   }
 #endif
 
-  for (uint8_t x = 0U; x < matrixWidth; x++)
-  {
+  for (uint8_t x = 0U; x < matrixWidth; x++) {
     CRGB thisColor = getPixColorXY(x, matrixHeight - 1U);
-    if ((uint32_t)thisColor == 0U)
-    {
-      if (random8(0, 50) == 0U)
-      {
+    if ((uint32_t)thisColor == 0U) {
+      if (random8(0, 50) == 0U) {
         if (modes[currentMode].Scale == 1) drawPixelXY(x, matrixHeight - 1U, CHSV(random(0, 9) * 28, 255U, 255U)); // Радужный дождь
         else if (modes[currentMode].Scale == 100) drawPixelXY(x, matrixHeight - 1U, 0xE0FFFF - 0x101010 * random(0, 4)); // Снег
         else
           drawPixelXY(x, matrixHeight - 1U, CHSV(modes[currentMode].Scale * 2.4 + random(0, 16), 255, 255)); // Цветной дождь
       }
-    }
-    else
+    } else
       leds[XY(x, matrixHeight - 1U)] -= CHSV(0, 0, random(96, 128));
   }
-  for (uint8_t x = 0U; x < matrixWidth; x++)
-  {
-    for (uint8_t y = 0U; y < matrixHeight - 1U; y++)
-    {
+  for (uint8_t x = 0U; x < matrixWidth; x++) {
+    for (uint8_t y = 0U; y < matrixHeight - 1U; y++) {
       drawPixelXY(x, y, getPixColorXY(x, y + 1U));
     }
   }
@@ -4167,8 +4138,7 @@ class Boid {
         PVector steer = sum - velocity;
         steer.limit(maxforce);
         return steer;
-      }
-      else {
+      } else {
         return PVector(0, 0);
       }
     }
@@ -4191,8 +4161,7 @@ class Boid {
       if (count > 0) {
         sum /= count;
         return seek(sum);  // Steer towards the location
-      }
-      else {
+      } else {
         return PVector(0, 0);
       }
     }
@@ -4455,8 +4424,7 @@ void whirlRoutine(bool oneColor) {
 // ===========================================================================
 
 void attractRoutine() {
-  if (loadingFlag)
-  {
+  if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
     if (selectedSettings) {
       uint8_t tmp = random8(8U);
@@ -4485,8 +4453,7 @@ void attractRoutine() {
 
   PVector attractLocation = PVector(matrixWidth * 0.5, matrixHeight * 0.5);
 
-  for (uint8_t i = 0; i < enlargedObjectNUM; i++)
-  {
+  for (uint8_t i = 0; i < enlargedObjectNUM; i++) {
     Boid boid = boids[i];
     PVector force = attractLocation - boid.location;   // Calculate direction of force // и вкорячиваем сюда регулировку скорости
     float d = force.mag();                              // Distance between objects
@@ -4952,8 +4919,7 @@ void cubeRubik() {
               uint8_t targetY = anim0 + rubikPoleY - 1;
               if (targetY < matrixHeight) leds[XY(px, targetY)] = color;
             }
-          }
-          else if (shift > 0) {
+          } else if (shift > 0) {
             color = leds[XY(colX, anim0 + rubikPoleY - 1)];
             for (uint8_t k = anim0 + rubikPoleY - 1; k > anim0; k--) {
               if (k - 1 >= matrixHeight) continue;
@@ -4970,8 +4936,7 @@ void cubeRubik() {
           }
         }
       }
-    }
-    else {
+    } else {
       for (uint8_t j = 0; j < shtukY; j++) {
         uint8_t rowY = deltaHue2 + j * (razmerY + 1U);
         if (noise3d[0][0][j] > 0) {
@@ -4994,8 +4959,7 @@ void cubeRubik() {
               uint8_t targetX = (anim0 + rubikPoleX - 1) % matrixWidth;
               if (py < matrixHeight) leds[XY(targetX, py)] = color;
             }
-          }
-          else if (shift > 0) {
+          } else if (shift > 0) {
             color = leds[XY((anim0 + rubikPoleX - 1) % matrixWidth, rowY)];
             for (uint8_t k = anim0 + rubikPoleX - 1; k > anim0; k--) {
               uint8_t prevX = (k - 1 + matrixWidth) % matrixWidth;
@@ -5062,8 +5026,7 @@ void cubeRubik() {
         }
         rubikAnim *= (maxMult + 1U);
       }
-    }
-    else {
+    } else {
       for (uint8_t j = 0; j < shtukY; j++) {
         noise3d[0][1][j] = random8(3);
         shift = noise3d[0][1][j] - 1;
@@ -6078,7 +6041,6 @@ void LeapersMove_leaper(uint8_t l) {
   trackingObjectSpeedY[l] *= WIND;
 }
 
-
 void LeapersRoutine() {
   if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
@@ -6099,7 +6061,6 @@ void LeapersRoutine() {
       trackingObjectHue[i] = random8();
     }
   }
-
 
   FastLED.clear();
 
@@ -6181,8 +6142,7 @@ void LavaLampRoutine() {
     if (trackingObjectPosY[i] < 0.01) {                  // почему-то при нуле появляется мерцание (один кадр, еле заметно)
       LavaLampGetspeed(i);
       trackingObjectPosY[i] = 0.01;
-    }
-    else if (trackingObjectPosY[i] > matrixHeight - 1.01) {    // тоже на всякий пожарный
+    } else if (trackingObjectPosY[i] > matrixHeight - 1.01) {    // тоже на всякий пожарный
       LavaLampGetspeed(i);
       trackingObjectSpeedY[i] = -trackingObjectSpeedY[i];
       trackingObjectPosY[i] = matrixHeight - 1.01;
@@ -6370,7 +6330,6 @@ void snakesRoutine() {
       // B10     B11
       //     B01
     }
-
   }
 
   FastLED.clear();
@@ -6473,7 +6432,6 @@ void snakesRoutine() {
               trackingObjectPosX[i]++;
             break;
         }
-
       }
     }
 
@@ -6734,8 +6692,7 @@ void LiquidLampRoutine(bool isColored) {
 
         if (d < trackingObjectShift[i]) {
           sum += mapcurve(d, 0, trackingObjectShift[i], 255, liquidLampMX[i], InQuad);
-        }
-        else if (d < liquidLampSC[i]) {
+        } else if (d < liquidLampSC[i]) {
           sum += mapcurve(d, trackingObjectShift[i], liquidLampSC[i], liquidLampMX[i], 0, OutQuart);
         }
         if (sum >= 255) {
@@ -7700,7 +7657,6 @@ void polarRoutine() {
     ff_y = map(matrixWidth, 8, 64, 310, 63);
     ff_z = ff_y;
     speedfactor = map(modes[currentMode].Speed, 1, 255, 128, 16);
-
   }
 
   if (modes[currentMode].Scale == 100) {

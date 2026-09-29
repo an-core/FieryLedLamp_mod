@@ -67,9 +67,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
-                if (mp3Enabled) {
-                  play_sound();
-                }
+                mp3_folder_last = mp3_folder;
+                mp3_pending_play = true;
               }
             }
 #endif
@@ -83,7 +82,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
-                play_sound();
+                mp3_folder_last = mp3_folder;
+                mp3_pending_play = true;
               }
             }
 #endif
@@ -96,7 +96,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             uint8_t newFolder = effects_folders[currentMode];
             if (mp3_folder != newFolder) {
               mp3_folder = newFolder;
-              play_sound();
+              mp3_folder_last = mp3_folder;
+              mp3_pending_play = true;
             }
           }
 #endif
@@ -113,7 +114,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
-                play_sound();
+                mp3_folder_last = mp3_folder;
+                mp3_pending_play = true;
               }
             }
 #endif
@@ -128,7 +130,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
-                play_sound();
+                mp3_folder_last = mp3_folder;
+                mp3_pending_play = true;
               }
             }
 #endif
@@ -142,7 +145,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             uint8_t newFolder = effects_folders[currentMode];
             if (mp3_folder != newFolder) {
               mp3_folder = newFolder;
-              play_sound();
+              mp3_folder_last = mp3_folder;
+              mp3_pending_play = true;
             }
           }
 #endif
@@ -163,7 +167,11 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       SetBrightness(modes[currentMode].Brightness);
       loadingFlag = true;
       if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
-
+      effTimer = millis() - 1000;
+      effectsTick();
+      effTimer = millis() - 1000;
+      effectsTick();
+      FastLED.show();
       sendCurrent(inputBuffer);
 
 #if USE_MQTT
@@ -197,7 +205,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         uint8_t newFolder = effects_folders[currentMode];
         if (mp3_folder != newFolder) {
           mp3_folder = newFolder;
-          play_sound();
+          mp3_folder_last = mp3_folder;
+          mp3_pending_play = true;
         }
       }
 #endif
@@ -211,6 +220,12 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       repeat_multiple_lamp_control = true;
 #endif
 
+      loadingFlag = true;
+      effTimer = millis() - 1000;
+      effectsTick();
+      effTimer = millis() - 1000;
+      effectsTick();
+      FastLED.show();
       sendCurrent(inputBuffer);
 
 #if USE_BLYNK_PLUS
@@ -299,8 +314,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
   }
-#endif  // USE_MP3_PLAYER (стр.206)
-  /// ------------------
+#endif  // USE_MP3_PLAYER
+  // ------------------
   else if (!strncmp_P(inputBuffer, PSTR("LANG"), 4)) {
     memcpy(buff, &inputBuffer[4], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
     jsonWrite(configSetup, "lang", buff);
@@ -316,7 +331,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 
 #if USE_MULTILAMP
     repeat_multiple_lamp_control = true;
-#endif  // USE_MULTILAMP
+#endif
 
     SetBrightness(modes[currentMode].Brightness);
     sendCurrent(inputBuffer);
@@ -370,18 +385,50 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 #if USE_DAWN
     if (dawnFlag == 1) {
       manualOff = true;
-      dawnFlag = 2;
-#if USE_TM1637
-      if (tm1637Enabled) {
-        clockTicker_blink();
-      }
+      dawnFlag = 0;
+
+      ONflag = false;
+      jsonWrite(configSetup, "Power", 0);
+      FastLED.clear();
+      FastLED.setBrightness(0);
+      FastLED.show();
+
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+      digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
 #endif
-      SetBrightness(modes[currentMode].Brightness);
-      changePower();
+
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+      digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
       sendCurrent(inputBuffer);
       return;
     }
-#endif // USE_DAWN
+#endif
+
+#if USE_SUNSET
+    if (sunsetFlag == 1) {
+      manualsOff = true;
+      sunsetFlag = 0;
+
+      ONflag = false;
+      jsonWrite(configSetup, "Power", 0);
+      FastLED.clear();
+      FastLED.setBrightness(0);
+      FastLED.show();
+
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+      digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+      digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
+      sendCurrent(inputBuffer);
+      return;
+    }
+#endif
 
     // обычное включение лампы (если не был активен рассвет)
     ONflag = true;
@@ -392,31 +439,77 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     updateSets();
     changePower();
     loadingFlag = true;
+    
 #if USE_MULTILAMP
     repeat_multiple_lamp_control = true;
 #endif
+
     sendCurrent(inputBuffer);
+    
 #if USE_BLYNK_PLUS
     updateRemoteBlynkParams();
 #endif
+
   }
   // ------------------
   else if (!strncmp_P(inputBuffer, PSTR("P_OFF"), 5)) {
 #if USE_DAWN
     if (dawnFlag == 1) {
       manualOff = true;
-      dawnFlag = 2;
+      dawnFlag = 0;
+
+      ONflag = false;
+      jsonWrite(configSetup, "Power", 0);
+      FastLED.clear();
+      FastLED.setBrightness(0);
+      FastLED.show();
+
 #if USE_TM1637
       if (tm1637Enabled) {
         clockTicker_blink();
       }
 #endif
-      SetBrightness(modes[currentMode].Brightness);
-      changePower();
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+      digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+      digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
       sendCurrent(inputBuffer);
       return;
     }
 #endif // USE_DAWN
+// ------------------
+#if USE_SUNSET
+    if (sunsetFlag == 1) {
+      manualsOff = true;
+      sunsetFlag = 0;
+
+      ONflag = false;
+      jsonWrite(configSetup, "Power", 0);
+      FastLED.clear();
+      FastLED.setBrightness(0);
+      FastLED.show();
+
+#if USE_TM1637
+      if (tm1637Enabled) {
+        clockTicker_blink();
+      }
+#endif
+
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+      digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+      digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
+      sendCurrent(inputBuffer);
+      return;
+    }
+#endif // USE_SUNSET
 
     // обычное выключение лампы
     ONflag = false;
@@ -433,30 +526,35 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 
     changePower();
     loadingFlag = true;
+    
 #if USE_MULTILAMP
     multiple_lamp_control();
 #endif
     sendCurrent(inputBuffer);
+    
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
     }
 #endif
+
 #if USE_BLYNK_PLUS
     updateRemoteBlynkParams();
 #endif
   }
+  
   // ------------------
+  
 #if USE_MULTILAMP
   else if (!strncmp_P(inputBuffer, PSTR("MULTI"), 5)) { // Управление несколькими лампами
     uint8_t valid = 0, i = 0;
-    while (inputBuffer[i])   {   // пакет должен иметь вид MULTI,%U,%U,%U,%U,%U соответственно ON/OFF,№эффекта,яркость,скорость,масштаб или + №текущей папки или + озвучування_on/off, гучнисть
+    while (inputBuffer[i]) { // пакет должен иметь вид MULTI,%U,%U,%U,%U,%U соответственно ON/OFF,№эффекта,яркость,скорость,масштаб или + №текущей папки или + озвучування_on/off, гучнисть
       if (inputBuffer[i] == ',') {
         valid++;  // Проверка на правильность пакета (по количеству запятых)
       }
       i++;
     }
-    if (valid == 5 || valid == 6 || valid == 8) {   // Если пакет правильный выделяем лексемы,разделённые запятыми, и присваиваем параметрам эффектов
+    if (valid == 5 || valid == 6 || valid == 8) { // Если пакет правильный выделяем лексемы,разделённые запятыми, и присваиваем параметрам эффектов
       char *tmp = strtok (inputBuffer, ","); // Первая лексема MULTI пропускается
       tmp = strtok (NULL, ",");
       bool onflg = false;
@@ -474,6 +572,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
           modes[currentMode].Speed = atoi (tmp);
           tmp = strtok (NULL, ",");
           modes[currentMode].Scale = atoi (tmp);
+          
 #if USE_MP3_PLAYER
           if (valid == 8) {
             tmp = strtok (NULL, ",");
@@ -481,21 +580,24 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             tmp = strtok (NULL, ",");
             eff_volume = atoi (tmp);
 #if USE_DAWN
+
             if (mp3Enabled && !dawnFlag && ONflag && eff_sound_on) {
-              send_command(6, FEEDBACK, 0, eff_volume); // Меняем громкость
+              send_command(6, FEEDBACK, 0, eff_volume); // меняем громкость
               delay(mp3_delay);
             }
-#endif
+#endif // USE_DAWN
+
           }
           if (valid == 8 || valid == 6) {
             tmp = strtok (NULL, ",");
             mp3_folder = effects_folders[currentMode];
             mp3_folder_last = mp3_folder;
             if (mp3Enabled) {
-              play_sound();
+              mp3_pending_play = true;
             }
             if (atoi (tmp) != CurrentFolder) {
               CurrentFolder = atoi (tmp);
+              
 #if USE_DAWN
               if (mp3Enabled && !dawnFlag && ONflag && eff_sound_on) {
                 send_command(0x17, FEEDBACK, 0, CurrentFolder);
@@ -503,22 +605,23 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
                 mp3_stop = false;
                 delay(mp3_delay);
               }
-#endif
+#endif // USE_DAWN
+
             }
           }
 #endif // USE_MP3_PLAYER
           loadingFlag = true; // Перезапуск эффекта
-          SetBrightness(modes[currentMode].Brightness); //Применение яркости
-        } else   {
+          SetBrightness(modes[currentMode].Brightness); // применение яркости
+        } else {
           currentMode = MODE_AMOUNT - 3;  // Если полученный номер эффекта больше , чем количество эффектов в лампе,включаем последний "адекватный" эффект
           loadingFlag = true; // Перезапуск эффекта
-          SetBrightness(modes[currentMode].Brightness); // Применение яркости
+          SetBrightness(modes[currentMode].Brightness); // применение яркости
         }
-      } else   {
+      } else {
         tmp = strtok (NULL, ",");
         if (modes[currentMode].Brightness != atoi(tmp)) {
           modes[currentMode].Brightness = atoi (tmp);
-          SetBrightness(modes[currentMode].Brightness); // Применение яркости
+          SetBrightness(modes[currentMode].Brightness); // применение яркости
         }
         tmp = strtok (NULL, ",");
         if (modes[currentMode].Speed != atoi(tmp)) {
@@ -528,25 +631,29 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         tmp = strtok (NULL, ",");
         if (modes[currentMode].Scale != atoi(tmp)) {
           modes[currentMode].Scale = atoi (tmp);
-          loadingFlag = true; // Перезапуск эффекта
+          loadingFlag = true; // перезапуск эффекта
         }
+        
 #if USE_MP3_PLAYER
         if (valid == 8) {
           tmp = strtok (NULL, ",");
           eff_sound_on = atoi (tmp);
           tmp = strtok (NULL, ",");
           eff_volume = atoi (tmp);
+          
 #if USE_DAWN
           if (mp3Enabled && !dawnFlag && ONflag && eff_sound_on) {
             send_command(6, FEEDBACK, 0, eff_volume);
             delay(mp3_delay);
           }
-#endif
+#endif // USE_DAWN
+
         }
         if (valid == 8 || valid == 6) {
           tmp = strtok (NULL, ",");
           if (atoi (tmp) != CurrentFolder) {
             CurrentFolder = atoi (tmp);
+            
 #if USE_DAWN
             if (mp3Enabled && eff_sound_on && !dawnFlag && ONflag) {
               send_command(0x17, FEEDBACK, 0, CurrentFolder);
@@ -554,16 +661,19 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
               CurrentFolder_last = CurrentFolder;
               delay(mp3_delay);
             }
-#endif
+#endif // USE_DAWN
+
           }
         }
 #endif // USE_MP3_PLAYER
+
       }
       if (onflg) {
 #if USE_MP3_PLAYER
         if (ONflag) mp3_folder = effects_folders[currentMode];
-#endif
-        changePower();   // Активация состояния ON/OFF
+#endif // USE_MP3_PLAYER
+
+        changePower();   // активация состояния ON/OFF
       }
 #if GENERAL_LOG
       SYSLOG.add ("Принято MULTI ");
@@ -572,6 +682,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       SYSLOG.add("Brightness: %u", modes[currentMode].Brightness);
       SYSLOG.add("Speed: %u", modes[currentMode].Speed);
       SYSLOG.add("Scale: %u", modes[currentMode].Scale);
+      
 #if USE_MP3_PLAYER
       SYSLOG.add("CurrentFolder: %u", CurrentFolder);
       SYSLOG.add("eff_sound_on: %u", eff_sound_on);
@@ -583,6 +694,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       jsonWrite(configSetup, "sp", modes[currentMode].Speed); //для правильного отображения
       jsonWrite(configSetup, "sc", modes[currentMode].Scale);
       jsonWrite(configSetup, "eff_sel", currentMode);
+      
 #if USE_MP3_PLAYER
       jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
       jsonWrite(configMP3, "vol", eff_volume);
@@ -641,16 +753,19 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       }
       timeout_save_file_changes = millis();
       bitSet(save_file_changes, 2);
+      
 #if USE_MQTT
       if (Wifi::instance().isConnected()) {
         Mqtt::instance().needToPublish = true;
       }
 #endif
+
     } else if (!strncmp_P(inputBuffer, PSTR("FAV_GET"), 7)) {
       Favorites::instance().SetStatus(inputBuffer);
     }
   }
   // ------------------
+  
 #if USE_OTA
   else if (!strncmp_P(inputBuffer, PSTR("OTA"), 3)) {
     Ota::instance().RequestOtaUpdate();
@@ -694,6 +809,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     jsonWrite(configSetup, "br", ALLbri);
     FastLED.setBrightness(ALLbri);
     loadingFlag = true;
+    
 #if USE_MULTILAMP
     repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
@@ -704,27 +820,34 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     if (!strncmp_P(inputBuffer, PSTR("RND_0"), 5)) { // вернуть настройки по умолчанию текущему эффекту
       setModeSettings();
       updateSets();
+      
 #if USE_MULTILAMP
       repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
+
       sendCurrent(inputBuffer);
     } else if (!strncmp_P(inputBuffer, PSTR("RND_1"), 5)) { // выбрать случайные настройки текущему эффекту  // раньше была идея, что будут числа RND_1, RND_2, RND_3 - выбор из предустановленных настроек, но потом всё свелось к единственному варианту случайных настроек
       selectedSettings = 1U;
       updateSets();
+      
 #if USE_MULTILAMP
       repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
+
     } else if (!strncmp_P(inputBuffer, PSTR("RND_Z"), 5)) { // вернуть настройки по умолчанию всем эффектам
       restoreSettings();
       selectedSettings = 0U;
       updateSets();
+      
 #if USE_MULTILAMP
       repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
       sendCurrent(inputBuffer);
+      
 #if USE_BLYNK
       updateRemoteBlynkParams();
-#endif
+#endif // USE_BLYNK
+
     } else if (!strncmp_P(inputBuffer, PSTR("RND_C1"), 5)) { // Включаем случайный выбор эффектов в цикле
       Favorites::instance().rndCycle = 1;
       jsonWrite(configSetup, "rnd_cycle", 1);
@@ -766,9 +889,6 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       while (*ptr == ' ' || *ptr == '=') ptr++;
 
       if (*ptr == '\0') {
-#if GENERAL_LOG
-        SYSLOG.add("RUN_X: пустая команда — игнорируем");
-#endif
         return;
       }
 
@@ -816,7 +936,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         strcpy(Mqtt::instance().mqttBuffer, inputBuffer);
         Mqtt::instance().needToPublish = true;
       }
-#endif
+#endif // USE_MQTT
     } else
       sendAlarms(inputBuffer);
   }
@@ -829,7 +949,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
     }
-#endif
+#endif // USE_MQTT
   }
 #endif  // USE_DAWN
   // ------------------
@@ -854,7 +974,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         strcpy(Mqtt::instance().mqttBuffer, inputBuffer);
         Mqtt::instance().needToPublish = true;
       }
-#endif
+#endif // USE_MQTT
     } else
       sendSunsets(inputBuffer);
   } // else if (!strncmp_P(inputBuffer, PSTR("SUN_"), 4))
@@ -867,7 +987,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
     }
-#endif
+#endif // USE_MQTT
   }
 #endif  // USE_SUNSET
   // ------------------
@@ -897,13 +1017,14 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         }
       case 3U: {
           EffectList(F("/efflist3"));
+          
 #if USE_DEFAULT_SETTINGS_RESET
           restoreSettings();
           updateSets();
 #if USE_BLYNK_PLUS
           updateRemoteBlynkParams();
-#endif
-#endif
+#endif // USE_BLYNK_PLUS
+#endif // USE_DEFAULT_SETTINGS_RESET
           break;
         }
     }
@@ -931,13 +1052,6 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     }
   }
 
-  else if (!strncmp_P(inputBuffer, PSTR("COL"), 3)) {
-#ifdef USE_OLD_APP_FROM_KOTEYKA
-    DriwingColor = CRGB(getValue(BUFF, ';', 1).toInt(), getValue(BUFF, ';', 2).toInt(), getValue(BUFF, ';', 3).toInt());
-#else
-    DriwingColor = CRGB(getValue(BUFF, ';', 1).toInt(), getValue(BUFF, ';', 3).toInt(), getValue(BUFF, ';', 2).toInt());
-#endif
-  }
   // ------------------
   else if (!strncmp_P(inputBuffer, PSTR("DRAWO"), 5)) {
     if (!strncmp_P(inputBuffer, PSTR("DRAWON"), 6)) Painting = 1;
@@ -995,7 +1109,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   else if (!strncmp_P(inputBuffer, PSTR("STATE"), 5)) {
     if (Wifi::instance().isConnected()) Mqtt::instance().needToPublish = true;
   }
-#endif
+#endif // USE_MQTT
   // ------------------
   else if (!strncmp_P(inputBuffer, PSTR("SETS"), 4)) {
     memcpy(buff, &inputBuffer[4], 1U);

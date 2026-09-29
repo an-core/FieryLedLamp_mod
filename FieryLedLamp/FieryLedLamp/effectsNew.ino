@@ -1298,8 +1298,7 @@ void Snowfall() {
 // метель - 2
 #define e_sns_DENSE (32U)
 
-void stormRoutine2()
-{
+void stormRoutine2() {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
   if (selectedSettings) {
     uint8_t tmp = 175U + random8(39U);
@@ -1315,29 +1314,23 @@ void stormRoutine2()
   uint8_t e_TAIL_STEP = 127U;
   if (isColored)
     Saturation = modes[currentMode].Scale * 2.55;
-  else
-  {
+  else {
     e_TAIL_STEP = 255U - modes[currentMode].Scale * 2.5;
   }
-  for (uint8_t x = 0U; x < matrixWidth - 1U; x++)
-  {
-    if (!random8(e_sns_DENSE) && !getPixColorXY(wrapX(x), matrixHeight - 1U) && !getPixColorXY(wrapX(x + 1U), matrixHeight - 1U) && !getPixColorXY(wrapX(x - 1U), matrixHeight - 1U))
-    {
+  for (uint8_t x = 0U; x < matrixWidth - 1U; x++) {
+    if (!random8(e_sns_DENSE) && !getPixColorXY(wrapX(x), matrixHeight - 1U) && !getPixColorXY(wrapX(x + 1U), matrixHeight - 1U) && !getPixColorXY(wrapX(x - 1U), matrixHeight - 1U)) {
       drawPixelXY(x, matrixHeight - 1U, CHSV(random8(), Saturation, random8(64U, 255U)));
     }
   }
 
   // сдвигаем по диагонали
-  for (uint8_t y = 0U; y < matrixHeight - 1U; y++)
-  {
-    for (uint8_t x = 0; x < matrixWidth; x++)
-    {
+  for (uint8_t y = 0U; y < matrixHeight - 1U; y++) {
+    for (uint8_t x = 0; x < matrixWidth; x++) {
       drawPixelXY(wrapX(x + 1U), y, getPixColorXY(x, y + 1U));
     }
   }
 
-  for (uint8_t i = 0U; i < matrixWidth; i++)
-  {
+  for (uint8_t i = 0U; i < matrixWidth; i++) {
     fadePixel(i, matrixHeight - 1U, e_TAIL_STEP);
   }
 }

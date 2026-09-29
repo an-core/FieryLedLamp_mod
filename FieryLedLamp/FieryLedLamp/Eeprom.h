@@ -53,17 +53,20 @@ class Eeprom {
     }
 
 // --------------------------------------------------------------------
+    
     bool IsWelcomePageActive() const {
       return false;  // старая страница приветствия отключена
     }
 
 // --------------------------------------------------------------------
+    
     void EepromGet(ModeType* modes) {
       for (uint8_t i = 0; i < MODE_AMOUNT; i++)
         EEPROM.get(EEPROM_MODES_START_ADDRESS + EEPROM_MODE_STRUCT_SIZE * i, modes[i]);
     }
 
 // --------------------------------------------------------------------
+    
     void EepromPut(ModeType* modes) {
       for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
         EEPROM.put(EEPROM_MODES_START_ADDRESS + EEPROM_MODE_STRUCT_SIZE * i, modes[i]);
@@ -74,6 +77,7 @@ class Eeprom {
     }
 
 // --------------------------------------------------------------------
+
 // сохранение даты последнего обновления
 void SaveUpdateDate(const String& date) {
   if (date.length() == 0) return;
@@ -90,6 +94,7 @@ void SaveUpdateDate(const String& date) {
 }
 
 // --------------------------------------------------------------------
+
 // загрузка даты последнего обновления
 String LoadUpdateDate() {
   char buffer[EEPROM_UPDATE_DATE_SIZE] = {0};
@@ -104,6 +109,7 @@ String LoadUpdateDate() {
 }
 
 // --------------------------------------------------------------------
+
 // проверка, есть ли новое обновление
 bool HasUpdateAvailable(const String& newDate) {
   if (newDate.length() == 0) return false;
@@ -118,7 +124,7 @@ bool HasUpdateAvailable(const String& newDate) {
 }
 
 // --------------------------------------------------------------------
-// проверка, есть ли новое обновление
+
 bool CheckAndUpdateDate(const String& newDate) {
   if (newDate.length() < 10) return false;
   
@@ -156,6 +162,7 @@ bool CheckAndUpdateDate(const String& newDate) {
 }
 
 // --------------------------------------------------------------------
+
 #if BACKUP_CFG_FILES
     uint32_t WifiBackupCrc(const uint8_t* data, size_t len) {
       uint32_t crc = 0xFFFFFFFFUL;
@@ -171,6 +178,7 @@ bool CheckAndUpdateDate(const String& newDate) {
     }
 
 // --------------------------------------------------------------------
+   
     void WifiBackupCopy(char* dst, size_t dstSize, const String& src) {
       if (!dst || dstSize == 0) return;
       memset(dst, 0, dstSize);
@@ -180,6 +188,7 @@ bool CheckAndUpdateDate(const String& newDate) {
     }
 
 // --------------------------------------------------------------------
+   
     bool SaveWifiBackupForGitHubOta(String& configSetup) {
       if (configSetup.length() == 0) return false;
 
@@ -210,6 +219,7 @@ bool CheckAndUpdateDate(const String& newDate) {
     }
 
 // --------------------------------------------------------------------
+   
     bool ReadWifiBackupRaw(WifiBackupData &data) {
       memset(&data, 0, sizeof(data));
       if (sizeof(data) > EEPROM_WIFI_BACKUP_SIZE) return false;
@@ -227,12 +237,14 @@ bool CheckAndUpdateDate(const String& newDate) {
     }
 
 // --------------------------------------------------------------------
+  
     bool IsWifiBackupAvailable() {
       WifiBackupData data;
       return ReadWifiBackupRaw(data) && data.pending == EEPROM_WIFI_BACKUP_PENDING_MARK;
     }
 
 // --------------------------------------------------------------------
+   
     void ClearWifiBackupPending() {
       WifiBackupData data;
       if (!ReadWifiBackupRaw(data)) return;
@@ -248,6 +260,7 @@ bool CheckAndUpdateDate(const String& newDate) {
     }
 
 // --------------------------------------------------------------------
+   
     bool RestoreWifiBackupAfterGitHubOta(String &configSetup) {
       WifiBackupData data;
       if (!ReadWifiBackupRaw(data)) return false;
@@ -264,10 +277,11 @@ bool CheckAndUpdateDate(const String& newDate) {
 
       return true;
     }
-// --------------------------------------------------------------------
+
 #endif // BACKUP_CFG_FILES
 
 // --------------------------------------------------------------------
+ 
   private:
     Eeprom() = default;
     ~Eeprom() = default;
@@ -275,6 +289,7 @@ bool CheckAndUpdateDate(const String& newDate) {
     Eeprom& operator=(const Eeprom&) = delete;
 
 // --------------------------------------------------------------------
+
 }; // class Eeprom
 
 // ******************************************************************************************************************************************************

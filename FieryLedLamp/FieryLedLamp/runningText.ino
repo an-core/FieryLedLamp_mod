@@ -5,11 +5,13 @@
 // ------------------------
 
 // ================================================================ ШРИФТ и ОТРИСОВКА СИМВОЛА НА МАТРИЦЕ ================================================
+
 const FontDesc fontTable[3] PROGMEM = {
   {5,  8,  8, false, font5x8},
   {8, 13, 13, true, font8x13},
   {10, 16, 16, true, font10x16}
 };
+
 // -------------------------------------
 
 // возвращает реальную ширину строки в пикселях
@@ -482,6 +484,7 @@ void drawDegreeSymbol(int16_t xPos, CRGB letterColor) {
 }
 
 // ============================================================================= ЯРКОСТЬ ================================================================
+
 uint8_t getBrightnessForPrintTime() {
   if (!myTime.isTimeSet()) {
     return modes[currentMode].Brightness; // если время не синхронизировано - возвращаем текущую яркость эффекта
@@ -495,6 +498,7 @@ uint8_t getBrightnessForPrintTime() {
 }
 
 // ======================================================================== БЕГУЩАЯ СТРОКА ==============================================================
+
 boolean fillString(const char* text, CRGB letterColor, boolean itsText) {
   if (!text || text[0] == '\0') return true;
 
@@ -633,6 +637,7 @@ boolean fillString(const char* text, CRGB letterColor, boolean itsText) {
 }
 
 // -----------------------------------------------------------------
+
 void showScrollingMessage(const char* message, CRGB color) {
   loadingFlag = true;
   textBaseY = (matrixHeight - LET_HEIGHT) / 2 + textYOffset;
@@ -645,12 +650,15 @@ void showScrollingMessage(const char* message, CRGB color) {
   }
   FastLED.show();
 }
+
 // -----------------------------------------------------------------
+
 uint32_t getRunningTextDelayMs() {
   return map(constrain(SpeedRunningText, 20, 220), 20, 220, 250, 15);
 }
 
 // ========================================================================= ВЫВОД ВРЕМЕНИ ==============================================================
+
 // возвращает цвет для текста часов из настроек clock_hue
 CRGB getClockTextColor() {
   if (rainbowClock) {
@@ -717,7 +725,7 @@ void printTime(bool onDemand) {
   if (needAnnounce && mp3_player_connect == 4 && eff_sound_on && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
     if (timeAnnounceEnabled && ((day_advert_sound_on && day_night) || (night_advert_sound_on && !day_night))) {
       previous_folder = mp3_folder;
-      play_time_ADVERT();
+      mp3_pending_time_advert = true;
     }
   }
 #endif
@@ -801,6 +809,7 @@ void printTime(bool onDemand) {
 }
 
 // ============================================================================ ВЫВОД ПОГОДЫ ============================================================
+
 #if LED_PANEL && USE_WEATHER
 // возвращает цвет для текста погоды из настроек weather_hue
 CRGB getWeatherTextColor() {
@@ -880,7 +889,8 @@ void printWeather() {
   if (needAnnounce) {
     if (mp3_player_connect >= 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag && !advert_flag && !weather_advert_flag) {
       previous_folder = mp3_folder;
-      play_weather(false);
+      mp3_pending_weather_advert = true;
+      mp3_pending_weather_force = false;
       lastAnnounceMinute = currentMinute;
     }
   }

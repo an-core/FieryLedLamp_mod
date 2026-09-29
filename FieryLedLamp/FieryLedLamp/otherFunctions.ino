@@ -9,6 +9,7 @@ uint32_t get_Chip_ID(void) {
 }
 
 // ----------------------------------------------------------------------
+
 // логи
 #if DEBUG_ENABLED
 void loadSystemLogSettings() {
@@ -26,6 +27,7 @@ void writeDebugLog(const String& msg) {
 }
 
 // ----------------------------------------------------------------------
+
 bool FileCopy(const String& SourceFile, const String& TargetFile) {
 #if USE_OTA
   if (Ota::instance().isOtaActive()) return false;
@@ -51,6 +53,7 @@ bool FileCopy(const String& SourceFile, const String& TargetFile) {
 }
 
 // ----------------------------------------------------------------------
+
 // список эффектов
 void EffectList(const __FlashStringHelper * filename) {
   String effList = String(filename);
@@ -71,6 +74,7 @@ void EffectList(const __FlashStringHelper * filename) {
 }
 
 // ----------------------------------------------------------------------
+
 // ведущий ноль (для будильника Рассвет и заката)
 String zeroPad(String str, uint8_t len) {
   while (str.length() < len) str = "0" + str;
@@ -78,6 +82,7 @@ String zeroPad(String str, uint8_t len) {
 }
 
 // ----------------------------------------------------------------------
+
 // декодирование URL
 String urldecode(String str) {
   String decoded = "";
@@ -107,6 +112,7 @@ String urldecode(String str) {
 }
 
 // ----------------------------------------------------------------------
+
 // кодирование URL
 String urlencode(const String& str) {
   String encoded = "";
@@ -128,6 +134,7 @@ String urlencode(const String& str) {
 }
 
 // ----------------------------------------------------------------------
+
 // дата и время прошивки
 String convertBuildDate(const char* dateStr) {
   const char* months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
@@ -216,10 +223,10 @@ String formatDateTimeForDisplay(String dateTime) {
 }
 
 // ----------------------------------------------------------------------
-// Таймауты HTTPS-запросов (снижены с 10-15 сек до 3-5 сек, чтобы не блокировать loop)
+
 static const uint16_t HTTPS_TIMEOUT_CHANGELOG_MS = 3000;
-static const uint16_t HTTPS_TIMEOUT_PLANNED_MS   = 3000;
-static const uint16_t HTTPS_TIMEOUT_COMMIT_MS    = 5000;
+static const uint16_t HTTPS_TIMEOUT_PLANNED_MS = 3000;
+static const uint16_t HTTPS_TIMEOUT_COMMIT_MS = 5000;
 
 void performUpdateCheck() {
   if (!Wifi::instance().isConnected()) {
@@ -243,7 +250,7 @@ void performUpdateCheck() {
   doc["folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/FieryLedLamp_mod";
   doc["update_folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/update";
 
-  // ---------------------- Changelog ----------------------
+  // Changelog
   {
     String changelogUrl = "https://gist.githubusercontent.com/an-core/76efbb63916515dda1843a5574208b8d/raw/changelog.json";
     bool changelogLoaded = false;
@@ -289,7 +296,7 @@ void performUpdateCheck() {
     }
   }
 
-  // ---------------------- Planned ----------------------
+  // Planned
   {
     String plannedUrl = "https://gist.githubusercontent.com/an-core/2af384f891752661d020ae354274bc08/raw/planned.json";
     bool plannedLoaded = false;
@@ -330,7 +337,7 @@ void performUpdateCheck() {
     }
   }
 
-  // ---------------------- Проверка обновления ----------------------
+  // Проверка обновления
   {
     String fileName = "bin_ESP32_ESP32S3.zip";
     String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
@@ -389,8 +396,8 @@ void performUpdateCheck() {
 }
 
 // ----------------------------------------------------------------------
+
 #if USE_DAWN
-// save_alarms использует общий writeFile из ArduinoJson.ino
 void save_alarms() {
   if (configAlarm.isEmpty()) configAlarm = "{}";
 
@@ -406,7 +413,7 @@ void save_alarms() {
 
     uint8_t currentState = jsonReadtoInt(configAlarm, key_a);
     uint8_t currentHours = jsonReadtoInt(configAlarm, key_h);
-    uint8_t currentMins  = jsonReadtoInt(configAlarm, key_m);
+    uint8_t currentMins = jsonReadtoInt(configAlarm, key_m);
     uint16_t currentTime = currentHours * 60 + currentMins;
 
     if (alarms[i].State != currentState || alarms[i].Time != currentTime) {
@@ -442,6 +449,7 @@ void save_alarms() {
 #endif // USE_DAWN
 
 // ----------------------------------------------------------------------
+
 #if USE_SUNSET
 void save_sunsets() {
   if (configSunset.isEmpty() || configSunset == "null") {
@@ -491,6 +499,7 @@ void save_sunsets() {
 #endif // USE_SUNSET
 
 // ----------------------------------------------------------------------
+
 #if USE_SCHEDULE
 void load_schedule() {
   if (configSchedule.isEmpty() || configSchedule == "null") {
@@ -560,6 +569,7 @@ void load_schedule() {
 #endif // USE_SCHEDULE
 
 // ----------------------------------------------------------------------
+
 void Save_File_Changes() {
   if (save_file_changes && millis() - timeout_save_file_changes >= SAVE_FILE_DELAY_TIMEOUT) {
     if (save_file_changes & SAVE_CONFIG_BIT) {
@@ -592,6 +602,7 @@ void Save_File_Changes() {
 }
 
 // ----------------------------------------------------------------------
+
 // MQTT публикация
 void publishMqttState() {
 #if USE_MQTT
@@ -607,7 +618,6 @@ void publishMqttState() {
     Mqtt::instance().publishState(0);
 #endif
 
-    // UI-индекс текущего эффекта
     String effectIdxStr = "";
     for (uint8_t n = 0; n < MODE_AMOUNT; n++) {
       if (eff_num_correct[n] == currentMode) {
@@ -616,26 +626,25 @@ void publishMqttState() {
       }
     }
 
-    // Формирование JSON одним пакетным вызовом - один парсинг + одна сериализация
     String MqttSnd;
     jsonWriteMultiple(MqttSnd, {
       {"power", ONflag ? "ON" : "OFF"},
       {"cycle", Favorites::instance().FavoritesRunning ? "ON" : "OFF"},
       {"effect", effectIdxStr},
-      {"bri",   String(modes[currentMode].Brightness)},
-      {"spd",   String(modes[currentMode].Speed)},
-      {"sca",   String(modes[currentMode].Scale)},
+      {"bri", String(modes[currentMode].Brightness)},
+      {"spd", String(modes[currentMode].Speed)},
+      {"sca", String(modes[currentMode].Scale)},
 #if USE_MP3_PLAYER
       {"sound", eff_sound_on ? "ON" : "OFF"},
-      {"vol",   String(eff_volume)},
+      {"vol", String(eff_volume)},
 #endif
-      {"runt",  String(RuninTextOverEffects)},
-      {"runc",  String(ColorRunningText)},
-      {"runf",  String(ColorTextFon)},
-      {"runs",  String(SpeedRunningText)},
-      {"rnde",  String(Favorites::instance().rndCycle)},
-      {"rndc",  String(random_on)},
-      {"rndf",  String(selectedSettings)},
+      {"runt", String(RuninTextOverEffects)},
+      {"runc", String(ColorRunningText)},
+      {"runf", String(ColorTextFon)},
+      {"runs", String(SpeedRunningText)},
+      {"rnde", String(Favorites::instance().rndCycle)},
+      {"rndc", String(random_on)},
+      {"rndf", String(selectedSettings)},
     });
 
     MqttSnd.toCharArray(Mqtt::instance().mqttBuffer, sizeof(Mqtt::instance().mqttBuffer));
@@ -835,10 +844,31 @@ static inline bool sdFileExists(const String& path) {
 #if USE_TM1637
 void handleTM1637() {
   if (!tm1637Enabled) return;
+
+#if USE_DAWN || USE_SUNSET
+  bool blinkActive =
+#if USE_DAWN
+    (dawnFlag == 1)
+#endif
+#if USE_DAWN && USE_SUNSET
+    ||
+#endif
+#if USE_SUNSET
+    (sunsetFlag == 1)
+#endif
+    ;
+
+  if (blinkActive) {
+    clockTicker_blink(); // плавное мигание
+    return;
+  }
+#endif
+
   static uint32_t tmr_clock = 0;
   if (millis() - tmr_clock >= 500UL) {
     tmr_clock = millis();
-    if (inClockWeatherMode && showClock && DisplayFlag == 0) {
+    if (inClockWeatherMode && showClock && DisplayFlag == 0
+        && displayMode == DISP_MODE_CLOCK) {
       dotFlag = !dotFlag;
       boolean points[4] = {0, 0, 0, 0};
       points[1] = dotFlag;
@@ -846,13 +876,6 @@ void handleTM1637() {
     }
     Display_Timer();
   }
-  static uint32_t lastBlink = 0;
-#if USE_DAWN || USE_SUNSET
-  if ((dawnFlag == 1 || sunsetFlag == 1) && (millis() - lastBlink >= 250)) {
-    lastBlink = millis();
-    clockTicker_blink();
-  }
-#endif // USE_DAWN || USE_SUNSET
 }
 #endif // USE_TM1637
 
@@ -923,7 +946,7 @@ void handleDawnMp3() {
       send_command(0x06, FEEDBACK, 0, 0);
       alarm_sound_flag = true;
       mp3_folder_last = mp3_folder;
-      play_sound();
+      play_sound_async(mp3_folder);
     }
     return;
   }
@@ -977,7 +1000,7 @@ void handleSunsetMp3() {
       send_command(0x06, FEEDBACK, 0, 0);
       sunset_sound_flag = true;
       mp3_folder_last = mp3_folder;
-      play_sound();
+      play_sound_async(mp3_folder);
     }
     return;
   }

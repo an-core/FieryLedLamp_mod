@@ -3,8 +3,8 @@
 // --------------------------
 
 #if USE_BUTTON
-bool brightDirection = true;               // true - увеличение, false - уменьшение
-static bool startButtonHolding = false;    // кнопка удерживается для изменения яркости/скорости/масштаба лампы кнопкой
+bool brightDirection = true; // true - увеличение, false - уменьшение
+static bool startButtonHolding = false; // кнопка удерживается для изменения яркости/скорости/масштаба лампы кнопкой
 static bool Button_Holding = false;
 
 void buttonTick() {
@@ -28,14 +28,25 @@ void buttonTick() {
   uint8_t clickCount = touch.hasClicks() ? touch.getClicks() : 0U;
   // --------------------------------------------------------------------------------
 
-  // 1 клик - Вкл/Выкл (или обработка рассвета/заката)
+  // Вкл/Выкл (или обработка рассвета/заката)
   if (clickCount == btn_click_power) {
 #if USE_BUTTON
     if (!buttonEnabled) return;
-#endif
+#endif // USE_BUTTON
 
 #if USE_DAWN || USE_SUNSET
-    if (dawnFlag == 1 || sunsetFlag == 1) {
+    bool dawnOrSunsetActive = false;
+    
+#if USE_DAWN
+    if (dawnFlag == 1) dawnOrSunsetActive = true;
+#endif // USE_DAWN
+
+#if USE_SUNSET
+    if (sunsetFlag == 1) dawnOrSunsetActive = true;
+#endif // USE_SUNSET
+
+    if (dawnOrSunsetActive) {
+#if USE_DAWN
       if (dawnFlag == 1) {
         manualOff = true;
         dawnFlag = 0;
@@ -45,30 +56,48 @@ void buttonTick() {
           mp3_stop = true;
           alarm_sound_flag = false;
         }
-#endif
-      } else if (sunsetFlag == 1) {
-        manualOff = true;
+#endif // USE_MP3_PLAYER
+      }
+#endif // USE_DAWN
+
+#if USE_SUNSET
+      if (sunsetFlag == 1) {
+        manualsOff = true;
         sunsetFlag = 0;
 #if USE_MP3_PLAYER
         if (mp3Enabled && sunset_sound_flag) {
           sunset_sound_flag = false;
         }
-#endif
+#endif // USE_MP3_PLAYER
+
       }
+#endif // USE_SUNSET
+
 #if USE_TM1637
       if (tm1637Enabled) {
+        DisplayFlag = 0;
         clockTicker_blink();
       }
-#endif
+#endif // USE_TM1637
+
+      ONflag = false;
+      jsonWrite(configSetup, "Power", 0);
+
       FastLED.clear();
       FastLED.setBrightness(0);
       FastLED.show();
       yield();
-      ONflag = true;
-      jsonWrite(configSetup, "Power", ONflag);
+
+#if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+      digitalWrite(MOSFET_PIN, !MOSFET_LEVEL);
+#endif
+
+#if defined(ALARM_PIN) && defined(ALARM_LEVEL)
+      digitalWrite(ALARM_PIN, !ALARM_LEVEL);
+#endif
+
       saveConfig();
-      loadingFlag = true;
-      changePower();
+      loadingFlag = false;
       return;
     }
 #endif // USE_DAWN || USE_SUNSET
@@ -87,8 +116,8 @@ void buttonTick() {
 #endif
     }
 
-    saveConfig();
     changePower();
+    saveConfig();
 
     if (!ONflag) {
       timeout_save_file_changes = millis() - SAVE_FILE_DELAY_TIMEOUT;
@@ -114,7 +143,7 @@ void buttonTick() {
   }
 
   // --------------------------------------------------------------------------------
-  // 2 клика — Следующий эффект
+  // Следующий эффект
   if (clickCount == btn_click_next && ONflag) {
     uint8_t temp = jsonReadtoInt(configSetup, "eff_sel");
     uint8_t lastMode = currentMode;
@@ -135,12 +164,24 @@ void buttonTick() {
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
 #if USE_MP3_PLAYER
-    mp3_folder = pgm_read_byte(&default_effects_folders[currentMode]);
+    if (mp3Enabled && mp3_player_connect == 4) {
+      uint8_t newFolder = effects_folders[currentMode];
+      if (mp3_folder != newFolder) {
+        mp3_folder = newFolder;
+        mp3_folder_last = mp3_folder;
+        mp3_pending_play = true;
+      }
+    }
 #endif
 
     SetBrightness(modes[currentMode].Brightness);
-    saveConfig();
+    timeout_save_file_changes = millis();
+    bitSet(save_file_changes, 0);
     loadingFlag = true;
+
+    effectsTick();
+    FastLED.show();
+
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
@@ -155,7 +196,7 @@ void buttonTick() {
   }
 
   // --------------------------------------------------------------------------------
-  // 3 клика — Предыдущий эффект
+  // Предыдущий эффект
   if (clickCount == btn_click_prev && ONflag) {
     uint8_t temp = jsonReadtoInt(configSetup, "eff_sel");
     uint8_t lastMode = currentMode;
@@ -176,12 +217,23 @@ void buttonTick() {
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
 #if USE_MP3_PLAYER
-    mp3_folder = pgm_read_byte(&default_effects_folders[currentMode]);
+    if (mp3Enabled && mp3_player_connect == 4) {
+      uint8_t newFolder = effects_folders[currentMode];
+      if (mp3_folder != newFolder) {
+        mp3_folder = newFolder;
+        mp3_folder_last = mp3_folder;
+        mp3_pending_play = true;
+      }
+    }
 #endif
 
     SetBrightness(modes[currentMode].Brightness);
-    saveConfig();
+    timeout_save_file_changes = millis();
+    bitSet(save_file_changes, 0);
     loadingFlag = true;
+
+    effectsTick();
+    FastLED.show();
 
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
@@ -197,7 +249,7 @@ void buttonTick() {
   }
 
   // --------------------------------------------------------------------------------
-  // 4 клика — OTA
+  // OTA
   if (clickCount == btn_click_action4) {
 #if USE_OTA
     if (Ota::instance().RequestOtaUpdate()) {
@@ -214,25 +266,56 @@ void buttonTick() {
   }
 
   // --------------------------------------------------------------------------------
-  // 5 кликов — Показ IP
+  // Показ IP
   if (clickCount == btn_click_ip) {
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
     digitalWrite(MOSFET_PIN, MOSFET_LEVEL);
 #endif
+
     loadingFlag = true;
+
     auto& wifi = Wifi::instance();
     String textToShow = wifi.isConnected() ? wifi.localIP().toString() : "AP: " + wifi.apIP().toString();
-    while (!fillString(textToShow.c_str(), CRGB::White, false)) {
+
+    FastLED.clear();
+    FastLED.show();
+
+    bool oldRunTextOver = runTextOver;
+    runTextOver = false;
+
+    uint8_t savedBrightness = FastLED.getBrightness();
+    FastLED.setBrightness(20);
+
+    bool textEnded = false;
+    while (!textEnded) {
+      textEnded = fillString(textToShow.c_str(), CRGB::White, false);
+      FastLED.show();
+      parseUDP();
+      HTTP.handleClient();
       delay(1);
+      yield();
     }
+
+    FastLED.setBrightness(savedBrightness);
+    FastLED.clear();
+    FastLED.show();
+    runTextOver = oldRunTextOver;
+    textIsRunning = false;
+
 #if USE_ST7789
     if (st7789Enabled) {
       TFT_HideIP();
     }
 #endif
+
     loadingFlag = true;
+
 #if defined(MOSFET_PIN) && defined(MOSFET_LEVEL)
+#if USE_DAWN
+    digitalWrite(MOSFET_PIN, ONflag || (dawnFlag == 1 && !manualOff) ? MOSFET_LEVEL : !MOSFET_LEVEL);
+#else
     digitalWrite(MOSFET_PIN, ONflag ? MOSFET_LEVEL : !MOSFET_LEVEL);
+#endif
 #endif
   }
 
@@ -241,7 +324,8 @@ void buttonTick() {
   if (clickCount == btn_click_time) {
 #if USE_MP3_PLAYER
     if (mp3Enabled && mp3_player_connect == 4) {
-      play_time_ADVERT(true);
+      mp3_pending_time_advert = true;
+      mp3_pending_time_force = true;
     } else
 #endif
       if (myTime.isTimeSet()) {
@@ -257,7 +341,8 @@ void buttonTick() {
 #if USE_WEATHER
 #if USE_MP3_PLAYER
     if (mp3Enabled && mp3_player_connect == 4) {
-      play_weather(true);
+      mp3_pending_weather_advert = true;
+      mp3_pending_weather_force = true;
     } else
 #endif
     {
@@ -276,7 +361,7 @@ void buttonTick() {
     if (mp3Enabled && mp3_player_connect == 4) {
       eff_sound_on = eff_sound_on ? 0 : eff_volume;
       showWarning(eff_sound_on ? CRGB::Blue : CRGB::Yellow, 1000, 250U);
-      jsonWrite(configSetup, "on_sound", eff_sound_on > 0 ? 1 : 0);
+      jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
       saveConfig();
 #if USE_MULTILAMP
       repeat_multiple_lamp_control = true;
@@ -457,7 +542,14 @@ void buttonTick() {
               Button_Holding = true;
               currentMode = EFF_ANIMATION;
 #if USE_MP3_PLAYER
-              mp3_folder = pgm_read_byte(&default_effects_folders[currentMode]);
+              if (mp3Enabled && mp3_player_connect == 4) {
+                uint8_t newFolder = effects_folders[currentMode];
+                if (mp3_folder != newFolder) {
+                  mp3_folder = newFolder;
+                  mp3_folder_last = mp3_folder;
+                  mp3_pending_play = true;
+                }
+              }
 #endif
               for (uint8_t n = 0; n < MODE_AMOUNT; n++) {
                 if (eff_num_correct[n] == currentMode) {
@@ -573,14 +665,17 @@ void buttonTick() {
     startButtonHolding = false;
     Button_Holding = false;
     loadingFlag = true;
+    
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
     }
 #endif
+
 #if USE_BLYNK
     updateRemoteBlynkParams();
 #endif
+
   }
 }
 

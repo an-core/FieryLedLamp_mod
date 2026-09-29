@@ -7,6 +7,7 @@
 #include "IRManager.h"
 // ---------------------
 
+extern bool displayIpAtStart;
 extern bool sd_card_present;
 extern uint8_t effSdIndex;
 extern bool outEffectActive;
@@ -119,11 +120,40 @@ extern bool sdEnabled;
 extern uint8_t sdType;
 
 // ------------------------------------------------------------------------------
-#if LED_PANEL
 extern unsigned long lastClockFixedSwitch;
 extern bool timer_clock_fixed;
 extern uint16_t interval_clock_fixed;
-#endif
+extern bool needFullRedraw;
+extern bool showFullYearEnabled;
+extern bool dateEnabled;
+extern uint8_t globalPointBrightness;
+extern int dateXOffset;
+extern int dateYOffset;
+extern uint8_t dateHue;
+extern bool dateSeparatorBlinking;
+extern bool showYearInDate;
+extern bool rainbowDate;
+extern bool autoHueDate;
+extern bool forceDateEnabled;
+extern bool dateColorCycle;
+extern bool dateNeedRedraw;
+extern int datePoleX, datePoleY;
+extern int16_t lastDateLeft;
+extern int16_t lastDateRight;
+extern int16_t lastDateTop;
+extern int16_t lastDateBottom;
+// таймеры и интервалы
+extern bool timer_c_w;
+extern bool timer_d_w;
+extern bool timer_c_d_w;
+extern bool timer_c_d;
+extern uint16_t interval_c_w;
+extern uint16_t interval_d_w;
+extern uint16_t interval_c_d_w;
+extern uint16_t interval_c_d;
+extern uint8_t currentTimerPhase;
+extern unsigned long lastTimerSwitch;
+extern unsigned long lastSwitchTime;
 // ------------------------------------------------------------------------------
 #if MULTI_MATRIX
 extern bool panelFlip;
@@ -137,6 +167,11 @@ extern String configButton;
 #endif
 // ------------------------------------------------------------------------------
 #if USE_MP3_PLAYER
+extern volatile bool mp3_pending_time_force;
+extern volatile bool mp3_pending_play;
+extern volatile bool mp3_pending_time_advert;
+extern volatile bool mp3_pending_weather_advert;
+extern volatile bool mp3_pending_weather_force;
 extern uint8_t mp3_init_step;
 extern String configMP3;
 extern String soundList;
@@ -227,6 +262,8 @@ extern bool tft_auto_brightness;
 extern uint8_t TFT_DAY_BRIGHTNESS;
 extern uint8_t TFT_NIGHT_BRIGHTNESS;
 #endif
+extern bool dateSwitchEnabled;
+extern bool weatherSwitchEnabled;
 // ------------------------------------------------------------------------------
 #if USE_MULTILAMP
 extern String configMultilamp;
