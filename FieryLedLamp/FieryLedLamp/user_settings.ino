@@ -226,7 +226,6 @@ void User_settings() {
 // -------------------------------------------------------------------------- ВРЕМЯ -------------------------------------------------------------------
 
   HTTP.on("/save_brightness", handle_save_brightness);
-  HTTP.on("/save_time", handle_save_time);
   HTTP.on("/night_time", handle_night_time);
   HTTP.on("/print_time", handle_print_time);
   HTTP.on("/clock_vert", handle_clock_vert);
@@ -835,7 +834,7 @@ void User_settings() {
     }
     if (configChanged) {
       saveConfig();
-      Weather::instance().loadSettings();
+      Weather::instance().requestReload();
     }
 
     if (needForceUpdate && Wifi::instance().isConnected()) {
@@ -902,7 +901,7 @@ void User_settings() {
 
     if (configChanged) {
       saveConfig();
-      Weather::instance().loadSettings();
+      Weather::instance().requestReload();
 
       if (Wifi::instance().isConnected()) {
         Weather::instance().forceUpdate();
@@ -2409,6 +2408,9 @@ void handle_save_wifi() {
   saveConfig();
 
   Wifi::instance().begin();
+  HTTP.send(200, "text/plain", "OK_REBOOT");
+  delay(500);
+  ESP.restart();
 
   HTTP.send(200, "text/plain", "OK");
 }
@@ -2417,6 +2419,9 @@ void handle_use_static_ip() {
   bool enable = (HTTP.arg("s_IP").toInt() == 1);
   jsonWrite(configWiFi, "s_IP", enable ? "1" : "0");
   saveConfig();
+  HTTP.send(200, "text/plain", "OK_REBOOT");
+  delay(500);
+  ESP.restart();
   Wifi::instance().begin();
   HTTP.send(200, "text/plain", "OK");
 }
@@ -2432,6 +2437,9 @@ void handle_set_static_ip() {
       dns.fromString(HTTP.arg("dns"))) {
     Wifi::instance().setStaticIP(ip, gateway, subnet, dns);
     saveConfig();
+    HTTP.send(200, "text/plain", "OK_REBOOT");
+    delay(500);
+    ESP.restart();
     HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
   } else {
     HTTP.send(400, "text/plain", "Invalid IP format");
@@ -3640,7 +3648,7 @@ void handle_night_time() {
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
-
+/*
 void handle_save_time() {
   String day_hour_str = HTTP.arg("day_time_hour");
   String day_min_str = HTTP.arg("day_time_minute");
@@ -3695,7 +3703,7 @@ void handle_save_time() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("text/plain"), F("OK"));
-}
+} */
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -4574,7 +4582,7 @@ void handle_def() {
     effectsTick();
   }
 #if USE_WEATHER
-  Weather::instance().update();
+  Weather::instance().forceUpdate();
 #endif
   resetTimerState();
   manualOverride = true;
@@ -4615,7 +4623,7 @@ void handle_eff_reset() {
     effectsTick();
   }
 #if USE_WEATHER
-  Weather::instance().update();
+  Weather::instance().forceUpdate();
 #endif
   resetTimerState();
   manualOverride = true;

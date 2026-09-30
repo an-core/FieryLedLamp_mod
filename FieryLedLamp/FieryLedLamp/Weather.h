@@ -17,6 +17,7 @@ class Weather {
       return instance;
     }
 
+    void requestReload();
     void loadSettings();
     void update();
     void updateIfNeeded();
@@ -48,14 +49,18 @@ class Weather {
 
     String getYandexGeoId() const { return yandexGeoId; }
     String getWeatherCity() const { return weatherCity; }
-
+    void startTask();
+    
   private:
+    TaskHandle_t taskHandle = nullptr;
+    void taskLoop();
     Weather() = default;
     ~Weather() = default;
     Weather(const Weather&) = delete;
     Weather& operator=(const Weather&) = delete;
 
-    uint32_t lastUpdateTime = 0;
+    volatile uint32_t lastUpdateTime = 0;
+    volatile bool needReloadSettings = false;
 
     bool fetchFromYandex();
     bool fetchFromOpenWeather();

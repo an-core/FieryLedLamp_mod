@@ -21,10 +21,7 @@
 
 int16_t send_command(int8_t cmd, uint8_t feedback, uint8_t dat1, uint8_t dat2) {
   uint8_t mp3_send_buf[8] = {0x7E, 0xFF, 0x06, cmd, feedback, dat1, dat2, 0xEF};
-  for (uint8_t i = 0; i < 8; i++) {
-    mp3.write(mp3_send_buf[i]);
-    delay(3);
-  }
+  mp3.write(mp3_send_buf, sizeof(mp3_send_buf));
 
 #if MP3_LOG
   char logBuf[128];
@@ -97,7 +94,7 @@ void mp3_send_command_nowait(uint8_t cmd, uint8_t feedback, uint8_t dat1, uint8_
 // ====================================================================================
 // ПЕРИОДИЧЕСКАЯ ПРОВЕРКА СВЯЗИ С ПЛЕЕРОМ
 // ------------------------------------------------------------------------------------
-// Раз в MP3_CHECK_INTERVAL (60 сек) шлёт команду 0x06 и ждёт ответа
+// MP3_CHECK_INTERVAL шлёт команду 0x06 и ждёт ответа
 // Если ответа нет MP3_CHECK_MAX_FAILS раз подряд - считает плеер потерянным: mp3_clear_runtime_flags(), mp3_player_connect = 0
 
 void mp3_periodic_check() {
@@ -918,7 +915,7 @@ void mp3Task(void *pvParameters) {
       mp3_periodic_check();
     }
 
-    vTaskDelay(5 / portTICK_PERIOD_MS);
+    vTaskDelay(20 / portTICK_PERIOD_MS);
   }
 }
 

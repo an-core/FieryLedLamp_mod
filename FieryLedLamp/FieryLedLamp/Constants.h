@@ -322,6 +322,10 @@ const uint32_t MEDIUM_TASK_INTERVAL = 250;
 const uint32_t SLOW_TASK_INTERVAL = 1000;
 const uint32_t WIFI_TASK_INTERVAL = 200;
 // --------------------------------------------------------------------------------------------------
+static const uint16_t HTTPS_TIMEOUT_CHANGELOG_MS = 3000;
+static const uint16_t HTTPS_TIMEOUT_PLANNED_MS = 3000;
+static const uint16_t HTTPS_TIMEOUT_COMMIT_MS = 5000;
+// --------------------------------------------------------------------------------------------------
 #if USE_WEATHER
 const uint32_t WEATHER_UPDATE_INTERVAL = 600000UL; // Интервал обновления погоды (10 минут)
 #endif

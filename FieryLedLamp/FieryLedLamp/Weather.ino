@@ -39,20 +39,21 @@ void Weather::loadSettings() {
   ::inClockWeatherMode = (show == 1);
 
   if (show == 0) {
-    jsonWrite(configWeather, "show_weather", 1);
-    saveConfig();
-    ::inClockWeatherMode = true;
-  }
+  jsonWrite(configWeather, "show_weather", 1);
+  configChanged = true;
+  ::inClockWeatherMode = true;
+}
 
   preferYandex = (jsonReadtoInt(configWeather, "weather_source") == 0);
-  lastUpdateTime = millis() - WEATHER_UPDATE_INTERVAL;
 
 #endif // USE_WEATHER
 } // void Weather::loadSettings()
 
 // --------------------------------------------------------------------------------
+
 #if USE_WEATHER
 // ----------------------
+
 void Weather::update() {
   if (!Wifi::instance().isConnected()) {
     return;
@@ -82,11 +83,19 @@ void Weather::update() {
 } // void Weather::update()
 
 // --------------------------------------------------
+
 void Weather::forceUpdate() {
   lastUpdateTime = 0;
 }
 
 // --------------------------------------------------
+
+void Weather::requestReload() {
+  needReloadSettings = true;
+}
+
+// --------------------------------------------------
+
 void Weather::updateIfNeeded() {
   if (millis() - lastUpdateTime >= WEATHER_UPDATE_INTERVAL) {
     update();
@@ -95,6 +104,7 @@ void Weather::updateIfNeeded() {
 }
 
 // --------------------------------------------------------------------------------
+
 // Яндекс.Погода
 bool Weather::fetchFromYandex() {
   if (!Wifi::instance().isConnected()) return false;
@@ -440,6 +450,37 @@ String getRussianCityNameForOpenWeather(String city) {
   if (city == "Zaporizhzhia") return "Запорожье";
   if (city == "Kryvyi Rih") return "Кривой Рог";
   return city;
+}
+
+void Weather::startTask() {
+  if (taskHandle != nullptr) return;
+  xTaskCreatePinnedToCore(
+    [](void* arg){ static_cast<Weather*>(arg)->taskLoop(); },
+    "weather", 8192, this, 1, &taskHandle, 0);
+}
+
+void Weather::taskLoop() {
+  while (!Wifi::instance().isConnected()) {
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+  
+  update();
+  lastUpdateTime = millis();
+
+  for (;;) {
+    if (needReloadSettings) {
+      needReloadSettings = false;
+      loadSettings();
+      lastUpdateTime = 0;
+    }
+
+    if (Wifi::instance().isConnected() &&
+        (millis() - lastUpdateTime >= WEATHER_UPDATE_INTERVAL)) {
+      update();
+      lastUpdateTime = millis();
+    }
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
 }
 
 // ------------------------

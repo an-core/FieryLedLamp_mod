@@ -103,6 +103,8 @@ void loadSystemLogSettings();
 #endif
 // ------------------------------------------------------
 time_t getCurrentLocalTime();
+void performUpdateCheck();
+void updateCheckTask(void* arg);
 String zeroPad(String str, uint8_t len);
 uint32_t getRunningTextDelayMs();
 inline bool isLampActive();

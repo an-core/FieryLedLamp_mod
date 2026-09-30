@@ -29,7 +29,9 @@ void parseUDP() {
     Udp.endPacket();
   }
 }
+
 // ------------------
+
 void updateSets() {
   loadingFlag = true;
 
@@ -39,7 +41,9 @@ void updateSets() {
   }
 #endif
 }
+
 // ------------------
+
 void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutput) {
   char buff[MAX_UDP_BUFFER_SIZE], *endToken = NULL;
   String BUFF = String(inputBuffer);

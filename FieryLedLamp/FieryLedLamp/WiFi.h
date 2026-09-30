@@ -62,6 +62,16 @@ class Wifi {
       STA_FAILED
     };
 
+    void wifiManagerTask();
+    TaskHandle_t wifiManagerTaskHandle = nullptr;
+    volatile bool wifiRunActive = false;
+    
+    void internetCheckTask();
+    TaskHandle_t internetCheckTaskHandle = nullptr;
+    volatile bool internetCheckRequest = false;
+    volatile bool internetCheckDone = false;
+    volatile bool internetCheckResultFlag = false;
+
     void initAP();
     void initSTA();
     void manageConnection();

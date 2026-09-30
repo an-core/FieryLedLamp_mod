@@ -7,6 +7,7 @@
 #include "IRManager.h"
 // ---------------------
 
+extern volatile bool wifiRunActive;
 extern bool displayIpAtStart;
 extern bool sd_card_present;
 extern uint8_t effSdIndex;
@@ -19,7 +20,7 @@ extern uint8_t max_image_num;
 extern uint8_t* use_animations;
 extern uint8_t lastNonAnimSel;
 extern int8_t specialTextEffectParam;
-extern bool configChanged;
+extern volatile bool configChanged;
 extern volatile bool systemShuttingDown;
 extern volatile bool isPrintingMessage;
 extern bool justPoweredOn;
@@ -331,8 +332,6 @@ extern uint16_t dawnPosition;
 extern String configAlarm;
 extern uint8_t dawnFlag;
 extern AlarmType alarms[7];
-extern CRGB dawnColor[6];
-extern uint8_t dawnCounter;
 extern const uint8_t dawnOffsets[];
 #endif
 // ------------------------------------------------------------------------------
@@ -343,8 +342,6 @@ extern uint16_t sunsetPosition;
 extern String configSunset;
 extern uint8_t sunsetFlag;
 extern SunsetType sunsets[7];
-extern CRGB sunsetColor[6];
-extern uint8_t sunsetCounter;
 extern const uint8_t sunsetOffsets[];
 #endif
 // -------------------------------------------------------------------------------

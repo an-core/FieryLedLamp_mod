@@ -53,6 +53,14 @@ void Wifi::restartAP() {
 
 // ----------------------------------------------------------
 void Wifi::begin() {
+  xTaskCreatePinnedToCore(
+    [](void* arg){ static_cast<Wifi*>(arg)->internetCheckTask(); },
+    "wifi_inet", 4096, this, 1, &internetCheckTaskHandle, 0);
+
+  xTaskCreatePinnedToCore(
+    [](void* arg){ static_cast<Wifi*>(arg)->wifiManagerTask(); },
+    "wifi_mgr", 4096, this, 1, &wifiManagerTaskHandle, 0);
+    
   static bool initialized = false;
   if (initialized) return;
   initialized = true;
@@ -169,6 +177,7 @@ void Wifi::loop() {
     if (forcedAPActive) {
       stopForcedAP();
     }
+    Time::instance().enable();
   }
 
   unsigned long now = millis();
@@ -180,18 +189,23 @@ void Wifi::loop() {
       lastQuickCheck = now;
       if (WiFi.status() != WL_CONNECTED) {
 #if WIFI_LOG
-        SYSLOG.add("WiFi отключен - инициируем переподключение");
+        SYSLOG.add("WiFi отключен - инициируется переподключение");
 #endif
         initSTA();
       }
     }
   }
 
-  if (connected && (now - lastInternetCheck >= 10000UL)) {
+    if (connected && (now - lastInternetCheck >= 10000UL)) {
     lastInternetCheck = now;
     if (!internetCheckPending) {
       checkInternetAsync();
     }
+  }
+
+  if (internetCheckDone) {
+    internetCheckDone = false;
+    onInternetCheckResult(internetCheckResultFlag);
   }
 
   if ((apActive || forcedAPActive) && !connectInProgress && !connected && hasAnyNetworks()) {
@@ -280,23 +294,36 @@ int32_t Wifi::getRSSI() const {
 }
 
 // ----------------------------------------------------------
+// WiFi.ino — заменить checkInternetAsync():
 void Wifi::checkInternetAsync() {
   if (internetCheckPending) return;
   if (WiFi.status() != WL_CONNECTED) {
     internetAvailable = false;
     return;
   }
-
   internetCheckPending = true;
-  internetCheckStart = millis();
+  internetCheckRequest = true;
+}
 
-  WiFiClient client;
-  client.setTimeout(2000);
-  if (client.connect(IPAddress(8, 8, 8, 8), 53)) {
-    client.stop();
-    onInternetCheckResult(true);
-  } else {
-    onInternetCheckResult(false);
+void Wifi::internetCheckTask() {
+  esp_task_wdt_delete(NULL);
+  for (;;) {
+    if (internetCheckRequest) {
+      internetCheckRequest = false;
+      bool result = false;
+      if (WiFi.status() == WL_CONNECTED) {
+        WiFiClient client;
+        client.setTimeout(2000);
+        if (client.connect(IPAddress(8, 8, 8, 8), 53)) {
+          result = true;
+        }
+        client.stop();
+      }
+      internetCheckResultFlag = result;
+      internetCheckDone = true;
+      internetCheckPending = false;
+    }
+    vTaskDelay(pdMS_TO_TICKS(50));
   }
 }
 
@@ -361,26 +388,13 @@ void Wifi::initAP() {
 
 // ----------------------------------------------------------
 void Wifi::initSTA() {
-  if (connectInProgress) {
-#if WIFI_LOG
-    SYSLOG.add("initSTA: уже идёт подключение");
-#endif
-    return;
-  }
-
-  if (networkCount == 0) {
-#if WIFI_LOG
-    SYSLOG.add("initSTA: нет сетей для подключения");
-#endif
-    return;
-  }
+  if (connectInProgress) return;
+  if (networkCount == 0) return;
 
   connectInProgress = true;
+  wifiRunActive = true;
   connectStartTime = millis();
   staState = STA_CONNECTING;
-#if WIFI_LOG
-  SYSLOG.add("Запущено неблокирующее подключение к WiFi");
-#endif
 }
 
 IPAddress Wifi::getCurrentIP() const {
@@ -393,50 +407,61 @@ IPAddress Wifi::getCurrentIP() const {
   return WiFi.softAPIP();
 }
 
+void Wifi::wifiManagerTask() {
+  esp_task_wdt_delete(NULL);
+
+  for (;;) {
+    if (wifiRunActive) {
+      wl_status_t status = (wl_status_t)wifiMulti.run();
+
+#if WIFI_LOG
+      static uint32_t lastLog = 0;
+      if (millis() - lastLog > 1000) {
+        lastLog = millis();
+        SYSLOG.add("WiFi статус: %d", status);
+      }
+#endif
+
+      if (status == WL_CONNECTED) {
+        wifiRunActive = false;
+        vTaskDelay(pdMS_TO_TICKS(200));
+        continue;
+      }
+      
+      vTaskDelay(pdMS_TO_TICKS(200));
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(200));
+    }
+  }
+}
+
 void Wifi::manageConnection() {
   if (WiFi.status() == WL_CONNECTED && !connected) {
     connected = true;
     staState = STA_CONNECTED;
     connectInProgress = false;
-    if (forcedAPActive) {
-      stopForcedAP();
-    }
+    wifiRunActive = false;
+    if (forcedAPActive) stopForcedAP();
 #if WIFI_LOG
     SYSLOG.add("WiFi уже подключён");
 #endif
     return;
   }
 
-  if (!connectInProgress) return;
+  if (!connectInProgress) {
+    wifiRunActive = false;
+    return;
+  }
 
   unsigned long now = millis();
   if (now - connectStartTime >= wifiTimeoutMs) {
     connectInProgress = false;
+    wifiRunActive = false;
     staState = STA_FAILED;
     connected = false;
 #if WIFI_LOG
     SYSLOG.add("Таймаут подключения к WiFi");
 #endif
-    return;
-  }
-
-  wl_status_t status = (wl_status_t)wifiMulti.run();
-#if WIFI_LOG
-  SYSLOG.add("WiFi статус: %d", status);
-#endif
-
-  if (status == WL_CONNECTED) {
-    connectInProgress = false;
-    staState = STA_CONNECTED;
-    connected = true;
-    noInternetStartTime = 0;
-    if (forcedAPActive) {
-      stopForcedAP();
-    }
-#if WIFI_LOG
-    SYSLOG.add("WiFi подключён! SSID: %s IP: %s", WiFi.SSID().c_str(), WiFi.localIP().toString().c_str());
-#endif
-    initTimeAndTimezone();
   }
 }
 
@@ -447,6 +472,7 @@ void Wifi::forceReconnect() {
 #endif
   WiFi.disconnect();
   delay(10);
+  wifiRunActive = false;
   connectInProgress = false;
   staState = STA_IDLE;
   connected = false;
@@ -472,6 +498,7 @@ void Wifi::startForcedAP() {
   connected = false;
   staState = STA_IDLE;
   connectInProgress = false;
+  wifiRunActive = false;
 #if WIFI_LOG
   SYSLOG.add("Принудительный AP активирован");
 #endif
@@ -480,6 +507,7 @@ void Wifi::startForcedAP() {
 void Wifi::stopForcedAP() {
   if (!forcedAPActive) return;
   forcedAPActive = false;
+  wifiRunActive = false;
   noInternetStartTime = 0;
   internetAvailable = false;
 

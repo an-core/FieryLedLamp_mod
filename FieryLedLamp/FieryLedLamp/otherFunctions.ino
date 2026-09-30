@@ -1,6 +1,7 @@
 // *********************************************************************** otherFunctions.ino ***********************************************************
 #include "Time.h"
 #include "Constants.h"
+#include "Prototypes.h"
 // --------------------------
 
 // идентификация чипа ESP32
@@ -224,9 +225,21 @@ String formatDateTimeForDisplay(String dateTime) {
 
 // ----------------------------------------------------------------------
 
-static const uint16_t HTTPS_TIMEOUT_CHANGELOG_MS = 3000;
-static const uint16_t HTTPS_TIMEOUT_PLANNED_MS = 3000;
-static const uint16_t HTTPS_TIMEOUT_COMMIT_MS = 5000;
+void updateCheckTask(void* arg) {
+  esp_task_wdt_delete(NULL);
+  for (;;) {
+    if (updateCheckPending && !updateCheckInProgress) {
+      updateCheckInProgress = true;
+      updateCheckPending = false;
+
+      performUpdateCheck();
+
+      updateCheckInProgress = false;
+      updateCheckLastRun = millis();
+    }
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+}
 
 void performUpdateCheck() {
   if (!Wifi::instance().isConnected()) {
@@ -359,7 +372,7 @@ void performUpdateCheck() {
 
       if (http.GET() == HTTP_CODE_OK) {
         String payload = http.getString();
-        DynamicJsonDocument commitDoc(2048);
+        DynamicJsonDocument commitDoc(8192);
 
         if (!deserializeJson(commitDoc, payload)) {
           String commitDate = commitDoc[0]["commit"]["author"]["date"].as<String>();
@@ -672,19 +685,9 @@ void handleSlowTasks() {
   printTime();
   updateAutoHueModes();
 
-#if USE_WEATHER
-  static bool firstWeatherUpdateDone = false;
-  if (!firstWeatherUpdateDone && WiFi.status() == WL_CONNECTED) {
-    Weather::instance().forceUpdate();
-    Weather::instance().update();
-    firstWeatherUpdateDone = true;
-  }
-
-#if LED_PANEL
+#if USE_WEATHER && LED_PANEL
   printWeather();
-#endif // LED_PANEL
-  Weather::instance().updateIfNeeded();
-#endif // USE_WEATHER
+#endif
 
   static bool ipShown = false;
   if (!ipShown) {
@@ -699,13 +702,6 @@ void handleSlowTasks() {
         ipShown = true;
       }
     }
-  }
-  if (updateCheckPending && !updateCheckInProgress) {
-    updateCheckInProgress = true;
-    updateCheckPending = false;
-    performUpdateCheck();
-    updateCheckInProgress = false;
-    updateCheckLastRun = millis();
   }
 }
 
