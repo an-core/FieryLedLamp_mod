@@ -399,8 +399,8 @@ void changePower() {
 #endif
 
     systemShuttingDown = false;
-    effectsTick();
-    FastLED.show();
+   // effectsTick();
+   // FastLED.show();
 
   } // if (ONflag) { // включение
   else { // выключение
