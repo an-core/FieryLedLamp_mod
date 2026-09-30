@@ -91,7 +91,6 @@ enum LogLevel : uint8_t {
 
 // -------------------------------
 #if USE_MP3_PLAYER
-// Состояния автомата
 enum Mp3PlayState {
   MP3_PLAY_IDLE,
   MP3_PLAY_SEND_PAUSE,

@@ -37,7 +37,7 @@ void SetBrightness(uint8_t newBrightness) {
 #endif
   FastLED.setBrightness(finalBrightness);
 
-  // Сохранение новой яркости только, если лампа включена (или нет рассвета)
+  // сохранение новой яркости только, если лампа включена
 #if USE_DAWN
   if (dawnFlag != 1) {
 #endif
@@ -59,7 +59,7 @@ void SetBrightness(uint8_t newBrightness) {
 #endif
 } // void SetBrightness(uint8_t newBrightness)
 
-// Сохранение текущей яркости эффекта
+// сохранение текущей яркости эффекта
 void saveCurrentBrightness() {
   if (!ONflag) return;
   modes[currentMode].Brightness = FastLED.getBrightness();
@@ -72,7 +72,7 @@ void saveCurrentBrightness() {
   Eeprom::instance().EepromPut(modes);
 }
 
-// Загрузка и применение яркость для эффекта
+// загрузка и применение яркость для эффекта
 void loadBrightnessForMode(uint8_t mode) {
   if (mode >= MODE_AMOUNT) mode = 0;
 
@@ -178,6 +178,7 @@ void handleTimerPhases(bool &showClock, bool &showDate, bool &showWeather) {
 }
 
 // ------------------------------------------
+
 #if LED_PANEL
 void clearTextAreaOnly() {
   int y_start = textBaseY + textYOffset - 1;
@@ -197,6 +198,7 @@ void clearTextAreaOnly() {
 #endif
 
 // ------------------------------------------
+
 #if LED_PANEL
 void finishRunningText() {
   if (systemShuttingDown) return;
@@ -216,6 +218,7 @@ void finishRunningText() {
 #endif
 
 // ------------------------------------------
+
 // сброс таймера (часы, дата, погода)
 void resetTimerState() {
   if (systemShuttingDown) return;
@@ -229,6 +232,7 @@ void resetTimerState() {
 }
 
 // ------------------------------------------
+
 void led_panel(bool drawStringThisTick) {
 #if LED_PANEL
   if (!ONflag) {
@@ -316,9 +320,8 @@ void led_panel(bool drawStringThisTick) {
 #endif
     }
     else if (ONflag && Painting == 0 && isLampActive()) {
-      // effectsTick();
     }
-  }  // обычный режим
+  } // обычный режим
 
   // вывод на матрицу
   bool needShow = loadingFlag || anyTimerActive || (millis() - lastShow >= FRAME_MS);

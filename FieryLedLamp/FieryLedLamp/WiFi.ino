@@ -54,13 +54,17 @@ void Wifi::restartAP() {
 // ----------------------------------------------------------
 void Wifi::begin() {
   xTaskCreatePinnedToCore(
-    [](void* arg){ static_cast<Wifi*>(arg)->internetCheckTask(); },
-    "wifi_inet", 4096, this, 1, &internetCheckTaskHandle, 0);
+  [](void* arg) {
+    static_cast<Wifi*>(arg)->internetCheckTask();
+  },
+  "wifi_inet", 4096, this, 1, &internetCheckTaskHandle, 0);
 
   xTaskCreatePinnedToCore(
-    [](void* arg){ static_cast<Wifi*>(arg)->wifiManagerTask(); },
-    "wifi_mgr", 4096, this, 1, &wifiManagerTaskHandle, 0);
-    
+  [](void* arg) {
+    static_cast<Wifi*>(arg)->wifiManagerTask();
+  },
+  "wifi_mgr", 4096, this, 1, &wifiManagerTaskHandle, 0);
+
   static bool initialized = false;
   if (initialized) return;
   initialized = true;
@@ -196,7 +200,7 @@ void Wifi::loop() {
     }
   }
 
-    if (connected && (now - lastInternetCheck >= 10000UL)) {
+  if (connected && (now - lastInternetCheck >= 10000UL)) {
     lastInternetCheck = now;
     if (!internetCheckPending) {
       checkInternetAsync();
@@ -294,7 +298,6 @@ int32_t Wifi::getRSSI() const {
 }
 
 // ----------------------------------------------------------
-// WiFi.ino — заменить checkInternetAsync():
 void Wifi::checkInternetAsync() {
   if (internetCheckPending) return;
   if (WiFi.status() != WL_CONNECTED) {
@@ -427,7 +430,7 @@ void Wifi::wifiManagerTask() {
         vTaskDelay(pdMS_TO_TICKS(200));
         continue;
       }
-      
+
       vTaskDelay(pdMS_TO_TICKS(200));
     } else {
       vTaskDelay(pdMS_TO_TICKS(200));

@@ -25,7 +25,6 @@ static TFT_eSPI tft = TFT_eSPI();
 const uint32_t WEATHER_ERR_BLINK = 500;
 #endif
 
-// лимит размера стартовой картинки
 static const size_t MAX_JPG_SIZE = 256 * 1024; // 256 КБ
 
 static inline uint16_t tftColorFromId(uint8_t id) {
@@ -60,7 +59,6 @@ static inline void tftBacklightWrite(uint8_t val) {
 }
 
 // ----------------------------------------------------------------------------------------
-// состояние дисплея
 static TFT_View lastView = TFT_VIEW_DASH;
 static uint32_t lastDraw = 0;
 static int lastMinuteTFT = -1;
@@ -219,7 +217,7 @@ static void tftTickerTick() {
 }
 
 // ----------------------------------------------------------------------------------------
-// Отрисовка видов
+// отрисовка
 static void tftClear() {
   tft.fillScreen(TFT_BLACK);
 }
@@ -389,7 +387,6 @@ static void tftDrawIP(const char* ip) {
 }
 
 // ----------------------------------------------------------------------------------------
-// JPEG
 static bool tftJpgOutput(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t *bitmap) {
   if (!tftInited) return false;
   tft.pushImage(x, y, w, h, bitmap);
@@ -564,7 +561,7 @@ void TFT_Display_Timer(uint8_t argument) {
     tftColonState = !tftColonState;
   }
 
-  // Переключение "Часы / Погода / Дата"
+  // переключение "Часы / Погода / Дата"
   if (!tftShowEffect && !tftShowArg) {
 #if (USE_WEATHER == 0)
     if (inClockWeatherMode && DISPLAY_SWITCH_INTERVAL > 0) {
@@ -590,8 +587,7 @@ void TFT_Display_Timer(uint8_t argument) {
           attempts++;
           if (attempts > 3) break;
         } while (
-          (displayMode == DISP_MODE_DATE && !dateSwitchEnabled) ||
-          (displayMode == DISP_MODE_WEATHER && !weatherSwitchEnabled)
+          (displayMode == DISP_MODE_DATE && !dateSwitchEnabled) || (displayMode == DISP_MODE_WEATHER && !weatherSwitchEnabled)
         );
       }
 
@@ -601,8 +597,7 @@ void TFT_Display_Timer(uint8_t argument) {
           do {
             displayMode = (DisplayMode)((displayMode + 1) % 3);
           } while (
-            (displayMode == DISP_MODE_DATE && !dateSwitchEnabled) ||
-            (displayMode == DISP_MODE_WEATHER && !weatherSwitchEnabled)
+            (displayMode == DISP_MODE_DATE && !dateSwitchEnabled) || (displayMode == DISP_MODE_WEATHER && !weatherSwitchEnabled)
           );
           displaySwitchTimer = millis();
         }
