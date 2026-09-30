@@ -254,7 +254,7 @@ void performUpdateCheck() {
     return;
   }
 
-  DynamicJsonDocument doc(4096);
+  DynamicJsonDocument doc(24576);
   String resp;
   String buildDateTime = buildDateTimeString();
 
@@ -280,7 +280,7 @@ void performUpdateCheck() {
 
       if (httpCodeChangelog == HTTP_CODE_OK) {
         String content = httpChangelog.getString();
-        DynamicJsonDocument changelogJson(4096);
+        DynamicJsonDocument changelogJson(16384);
         DeserializationError error = deserializeJson(changelogJson, content);
 
         if (!error && changelogJson.containsKey("changes")) {
