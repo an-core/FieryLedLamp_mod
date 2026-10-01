@@ -156,63 +156,71 @@ static const uint8_t hueMask[8][16] PROGMEM = {
   {1 , 0 , 0 , 0 , 0 , 0 , 0 , 1 , 1 , 0 , 0 , 0 , 0 , 0 , 0 , 1 }
 };
 
-#define SPARKLES (1U)                   // вылетающие угольки вкл/выкл
-#define UNIVERSE_FIRE                   // универсальный огонь 2-в-1 Цветной+Белый
+uint8_t getMaskValue(const uint8_t mask[8][16], uint8_t y, uint8_t x, uint8_t fireHeight, uint8_t width) {
+  uint8_t maskY = (fireHeight > 1) ? ((uint16_t)y * 7) / (fireHeight - 1) : 0;
+  if (maskY > 7) maskY = 7;
+
+  uint8_t maskX = (width > 1) ? ((uint16_t)x * 15) / (width - 1) : 0;
+  if (maskX > 15) maskX = 15;
+
+  return pgm_read_byte(&mask[maskY][maskX]);
+}
+
+#define SPARKLES (1U)   // вылетающие угольки вкл/выкл
+#define UNIVERSE_FIRE   // универсальный огонь 2-в-1 Цветной+Белый
 
 void fireRoutine() {
+  bool isColored = (modes[currentMode].Scale < 100);
+
+  uint8_t fireHeight = matrixHeight / 2;
+  if (fireHeight < 2) fireHeight = 2;
+  if (fireHeight > matrixHeight) fireHeight = matrixHeight;
+  uint8_t sparkleStart = fireHeight;
+
   static uint16_t lastWidth = 0, lastHeight = 0;
   bool sizeChanged = (lastWidth != matrixWidth || lastHeight != matrixHeight);
 
-  if (sizeChanged) {
-    lastWidth = matrixWidth;
-    lastHeight = matrixHeight;
-    loadingFlag = true;
-  }
-
-  bool isColored = (modes[currentMode].Scale != 100);
-
-  if (loadingFlag) {
+  if (loadingFlag || sizeChanged || lastWidth == 0) {
     loadingFlag = false;
 
-    for (uint8_t x = 0; x < matrixWidth; x++) {
-      line[x] = random(127, 255);
-    }
+    if (sizeChanged || lastWidth == 0) {
+      lastWidth = matrixWidth;
+      lastHeight = matrixHeight;
 
-    if (sizeChanged) {
-      for (uint8_t y = 0; y < matrixHeight; y++) {
+      for (uint8_t x = 0; x < matrixWidth; x++) {
+        line[x] = random(127, 255);
+      }
+      for (uint8_t y = 0; y < fireHeight; y++) {
         for (uint8_t x = 0; x < matrixWidth; x++) {
           matrixValue[y][x] = 0;
         }
       }
+      for (uint8_t y = 0; y < matrixHeight; y++) {
+        shiftHue[y] = 0;
+        shiftValue[y] = 0;
+      }
+      pcnt = 0;
     }
-
-    for (uint8_t y = 0; y < matrixHeight; y++) {
-      shiftHue[y] = 0;
-      shiftValue[y] = 0;
-    }
-
-    pcnt = 0;
   }
 
-  uint8_t fireSpeed = map(modes[currentMode].Speed, 1, 255, 4, 30);
-  if (pcnt >= 100) {
-    shiftUp();
+  if (pcnt >= 30) {
+    shiftUp(fireHeight);
     generateLine();
     pcnt = 0;
   }
 
-  drawFrame(pcnt, isColored);
-  pcnt += fireSpeed;
+  drawFrame(pcnt, isColored, fireHeight, sparkleStart);
+  pcnt += 25;
 }
 
 void generateLine() {
   for (uint8_t x = 0; x < matrixWidth; x++) {
-    line[x] = random(64, 255);
+    line[x] = random(127, 255);
   }
 }
 
-void shiftUp() {
-  for (uint8_t y = matrixHeight - 1; y > 0; y--) {
+void shiftUp(uint8_t fireHeight) {
+  for (uint8_t y = fireHeight - 1; y > 0; y--) {
     for (uint8_t x = 0; x < matrixWidth; x++) {
       matrixValue[y][x] = matrixValue[y - 1][x];
     }
@@ -222,57 +230,75 @@ void shiftUp() {
   }
 }
 
-void drawFrame(uint8_t pcnt, bool isColored) {
-  uint8_t baseHue;
-  if (isColored) {
-    baseHue = (uint8_t)((float)(modes[currentMode].Scale - 1) * 2.6);
-  } else {
-    baseHue = 0;
-  }
-  uint8_t baseSat = isColored ? 255 : 0;
+void drawFrame(uint8_t pcnt, bool isColored, uint8_t fireHeight, uint8_t sparkleStart) {
+  int32_t nextv;
+  uint8_t baseHue = (float)(modes[currentMode].Scale - 1U) * 2.6;
+  uint8_t baseSat = (modes[currentMode].Scale < 100) ? 255U : 0U;
 
-  deltaHue = random(0, 2) ? constrain(shiftHue[0] + random(0, 2) - random(0, 2), 15, 17) : shiftHue[0];
+  // смещение для нижней строки
+  deltaHue = random(0U, 2U) ? constrain(shiftHue[0] + random(0U, 2U) - random(0U, 2U), 15U, 17U) : shiftHue[0];
   shiftHue[0] = deltaHue;
-  deltaValue = random(0, 3) ? constrain(shiftValue[0] + random(0, 2) - random(0, 2), 15, 17) : shiftValue[0];
+  deltaValue = random(0U, 3U) ? constrain(shiftValue[0] + random(0U, 2U) - random(0U, 2U), 15U, 17U) : shiftValue[0];
   shiftValue[0] = deltaValue;
 
+  // строка 0 - очаг (нижняя)
   for (uint8_t x = 0; x < matrixWidth; x++) {
-    uint8_t index = x % 16;
-    int32_t intensity = ((100 - pcnt) * matrixValue[0][x] + pcnt * line[x]) / 100.0
-                        - pgm_read_byte(&valueMask[0][(x + deltaValue) % 16]);
-    if (intensity < 0) intensity = 0;
-    CRGB color = CHSV(baseHue + pgm_read_byte(&hueMask[0][(x + deltaHue) % 16]), baseSat, (uint8_t)intensity);
-    drawPixelXY(x, 0, color);
+    nextv = ((100.0 - pcnt) * matrixValue[0][x] + pcnt * line[x]) / 100.0 - getMaskValue(valueMask, 0, x, fireHeight, matrixWidth);
+    CRGB color = CHSV(
+                   baseHue + getMaskValue(hueMask, 0, x, fireHeight, matrixWidth), baseSat, (uint8_t)max(0, nextv));
+    leds[XY(x, 0)] = color;
   }
 
-  for (uint8_t y = 1; y < matrixHeight; y++) {
+  // остальные строки огня
+  for (uint8_t y = fireHeight - 1; y > 0; y--) {
     deltaHue = shiftHue[y];
     shiftHue[y] = shiftHue[y - 1];
     deltaValue = shiftValue[y];
     shiftValue[y] = shiftValue[y - 1];
 
-    uint8_t maskY = map(y, 0, matrixHeight - 1, 0, 7);
+    for (uint8_t x = 0; x < matrixWidth; x++) {
+      nextv = ((100.0 - pcnt) * matrixValue[y][x] + pcnt * matrixValue[y - 1][x]) / 100.0 - getMaskValue(valueMask, y, x, fireHeight, matrixWidth);
+      CRGB color = CHSV(
+                     baseHue + getMaskValue(hueMask, y, x, fireHeight, matrixWidth), baseSat, (uint8_t)max(0, nextv));
+      leds[XY(x, y)] = color;
+    }
+  }
 
-    if (SPARKLES && y > matrixHeight / 2) {
+#if SPARKLES
+  if (sparkleStart < matrixHeight) {
+    // стирание строки искр
+    for (uint8_t y = sparkleStart + 1; y < matrixHeight; y++) {
       for (uint8_t x = 0; x < matrixWidth; x++) {
-        if (random(0, 20) == 0 && getPixColorXY(x, y - 1) != 0) {
-          uint8_t newX = (random(0, 4) ? x : (x + matrixWidth + random(0, 2) - random(0, 2)) % matrixWidth);
-          drawPixelXY(newX, y, getPixColorXY(x, y - 1));
-        } else {
-          drawPixelXY(x, y, 0);
+        uint8_t newX = (random(0, 4)) ? x : (x + matrixWidth + random(0U, 2U) - random(0U, 2U)) % matrixWidth;
+        uint32_t pix = getPixColorXY(x, y - 1);
+        if (pix > 0) {
+          CRGB spark = pix;
+          spark.fadeToBlackBy(64);
+          drawPixelXY(newX, y, spark);
         }
       }
-    } else {
+    }
+
+    // первая строка искр - из огня
+    for (uint8_t x = 0; x < matrixWidth; x++) {
+      if (random(0, 40) == 0 && getPixColorXY(x, sparkleStart - 1) != 0) {
+        CRGB spark = getPixColorXY(x, sparkleStart - 1);
+        spark.fadeToBlackBy(160); // приглушить на ~63%
+        drawPixelXY(x, sparkleStart, spark);
+      }
+    }
+
+    // остальные строки искр - движение вверх
+    for (uint8_t y = sparkleStart + 1; y < matrixHeight; y++) {
       for (uint8_t x = 0; x < matrixWidth; x++) {
-        uint8_t index = x % 16;
-        int32_t intensity = ((100 - pcnt) * matrixValue[y][x] + pcnt * matrixValue[y - 1][x]) / 100.0
-                            - pgm_read_byte(&valueMask[maskY][(x + deltaValue) % 16]);
-        if (intensity < 0) intensity = 0;
-        CRGB color = CHSV(baseHue + pgm_read_byte(&hueMask[maskY][(x + deltaHue) % 16]), baseSat, (uint8_t)intensity);
-        drawPixelXY(x, y, color);
+        uint8_t newX = (random(0, 4)) ? x : (x + matrixWidth + random(0U, 2U) - random(0U, 2U)) % matrixWidth;
+        if (getPixColorXY(x, y - 1) > 0) {
+          drawPixelXY(newX, y, getPixColorXY(x, y - 1));
+        }
       }
     }
   }
+#endif
 }
 
 // ======================================================================== ОГОНЬ 2012 ================================================================
