@@ -2282,27 +2282,20 @@ void User_settings() {
 
   // Точка доступа
   HTTP.on("/ssidap", HTTP_GET, []() {
-    String newSSID = HTTP.arg("ssidAP");
-    String newPass = HTTP.arg("passwordAP");
+  String newSSID = HTTP.arg("ssidAP");
+  String newPass = HTTP.arg("passwordAP");
+  if (newSSID.length() == 0) newSSID = jsonRead(configWiFi, "ssidAP");
+  if (newPass.length() == 0) newPass = jsonRead(configWiFi, "passwordAP");
 
-    // если параметры пустые - не трогать текущие
-    if (newSSID.length() == 0) {
-      newSSID = jsonRead(configWiFi, "ssidAP");
-    }
-    if (newPass.length() == 0) {
-      newPass = jsonRead(configWiFi, "passwordAP");
-    }
+  jsonWrite(configWiFi, "ssidAP", newSSID);
+  jsonWrite(configWiFi, "passwordAP", newPass);
+  saveConfig();
 
-    jsonWrite(configWiFi, "ssidAP", newSSID);
-    jsonWrite(configWiFi, "passwordAP", newPass);
-    saveConfig();
+  Wifi::instance().setAPSettings(newSSID, newPass);
+  Wifi::instance().requestRestartAP();
 
-    // применение настроек и перезапуск AP
-    Wifi::instance().setAPSettings(newSSID, newPass);
-    Wifi::instance().restartAP();
-
-    HTTP.send(200, "text/plain", "OK");
-  });
+  HTTP.send(200, "text/plain", "OK");
+});
 
 } // User_settings()
 
@@ -2363,7 +2356,7 @@ void handle_wifi_check_interval() {
   }
 
   uint32_t interval = HTTP.arg("interval").toInt();
-  interval = constrain(interval, 60, 3600); // от 1 до 60 минут
+  interval = constrain(interval, 1, 30); // минуты
   Wifi::instance().setCheckInterval(interval);
 
   jsonWrite(configWiFi, "wifi_check_interval", String(interval));
@@ -2414,7 +2407,7 @@ void handle_save_wifi() {
     int checkInterval = HTTP.arg("wifi_check_interval").toInt();
     checkInterval = constrain(checkInterval, 1, 30);
     jsonWrite(configWiFi, "wifi_check_interval", checkInterval);
-    Wifi::instance().setCheckInterval(checkInterval * 60);
+    Wifi::instance().setCheckInterval(checkInterval);
   }
 
   if (HTTP.hasArg("wifi_multi")) {

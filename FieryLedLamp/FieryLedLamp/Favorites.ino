@@ -62,12 +62,15 @@ bool Favorites::HandleFavorites(
   bool* ONflag,
   uint8_t* currentMode,
   bool* loadingFlag,
+  
 #if USE_DAWN
   uint8_t* dawnFlag,
 #endif
+
 #if USE_SUNSET
   uint8_t* sunsetFlag,
 #endif
+
   uint8_t* random_on,
   uint8_t* selectedSettings,
   char* udpBuffer
@@ -264,6 +267,7 @@ uint8_t Favorites::getNextFavoriteMode(uint8_t* currentMode) {
   }
   return eff_num_correct[result];
 } // uint8_t Favorites::getNextFavoriteMode(uint8_t* currentMode)
+
 #endif // USE_SHUFFLE_FAVORITES
 
 uint32_t Favorites::getNextTime() {

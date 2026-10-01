@@ -59,6 +59,8 @@ void SetBrightness(uint8_t newBrightness) {
 #endif
 } // void SetBrightness(uint8_t newBrightness)
 
+// --------------------------------------------------------------------
+
 // сохранение текущей яркости эффекта
 void saveCurrentBrightness() {
   if (!ONflag) return;
@@ -71,6 +73,8 @@ void saveCurrentBrightness() {
 
   Eeprom::instance().EepromPut(modes);
 }
+
+// --------------------------------------------------------------------
 
 // загрузка и применение яркость для эффекта
 void loadBrightnessForMode(uint8_t mode) {

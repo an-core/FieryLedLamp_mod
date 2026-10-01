@@ -1,4 +1,4 @@
-// **************************************************************************** wifi.h *******************************************************************
+// **************************************************************************** WiFi.h ******************************************************************
 
 #pragma once
 #include <WiFi.h>
@@ -26,6 +26,10 @@ class Wifi {
     void setAPAlways(bool enable);
     bool isAPAlways() const {
       return apAlways;
+    }
+
+    void requestRestartAP() {
+      needRestartAP = true;
     }
 
     void setStaticIP(const IPAddress& ip, const IPAddress& gw, const IPAddress& subnet, const IPAddress& dns = IPAddress(8, 8, 8, 8));
@@ -64,13 +68,18 @@ class Wifi {
 
     void wifiManagerTask();
     TaskHandle_t wifiManagerTaskHandle = nullptr;
-    volatile bool wifiRunActive = false;
-    
+
     void internetCheckTask();
     TaskHandle_t internetCheckTaskHandle = nullptr;
+
     volatile bool internetCheckRequest = false;
     volatile bool internetCheckDone = false;
     volatile bool internetCheckResultFlag = false;
+
+    volatile bool wifiRunActive = false;
+    volatile bool needRestartAP = false;
+    volatile bool needSetAPAlways = false;
+    volatile bool apAlwaysNewValue = false;
 
     void initAP();
     void initSTA();

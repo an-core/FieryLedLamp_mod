@@ -1,7 +1,10 @@
+// **************************************************************************** WiFi.ino ****************************************************************
+
 #include "WiFi.h"
 #include "SystemLog.h"
 #include <WiFiClient.h>
 #include <nvs_flash.h>
+// ----------------------
 
 Wifi::Wifi()
   : staState(STA_IDLE)
@@ -32,6 +35,7 @@ Wifi::Wifi()
 Wifi::~Wifi() {}
 
 // -------------------------------------------------------------------
+
 void Wifi::setAPSettings(const String& ssid, const String& password) {
   apSSID = ssid;
   apPassword = password;
@@ -39,6 +43,8 @@ void Wifi::setAPSettings(const String& ssid, const String& password) {
   SYSLOG.add("Настройки AP обновлены: SSID=%s", apSSID.c_str());
 #endif
 }
+
+// ----------------------------------------------------------
 
 void Wifi::restartAP() {
 #if WIFI_LOG
@@ -52,6 +58,7 @@ void Wifi::restartAP() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::begin() {
   xTaskCreatePinnedToCore(
   [](void* arg) {
@@ -173,6 +180,7 @@ void Wifi::begin() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::loop() {
   if (WiFi.status() == WL_CONNECTED && !connected) {
     connected = true;
@@ -189,7 +197,7 @@ void Wifi::loop() {
   manageConnection();
 
   if (!apActive && !forcedAPActive && !connectInProgress) {
-    if (now - lastQuickCheck >= 5000UL) {
+    if (now - lastQuickCheck >= reconnectIntervalMs) {
       lastQuickCheck = now;
       if (WiFi.status() != WL_CONNECTED) {
 #if WIFI_LOG
@@ -213,7 +221,7 @@ void Wifi::loop() {
   }
 
   if ((apActive || forcedAPActive) && !connectInProgress && !connected && hasAnyNetworks()) {
-    if (now - lastReconnectAttempt >= reconnectIntervalMs) {
+    if (now - lastReconnectAttempt >= checkIntervalMs) {
       lastReconnectAttempt = now;
       initSTA();
     }
@@ -243,30 +251,18 @@ void Wifi::loop() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::setAPAlways(bool enable) {
   apAlways = enable;
   jsonWrite(configWiFi, "ap_always", enable ? "1" : "0");
   saveConfig();
 
-  if (enable) {
-    if (WiFi.getMode() == WIFI_STA) {
-      WiFi.mode(WIFI_AP_STA);
-      initAP();
-    } else if (!apActive) {
-      initAP();
-    }
-  } else {
-    if (apActive && !forcedAPActive) {
-      WiFi.softAPdisconnect(true);
-      apActive = false;
-      if (WiFi.getMode() == WIFI_AP_STA) {
-        WiFi.mode(WIFI_STA);
-      }
-    }
-  }
+  needSetAPAlways = true;
+  apAlwaysNewValue = enable;
 }
 
 // ----------------------------------------------------------
+
 void Wifi::ensureAP() {
   if (!apActive && !forcedAPActive && !isConnected()) {
 #if WIFI_LOG
@@ -277,6 +273,7 @@ void Wifi::ensureAP() {
 }
 
 // ----------------------------------------------------------
+
 bool Wifi::isConnected() const {
   return connected && (WiFi.status() == WL_CONNECTED);
 }
@@ -298,6 +295,7 @@ int32_t Wifi::getRSSI() const {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::checkInternetAsync() {
   if (internetCheckPending) return;
   if (WiFi.status() != WL_CONNECTED) {
@@ -307,6 +305,8 @@ void Wifi::checkInternetAsync() {
   internetCheckPending = true;
   internetCheckRequest = true;
 }
+
+// ----------------------------------------------------------
 
 void Wifi::internetCheckTask() {
   esp_task_wdt_delete(NULL);
@@ -330,6 +330,8 @@ void Wifi::internetCheckTask() {
   }
 }
 
+// ----------------------------------------------------------
+
 void Wifi::onInternetCheckResult(bool has) {
   internetAvailable = has;
   internetCheckPending = false;
@@ -348,6 +350,7 @@ void Wifi::onInternetCheckResult(bool has) {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::initAP() {
   if (apActive) {
 #if WIFI_LOG
@@ -390,6 +393,7 @@ void Wifi::initAP() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::initSTA() {
   if (connectInProgress) return;
   if (networkCount == 0) return;
@@ -410,10 +414,43 @@ IPAddress Wifi::getCurrentIP() const {
   return WiFi.softAPIP();
 }
 
+// ----------------------------------------------------------
+
 void Wifi::wifiManagerTask() {
   esp_task_wdt_delete(NULL);
 
   for (;;) {
+    if (needRestartAP) {
+      needRestartAP = false;
+      restartAP();
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
+    }
+
+    if (needSetAPAlways) {
+      needSetAPAlways = false;
+      bool enable = apAlwaysNewValue;
+
+      if (enable) {
+        if (WiFi.getMode() == WIFI_STA) {
+          WiFi.mode(WIFI_AP_STA);
+          initAP();
+        } else if (!apActive) {
+          initAP();
+        }
+      } else {
+        if (apActive && !forcedAPActive) {
+          WiFi.softAPdisconnect(true);
+          apActive = false;
+          if (WiFi.getMode() == WIFI_AP_STA) {
+            WiFi.mode(WIFI_STA);
+          }
+        }
+      }
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
+    }
+
     if (wifiRunActive) {
       wl_status_t status = (wl_status_t)wifiMulti.run();
 
@@ -437,6 +474,8 @@ void Wifi::wifiManagerTask() {
     }
   }
 }
+
+// ----------------------------------------------------------
 
 void Wifi::manageConnection() {
   if (WiFi.status() == WL_CONNECTED && !connected) {
@@ -469,6 +508,7 @@ void Wifi::manageConnection() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::forceReconnect() {
 #if WIFI_LOG
   SYSLOG.add("Принудительное переподключение WiFi");
@@ -483,6 +523,7 @@ void Wifi::forceReconnect() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::startForcedAP() {
   if (apActive) {
 #if WIFI_LOG
@@ -506,6 +547,8 @@ void Wifi::startForcedAP() {
   SYSLOG.add("Принудительный AP активирован");
 #endif
 }
+
+// ----------------------------------------------------------
 
 void Wifi::stopForcedAP() {
   if (!forcedAPActive) return;
@@ -534,6 +577,7 @@ void Wifi::stopForcedAP() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::clearWiFiCache() {
 #if WIFI_LOG
   SYSLOG.add("Очистка кэша WiFi...");
@@ -548,6 +592,8 @@ void Wifi::clearWiFiCache() {
   SYSLOG.add("Кэш WiFi очищен");
 #endif
 }
+
+// ----------------------------------------------------------
 
 bool Wifi::hasAnyNetworks() {
   String main_ssid = jsonRead(configWiFi, "ssid");
@@ -565,6 +611,7 @@ bool Wifi::hasAnyNetworks() {
 }
 
 // ----------------------------------------------------------
+
 void Wifi::setStaticIP(const IPAddress& ip, const IPAddress& gw, const IPAddress& subnet, const IPAddress& dns) {
   useStaticIP = true;
   staticIP = ip; gateway = gw; this->subnet = subnet; dns1 = dns;
@@ -576,19 +623,27 @@ void Wifi::setStaticIP(const IPAddress& ip, const IPAddress& gw, const IPAddress
   saveConfig();
 }
 
+// ----------------------------------------------------------
+
 void Wifi::disableStaticIP() {
   useStaticIP = false;
   jsonWrite(configWiFi, "s_IP", "0");
   saveConfig();
 }
 
+// ----------------------------------------------------------
+
 void Wifi::addNetwork(const char* ssid, const char* password) {
   wifiMulti.addAP(ssid, password);
 }
 
+// ----------------------------------------------------------
+
 void Wifi::clearNetworks() {
   wifiMulti = WiFiMulti();
 }
+
+// ----------------------------------------------------------
 
 void Wifi::setWiFiTimeout(uint32_t timeoutSec) {
   wifiTimeoutMs = timeoutSec * 1000UL;
@@ -596,28 +651,40 @@ void Wifi::setWiFiTimeout(uint32_t timeoutSec) {
   saveConfig();
 }
 
+// ----------------------------------------------------------
+
 void Wifi::setReconnectInterval(uint32_t intervalSec) {
   reconnectIntervalMs = intervalSec * 1000UL;
   jsonWrite(configWiFi, "wifi_reconnect_interval", intervalSec);
   saveConfig();
 }
 
-void Wifi::setCheckInterval(uint32_t intervalSec) {
-  checkIntervalMs = intervalSec * 1000UL;
-  jsonWrite(configWiFi, "wifi_check_interval", intervalSec);
+// ----------------------------------------------------------
+
+void Wifi::setCheckInterval(uint32_t intervalMin) {
+  checkIntervalMs = intervalMin * 60UL * 1000UL;
+  jsonWrite(configWiFi, "wifi_check_interval", intervalMin);
   saveConfig();
 }
 
-void Wifi::setForcedAPTimeout(uint32_t timeoutSec) {
-  forcedApTimeoutMs = timeoutSec * 1000UL;
-  jsonWrite(configWiFi, "forced_ap_after", timeoutSec);
+// ----------------------------------------------------------
+
+void Wifi::setForcedAPTimeout(uint32_t timeoutMin) {
+  forcedApTimeoutMs = timeoutMin * 60UL * 1000UL;
+  jsonWrite(configWiFi, "forced_ap_after", timeoutMin);
   saveConfig();
 }
+
+// ----------------------------------------------------------
 
 void Wifi::reconnect() {
   forceReconnect();
 }
 
+// ----------------------------------------------------------
+
 bool Wifi::hasInternet() {
   return internetAvailable;
 }
+
+// ******************************************************************************************************************************************************

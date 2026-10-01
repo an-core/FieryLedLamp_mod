@@ -337,7 +337,6 @@ bool sdEnabled = false;
 uint8_t sdType = 0;
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 // WI-FI
-volatile bool wifiRunActive = false;
 String configWiFi;                               // Конфиг настроек WiFi (config_wifi.json)
 String AP_NAME = "";                             // Имя точки доступа
 String AP_PASS = "";                             // Пароль точки доступа
@@ -916,6 +915,10 @@ void setup() {
 #endif
 // -------------------------------------------------------------------
   Time::instance(); // Инициализация времени
+  String saved_tz = jsonRead(configSetup, "tz");
+  saved_tz.trim();
+  if (saved_tz.length() == 0 || saved_tz == "auto") saved_tz = "MSK-3";
+  myTime.tzsetup(saved_tz.c_str());
   Wifi::instance().begin(); // Инициализация WiFi
   xTaskCreatePinnedToCore(updateCheckTask, "updchk", 8192, NULL, 1, NULL, 0);
 // -------------------------------------------------------------------
