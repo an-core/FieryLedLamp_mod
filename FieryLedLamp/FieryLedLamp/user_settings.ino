@@ -3557,8 +3557,6 @@ void handle_eff_sel() {
   loadingFlag = true;
   effTimer = millis() - 1000;
   effectsTick();
-  effTimer = millis() - 1000;
-  effectsTick();
   FastLED.show();
 
   if (random_on && Favorites::instance().FavoritesRunning) {
