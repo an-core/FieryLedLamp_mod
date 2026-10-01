@@ -2248,9 +2248,16 @@ void User_settings() {
   HTTP.on("/wifi_reconnect_interval", handle_wifi_reconnect_interval);
   HTTP.on("/wifi_check_interval", handle_wifi_check_interval);
   HTTP.on("/ap_always", handle_ap_always); // Чекбокс "Показывать точку доступа"
+  HTTP.on("/res_to_def", handle_reset_to_default);
   HTTP.on("/reset_to_default", handle_reset_to_default);
   HTTP.on("/s_IP", handle_use_static_ip);
   HTTP.on("/set_ip", handle_set_static_ip);
+  
+  HTTP.on("/restart", HTTP_GET, []() {
+    HTTP.send(200, "text/plain", "OK");
+    delay(500);
+    ESP.restart();
+  });
 
   HTTP.on("/display_ip", HTTP_GET, []() {  // Чекбокс "Показывать IP адрес при старте"
     int value = HTTP.arg("value").toInt();
@@ -2275,9 +2282,25 @@ void User_settings() {
 
   // Точка доступа
   HTTP.on("/ssidap", HTTP_GET, []() {
-    jsonWrite(configWiFi, "ssidAP", HTTP.arg("ssidAP"));
-    jsonWrite(configWiFi, "passwordAP", HTTP.arg("passwordAP"));
+    String newSSID = HTTP.arg("ssidAP");
+    String newPass = HTTP.arg("passwordAP");
+
+    // если параметры пустые - не трогать текущие
+    if (newSSID.length() == 0) {
+      newSSID = jsonRead(configWiFi, "ssidAP");
+    }
+    if (newPass.length() == 0) {
+      newPass = jsonRead(configWiFi, "passwordAP");
+    }
+
+    jsonWrite(configWiFi, "ssidAP", newSSID);
+    jsonWrite(configWiFi, "passwordAP", newPass);
     saveConfig();
+
+    // применение настроек и перезапуск AP
+    Wifi::instance().setAPSettings(newSSID, newPass);
+    Wifi::instance().restartAP();
+
     HTTP.send(200, "text/plain", "OK");
   });
 
@@ -2412,18 +2435,17 @@ void handle_save_wifi() {
   delay(500);
   ESP.restart();
 
-  HTTP.send(200, "text/plain", "OK");
+ // HTTP.send(200, "text/plain", "OK");
 }
 
 void handle_use_static_ip() {
   bool enable = (HTTP.arg("s_IP").toInt() == 1);
   jsonWrite(configWiFi, "s_IP", enable ? "1" : "0");
   saveConfig();
+
   HTTP.send(200, "text/plain", "OK_REBOOT");
   delay(500);
   ESP.restart();
-  Wifi::instance().begin();
-  HTTP.send(200, "text/plain", "OK");
 }
 
 void handle_set_static_ip() {
