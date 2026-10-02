@@ -1,4 +1,5 @@
-## Модифицированная прошивка FieryLedLamp с поддержкой эффектов jinx (.out) на внешней SD-карте! Платформы: ESP32 / ESP32-S3.
+## Модифицированная прошивка FieryLedLamp с поддержкой эффектов jinx (.out) на внешней SD-карте!
+# Платформы: ESP32 / ESP32-S3!
 
 <p align="center">
 <img width="1248" height="832" alt="FieryLedLamp" src="https://github.com/user-attachments/assets/7505feff-03ec-4d2f-bef0-c6a335407d3f" />
