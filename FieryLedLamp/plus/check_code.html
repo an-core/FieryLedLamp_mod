@@ -964,31 +964,40 @@
     }
 
     function validateJavaScript(text) {
-        const errors = [];
-        try {
-            new Function('"use strict";\n' + text);
-            errors.push({
-                line: 0,
-                column: 0,
-                message: 'JavaScript-синтаксис корректен',
-                severity: 'info'
+    const errors = [];
+    try {
+        if (typeof acorn !== 'undefined') {
+            acorn.parse(text, {
+                ecmaVersion: 'latest',
+                sourceType: 'module',
+                allowAwaitOutsideFunction: true,
+                allowReturnOutsideFunction: false,
+                locations: true,
             });
-        } catch (e) {
-            let line = 1,
-                col = 1;
+        } else {
+            new Function('"use strict";\n' + text);
+        }
+        errors.push({ line: 0, column: 0, message: 'JavaScript-синтаксис корректен', severity: 'info' });
+    } catch (e) {
+        let line = 1, col = 1;
+        if (e.loc && typeof e.loc.line === 'number') {
+            line = e.loc.line;
+            col = e.loc.column + 1;
+        } else {
             const match = e.message.match(/line (\d+)/i);
             if (match) line = parseInt(match[1]);
             const matchCol = e.message.match(/column (\d+)/i);
             if (matchCol) col = parseInt(matchCol[1]);
-            errors.push({
-                line: line,
-                column: col,
-                message: 'Ошибка JavaScript: ' + e.message.replace(/^[^:]+:\s*/, ''),
-                severity: 'error'
-            });
         }
-        return errors;
+        errors.push({
+            line: line,
+            column: col,
+            message: 'Ошибка JavaScript: ' + e.message.replace(/^[^:]+:\s*/, ''),
+            severity: 'error'
+        });
     }
+    return errors;
+}
 
     function validateJSON(text) {
         const errors = [];
