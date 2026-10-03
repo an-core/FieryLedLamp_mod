@@ -4,7 +4,7 @@
 #include <esp_sntp.h>
 // -------------------------
 
-static constexpr const char* NTP_SERVER_PRIMARY  = "pool.ntp.org";
+static constexpr const char* NTP_SERVER_PRIMARY = "pool.ntp.org";
 static constexpr const char* NTP_SERVER_SECONDARY = "time.nist.gov";
 static constexpr const char* NTP_SERVER_GOOGLE = "time.google.com";
 

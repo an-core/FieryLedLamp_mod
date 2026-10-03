@@ -22,12 +22,15 @@ class Favorites {
       bool* ONflag,
       uint8_t* currentMode,
       bool* loadingFlag,
+      
 #if USE_DAWN
       uint8_t* dawnFlag,
 #endif
+
 #if USE_SUNSET
       uint8_t* sunsetFlag,
 #endif
+
       uint8_t* random_on,
       uint8_t* selectedSettings,
       char* udpBuffer
@@ -64,6 +67,7 @@ class Favorites {
     uint8_t shuffleFavoriteModes[MODE_AMOUNT];
     uint8_t shuffleCurrentIndex = MODE_AMOUNT;
 #endif
+
 }; // class Favorites
 
 // *******************************************************************************************************************************************************

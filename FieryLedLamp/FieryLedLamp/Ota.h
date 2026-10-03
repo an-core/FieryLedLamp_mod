@@ -17,11 +17,15 @@ class Ota {
       static Ota instance;
       return instance;
     }
-
+    
+// ---------------------------------------------------------
+   
     void setWarningDelegate(ShowWarningDelegate delegate) {
       showWarningDelegate = delegate;
     }
-
+    
+// ---------------------------------------------------------
+   
     bool RequestOtaUpdate() {
       if (!Wifi::instance().isConnected()) return false;
       if (otaFlag == OtaPhase::None) {
@@ -40,7 +44,9 @@ class Ota {
       }
       return false;
     }
-
+    
+// ---------------------------------------------------------
+   
     void HandleOtaUpdate() {
       if (otaFlag == OtaPhase::None && momentOfOtaStart != 0 && millis() - momentOfOtaStart >= ESP_CONF_TIMEOUT * 1000UL) {
         if (showWarningDelegate != nullptr) showWarningDelegate(CRGB::Red, 2000U, 500U);
@@ -68,13 +74,16 @@ class Ota {
       } else {
         uploadStartTime = 0;
       }
-
     }
-
+    
+// ---------------------------------------------------------
+    
     bool isOtaActive() const {
       return (otaFlag == OtaPhase::InProgress);
     }
-
+    
+// ---------------------------------------------------------
+    
     void abortOta() {
       if (isOtaActive()) {
         otaFlag = OtaPhase::None;
@@ -82,7 +91,9 @@ class Ota {
         if (showWarningDelegate != nullptr) showWarningDelegate(CRGB::Red, 1000U, 250U);
       }
     }
-
+    
+// ---------------------------------------------------------
+  
   private:
     Ota() = default;
     ~Ota() = default;
@@ -104,7 +115,9 @@ class Ota {
 #endif
       return false;
     }
-
+    
+// ---------------------------------------------------------
+    
     void prepareForOTA() {
       if (nightClockEnabled) {
         jsonWrite(configLedPanel, "night_clock_enabled", "1");
@@ -136,7 +149,7 @@ class Ota {
       saveConfig();
       delay(100);
     }
-
+// ---------------------------------------------------------
     void startOtaUpdate() {
       if (!Wifi::instance().isConnected()) {
         otaFlag = OtaPhase::None;
@@ -181,7 +194,9 @@ class Ota {
       ArduinoOTA.begin();
       otaFlag = OtaPhase::InProgress;
     }
+    
 }; // class Ota
+
 #endif // USE_OTA
 
 // ******************************************************************************************************************************************************

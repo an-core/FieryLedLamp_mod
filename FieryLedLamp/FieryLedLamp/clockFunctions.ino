@@ -29,6 +29,7 @@ bool isValidPosixFormat(const String& tz) {
 }
 
 // -----------------------------------------
+
 String ianaToPosix(const String& iana) {
   if (iana == "Europe/Moscow" || iana == "Europe/Volgograd" || iana == "Europe/Simferopol" || iana == "Europe/Minsk" || iana == "Europe/Kirov") {
     return "MSK-3";
@@ -49,6 +50,7 @@ String ianaToPosix(const String& iana) {
 }
 
 // -----------------------------------------
+
 // получение информации о текущем часовом поясе
 String getTimezoneInfo() {
   DynamicJsonDocument doc(512);
@@ -65,6 +67,7 @@ String getTimezoneInfo() {
   doc["auto_detected"] = autoDetectedTz;
 
 // -----------------------------------------
+
   String displayName = currentTz;
   if (isCustom && customTz.length() > 0) {
     displayName = customTz + " (пользовательский)";
@@ -104,6 +107,7 @@ String getTimezoneInfo() {
 }
 
 // -----------------------------------------
+
 // преобразование русского названия города в POSIX
 String russianCityToPosix(String city) {
   city.trim();
@@ -165,7 +169,6 @@ String russianCityToPosix(String city) {
   if (city == "Оренбург") return "MSK-3_Orenburg";
   if (city == "Пенза") return "MSK-3_Penza";
   if (city == "Ульяновск") return "MSK-3_Ulyanovsk";
-
   if (city == "Зеленодольск") return "MSK-3_Zelenodolsk";
   if (city == "Подольск") return "MSK-3_Podolsk";
   if (city == "Люберцы") return "MSK-3_Lubertsy";
@@ -196,50 +199,39 @@ String russianCityToPosix(String city) {
   if (city == "Наро-Фоминск") return "MSK-3_NaroFominsk";
   if (city == "Клин") return "MSK-3_Klin";
   if (city == "Красногорск") return "MSK-3_Krasnogorsk";
-
   if (city == "Калининград") return "EET-2";
-
   if (city == "Самара") return "SAMT-4";
   if (city == "Астрахань") return "SAMT-4_Astrakhan";
   if (city == "Саратов") return "SAMT-4_Saratov";
   if (city == "Тольятти") return "SAMT-4_Tolyatti";
-
   if (city == "Екатеринбург") return "YEKT-5";
   if (city == "Челябинск") return "YEKT-5_Chelyabinsk";
   if (city == "Пермь") return "YEKT-5_Perm";
   if (city == "Уфа") return "YEKT-5_Ufa";
   if (city == "Курган") return "YEKT-5_Kurgan";
   if (city == "Тюмень") return "YEKT-5_Tyumen";
-
   if (city == "Омск") return "OMST-6";
-
   if (city == "Красноярск") return "KRAT-7";
   if (city == "Новосибирск") return "KRAT-7_Novosibirsk";
   if (city == "Томск") return "KRAT-7_Tomsk";
   if (city == "Барнаул") return "KRAT-7_Barnaul";
   if (city == "Кемерово") return "KRAT-7_Kemerovo";
   if (city == "Новокузнецк") return "KRAT-7_Novokuznetsk";
-
   if (city == "Иркутск") return "IRKT-8";
   if (city == "Улан-Удэ") return "IRKT-8_UlanUde";
-
   if (city == "Якутск") return "YAKT-9";
   if (city == "Чита") return "YAKT-9_Chita";
   if (city == "Благовещенск") return "YAKT-9_Blagoveshchensk";
-
   if (city == "Владивосток") return "VLAT-10";
   if (city == "Хабаровск") return "VLAT-10_Khabarovsk";
   if (city == "Уссурийск") return "VLAT-10_Ussuriysk";
   if (city == "Комсомольск-на-Амуре") return "VLAT-10_Komsomolsk";
-
   if (city == "Магадан") return "MAGT-11";
   if (city == "Сахалин") return "MAGT-11_Sakhalin";
   if (city == "Южно-Сахалинск") return "MAGT-11_YuzhnoSakhalinsk";
-
   if (city == "Камчатка") return "PETT-12";
   if (city == "Анадырь") return "PETT-12_Anadyr";
   if (city == "Петропавловск-Камчатский") return "PETT-12_Petropavlovsk";
-
   if (city == "Алматы") return "ALMT-5";
   if (city == "Астана") return "ALMT-5_Astana";
   if (city == "Караганда") return "ALMT-5_Karaganda";
@@ -292,6 +284,7 @@ String russianCityToPosix(String city) {
 }
 
 // -----------------------------------------
+
 // установка ручного часового пояса
 bool setCustomTimezone(String customTz) {
   customTz.trim();
@@ -329,6 +322,7 @@ bool setCustomTimezone(String customTz) {
 }
 
 // -----------------------------------------
+
 // автоопределение часового пояса по IP
 void autoDetectTimezone() {
   if (!Wifi::instance().isConnected()) {
@@ -393,6 +387,7 @@ void autoDetectTimezone() {
 }
 
 // -----------------------------------------
+
 void initTimeAndTimezone() {
   static uint32_t lastSyncAttempt = 0;
   static bool firstRun = true;

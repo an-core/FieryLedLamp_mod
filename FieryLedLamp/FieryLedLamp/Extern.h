@@ -7,7 +7,6 @@
 #include "IRManager.h"
 // ---------------------
 
-extern volatile bool wifiRunActive;
 extern bool displayIpAtStart;
 extern bool sd_card_present;
 extern uint8_t effSdIndex;

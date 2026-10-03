@@ -694,26 +694,27 @@ void printTime(bool onDemand) {
   bool needPrint = false;
   bool needAnnounce = false;
 
+  uint8_t currentMinute = 0;   // <-- объявляем заранее
+  uint8_t currentHour = 0;     // <-- объявляем заранее
+
   if (onDemand) {
     needPrint = true;
     needAnnounce = true;
   } else if (PRINT_TIME > 0) {
     time_t t = getCurrentLocalTime();
     struct tm *ti = localtime(&t);
-    uint8_t currentMinute = ti->tm_min;
-    uint8_t currentHour = ti->tm_hour;
+    currentMinute = ti->tm_min;
+    currentHour = ti->tm_hour;
 
     if (PRINT_TIME >= 60) {
       if (currentMinute == 0 && lastHourChecked != currentHour) {
         needPrint = true;
         needAnnounce = true;
-        lastHourChecked = currentHour;
       }
     } else {
       if (currentMinute % PRINT_TIME == 0 && lastMinuteChecked != currentMinute) {
         needPrint = true;
         needAnnounce = true;
-        lastMinuteChecked = currentMinute;
       }
     }
   } else {
@@ -722,11 +723,12 @@ void printTime(bool onDemand) {
   }
 
 #if USE_MP3_PLAYER
-  if (needAnnounce && mp3_player_connect == 4 && eff_sound_on && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
-    if (timeAnnounceEnabled && ((day_advert_sound_on && day_night) || (night_advert_sound_on && !day_night))) {
-      previous_folder = mp3_folder;
-      mp3_pending_time_advert = true;
-    }
+  if (needAnnounce && mp3_player_connect >= 4 && timeAnnounceEnabled && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag && !advert_flag && !weather_advert_flag) {
+    previous_folder = mp3_folder;
+    mp3_pending_time_advert = true;
+    mp3_pending_time_force = false;
+    lastMinuteChecked = currentMinute;
+    lastHourChecked = currentHour;
   }
 #endif
 

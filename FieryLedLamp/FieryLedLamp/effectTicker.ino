@@ -418,7 +418,7 @@ void changePower() {
     manualOverrideUntil = millis() + 300000UL;
 
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4) {
+    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       mp3_send_command_nowait(0x0E, 0, 0, 0);
       mp3_stop = true;
       pause_on = true;

@@ -23,7 +23,7 @@ static void displayDate() {
     buf[3] = display.encodeDigit(month);
   } else {
     // месяц 10, 11, 12 - не влезает в 4 разряда с тире
-    // вариант: показать 25-1 (первая цифра месяца) или переключиться на формат без тире
+    // вариант: показать 25-1 (первая цифра месяца)
     buf[3] = display.encodeDigit(month / 10);  // покажет 25-1 для 10-12
   }
 
@@ -131,7 +131,7 @@ void Display_Timer(uint8_t argument) {
   }
 
 #if USE_MP3_PLAYER && USE_TM1637
-  // Отображение номера папки только если и MP3, и TM1637 включены в прошивку
+  // отображение номера папки только если и MP3, и TM1637 включены в прошивку
   if (mp3Enabled && tm1637Enabled) {
     if (DisplayFlag == 0 && LastCurrentFolder != CurrentFolder) {
       LastCurrentFolder = CurrentFolder;

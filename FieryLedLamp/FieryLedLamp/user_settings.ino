@@ -10,7 +10,7 @@
 // ==================================================================== РЕГИСТРАЦИЯ МАРШРУТОВ =========================================================
 void User_settings() {
 
-// ----------------------------------------------------------------------------------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
   HTTP.on("/get_settings", HTTP_GET, []() {
     DynamicJsonDocument doc(4096);
@@ -97,14 +97,14 @@ void User_settings() {
     }
   });
 
-// ----------------------------------------------------------------------------------------------------------------------------------------------------
- 
+  // ----------------------------------------------------------------------------------------------------------------------------------------------------
+
   HTTP.on("/PassOn", handle_PassOn);                         // Пароль на страницу настроек
   HTTP.on("/Power", handle_Power);                           // Управление питанием
   HTTP.on("/index", handle_index);                           // Переключение на финальную страницу
   HTTP.on("/lang", handle_lang);                             // Язык
 
-// ------------------------------------------------------------ РЕГУЛИРОВКА НАСТРОЕК ЭФФЕКТОВ ---------------------------------------------------------
+  // ------------------------------------------------------------ РЕГУЛИРОВКА НАСТРОЕК ЭФФЕКТОВ ---------------------------------------------------------
 
   HTTP.on("/all_br", handle_all_br);                         // Общая яркость всех эффектов
   HTTP.on("/br", handle_br);                                 // Яркость эффекта
@@ -130,14 +130,14 @@ void User_settings() {
   HTTP.on("/random_on", handle_random);                      // Случайные настройки эффектов в режиме цикл
   HTTP.on("/effect_always", handle_effect_always);           // Не возобновлять эффекты после обесточивания лампы
 
-// -------------------------------------------------------------------------- ЦИКЛ --------------------------------------------------------------------
+  // -------------------------------------------------------------------------- ЦИКЛ --------------------------------------------------------------------
 
   HTTP.on("/cycle_on", handle_cycle_on);                     // Вкл/Выкл режим Цикл
   HTTP.on("/rnd_cycle", handle_rnd_cycle);                   // Перемешивать или по порядку
   HTTP.on("/cycle_always", handle_cycle_always);             // Запускать цикл после включения
   HTTP.on("/cycle_set", handle_cycle_set);                   // Выбор эффектов для цикла
 
-// ------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ В ВЭБ-ИНТЕРФЕЙС -----------------------------------------------
+  // ------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ В ВЭБ-ИНТЕРФЕЙС -----------------------------------------------
 
   HTTP.on("/button_enable", handle_button_enable);
   HTTP.on("/ir_enable", handle_ir_enable);
@@ -163,7 +163,7 @@ void User_settings() {
     HTTP.send(200, "application/json", response);
   });
 
-// ----------------------------------------------------------------------------------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 #if USE_BUTTON
   HTTP.on("/button_type", handle_button_type);         // Сенсорная / механическая кнопка
@@ -191,7 +191,7 @@ void User_settings() {
   });
 #endif
 
-// -------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
+  // -------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
 
 #if USE_MULTILAMP
   HTTP.on("/multi", HTTP_GET, handle_multiple_lamp);
@@ -208,7 +208,7 @@ void User_settings() {
 #endif
   });
 
-// --------------------------------------------------------------------- ДИСПЛЕЙ ST7789 ---------------------------------------------------------------
+  // --------------------------------------------------------------------- ДИСПЛЕЙ ST7789 ---------------------------------------------------------------
 
 #if USE_ST7789
   HTTP.on("/tft_clock_color", handle_tft_clock_color);
@@ -223,7 +223,7 @@ void User_settings() {
   HTTP.on("/tft_date_color", HTTP_GET, handle_tft_date_color);
 #endif
 
-// -------------------------------------------------------------------------- ВРЕМЯ -------------------------------------------------------------------
+  // -------------------------------------------------------------------------- ВРЕМЯ -------------------------------------------------------------------
 
   HTTP.on("/save_brightness", handle_save_brightness);
   HTTP.on("/night_time", handle_night_time);
@@ -751,7 +751,7 @@ void User_settings() {
     HTTP.send(200, "text/plain", rainbowClock ? "1" : "0");
   });
 
-// --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) -------------------------------------------------------
+  // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) -------------------------------------------------------
 
 #if USE_WEATHER
   HTTP.on("/print_weather", handle_print_weather); // Интервал вывода погоды
@@ -969,7 +969,7 @@ void User_settings() {
   });
 #endif
 
-// ------------------------------------------------------------------------ НАСТРОЙКИ МАТРИЦЫ ---------------------------------------------------------
+  // ------------------------------------------------------------------------ НАСТРОЙКИ МАТРИЦЫ ---------------------------------------------------------
 
   HTTP.on("/m_t", handle_matrix_tipe);
   HTTP.on("/m_o", handle_matrix_orientation);
@@ -1151,7 +1151,7 @@ void User_settings() {
     }
   });
 
-// --------------------------------------------------------------------- АНИМАЦИОННЫЕ ЭФФЕКТЫ ---------------------------------------------------------
+  // --------------------------------------------------------------------- АНИМАЦИОННЫЕ ЭФФЕКТЫ ---------------------------------------------------------
 
 #if USE_ANIMATIONS
   HTTP.on("/get_anim_list", HTTP_GET, []() {
@@ -1249,7 +1249,7 @@ void User_settings() {
 
 #endif // USE_ANIMATIONS
 
-// -------------------------------------------------------------------- ЭФФЕКТЫ С SD формата .out -----------------------------------------------------
+  // -------------------------------------------------------------------- ЭФФЕКТЫ С SD формата .out -----------------------------------------------------
 
 #if USE_SD
 
@@ -1348,7 +1348,7 @@ void User_settings() {
     HTTP.send(200, "text/plain", String(effSdIndex));
   });
 
-// --------------------------------------------------------------------
+  // --------------------------------------------------------------------
   HTTP.on("/debug.log", HTTP_GET, []() {
     File logFile = LittleFS.open("/debug.log", "r");
     if (!logFile) {
@@ -1359,7 +1359,7 @@ void User_settings() {
     logFile.close();
   });
 
-// ------------------------------------------------------------------------- LED ПАНЕЛЬ ---------------------------------------------------------------
+  // ------------------------------------------------------------------------- LED ПАНЕЛЬ ---------------------------------------------------------------
 
   // бегущая строка
 #if LED_PANEL
@@ -1478,7 +1478,7 @@ void User_settings() {
   HTTP.on("/interval_c_d", handle_interval_c_d);
 #endif // LED_PANEL
 
-// ------------------------------------------------------------------------- МП3 ПЛЕЕР ----------------------------------------------------------------
+  // ------------------------------------------------------------------------- МП3 ПЛЕЕР ----------------------------------------------------------------
 
 #if USE_MP3_PLAYER
   HTTP.on("/save_sound_settings", HTTP_GET, handle_save_sound_settings);
@@ -1540,7 +1540,7 @@ void User_settings() {
 #endif
   });
 
-// ------------------------------------------------------------------- УПРАВЛЕНИЕ ИК ПУЛЬТАМИ ---------------------------------------------------------
+  // ------------------------------------------------------------------- УПРАВЛЕНИЕ ИК ПУЛЬТАМИ ---------------------------------------------------------
 
 #if USE_IR_RECEIVER
   // список всех пультов
@@ -1657,7 +1657,7 @@ void User_settings() {
 
 #endif // USE_IR_RECEIVER
 
-// ----------------------------------------------------------------------- НАСТРОЙКА ШРИФТА -----------------------------------------------------------
+  // ----------------------------------------------------------------------- НАСТРОЙКА ШРИФТА -----------------------------------------------------------
 
   HTTP.on("/static_font", HTTP_GET, []() {
     if (!HTTP.hasArg("static_font")) {
@@ -1685,7 +1685,7 @@ void User_settings() {
     HTTP.send(200, "text/plain", "OK");
   });
 
-// -------------------------------------------------------------- МОДАЛЬНЫЕ ОКНА МЕНЮ ВЭБ-ИНТЕРФЕЙСА --------------------------------------------------
+  // -------------------------------------------------------------- МОДАЛЬНЫЕ ОКНА МЕНЮ ВЭБ-ИНТЕРФЕЙСА --------------------------------------------------
 
 #if STATUS_DEVICE
   HTTP.on("/sd_status", HTTP_GET, handle_sd_status);
@@ -1788,7 +1788,7 @@ void User_settings() {
 
 #endif // STATUS_DEVICE
 
-// ------------------------------------------------------------
+  // ------------------------------------------------------------
 #if SOFT_INFO
   // информация о памяти
   HTTP.on("/heap", HTTP_GET, []() {
@@ -1828,7 +1828,7 @@ void User_settings() {
     HTTP.send(200, "application/json", response);
   });
 
-// ----------------------------------------------------------------------
+  // ----------------------------------------------------------------------
   HTTP.on("/get_version", HTTP_GET, []() {
     StaticJsonDocument<512> doc;
     String resp;
@@ -1873,7 +1873,7 @@ void User_settings() {
 
 #endif // SOFT_INFO
 
-// ---------------------------------------------------------------------- СКРЫТИЕ ПУНКТОВ МЕНЮ --------------------------------------------------------
+  // ---------------------------------------------------------------------- СКРЫТИЕ ПУНКТОВ МЕНЮ --------------------------------------------------------
 
   HTTP.on("/features", HTTP_GET, []() {
     DynamicJsonDocument doc(512);
@@ -1911,7 +1911,7 @@ void User_settings() {
     HTTP.send(200, "application/json", response);
   });
 
-// ------------------------------------------------------------------------ MQTT ПОДКЛЮЧЕНИЕ ----------------------------------------------------------
+  // ------------------------------------------------------------------------ MQTT ПОДКЛЮЧЕНИЕ ----------------------------------------------------------
 
 #if USE_MQTT
   HTTP.on("/mqtt_set", handle_mqtt_set);
@@ -1933,7 +1933,7 @@ void User_settings() {
 #endif
   });
 
-// ------------------------------------------------------------- ОБНОВЛЕНИЕ ПРОШИВКИ ПО ВОЗДУХУ (OTA) -------------------------------------------------
+  // ------------------------------------------------------------- ОБНОВЛЕНИЕ ПРОШИВКИ ПО ВОЗДУХУ (OTA) -------------------------------------------------
 
 #if USE_OTA
   // страница OTA ОБНОВЛЕНИЕ
@@ -2128,7 +2128,7 @@ void User_settings() {
 
 #endif // USE_OTA
 
-// -------------------------------------------------- ПЕРЕКЛЮЧЕНИЕ "ЧАСЫ / ПОГОДА" НА ДИСПЛЕЯХ TM1637 и ST7789 ----------------------------------------
+  // -------------------------------------------------- ПЕРЕКЛЮЧЕНИЕ "ЧАСЫ / ПОГОДА" НА ДИСПЛЕЯХ TM1637 и ST7789 ----------------------------------------
 
 #if (USE_TM1637 || USE_ST7789)
   HTTP.on("/save_display_switch", HTTP_GET, []() {
@@ -2169,7 +2169,7 @@ void User_settings() {
 
 #endif // (USE_TM1637 || USE_ST7789)
 
-// ---------------------------------------------------------------------- ПАРОЛЬ ДЛЯ РЕДАКТОРА --------------------------------------------------------
+  // ---------------------------------------------------------------------- ПАРОЛЬ ДЛЯ РЕДАКТОРА --------------------------------------------------------
 
   HTTP.on("/set_local_auth", HTTP_GET, []() {
     if (!HTTP.hasArg("value")) {
@@ -2192,7 +2192,7 @@ void User_settings() {
     ESP.restart();
   });
 
-// ----------------------------------------------------------------------- СИСТЕМНЫЕ ЛОГИ -------------------------------------------------------------
+  // ----------------------------------------------------------------------- СИСТЕМНЫЕ ЛОГИ -------------------------------------------------------------
 
 #if DEBUG_ENABLED
   // Чекбокс "Включить получение новых логов"
@@ -2241,7 +2241,7 @@ void User_settings() {
   });
 #endif // DEBUG_ENABLED
 
-// --------------------------------------------------------------------- Wi-Fi ПОДКЛЮЧЕНИЕ ------------------------------------------------------------
+  // --------------------------------------------------------------------- Wi-Fi ПОДКЛЮЧЕНИЕ ------------------------------------------------------------
 
   HTTP.on("/ssdp", handle_ssdp);
   HTTP.on("/save_wifi", HTTP_GET, handle_save_wifi);
@@ -2252,7 +2252,7 @@ void User_settings() {
   HTTP.on("/reset_to_default", handle_reset_to_default);
   HTTP.on("/s_IP", handle_use_static_ip);
   HTTP.on("/set_ip", handle_set_static_ip);
-  
+
   HTTP.on("/restart", HTTP_GET, []() {
     HTTP.send(200, "text/plain", "OK");
     delay(500);
@@ -2282,20 +2282,20 @@ void User_settings() {
 
   // Точка доступа
   HTTP.on("/ssidap", HTTP_GET, []() {
-  String newSSID = HTTP.arg("ssidAP");
-  String newPass = HTTP.arg("passwordAP");
-  if (newSSID.length() == 0) newSSID = jsonRead(configWiFi, "ssidAP");
-  if (newPass.length() == 0) newPass = jsonRead(configWiFi, "passwordAP");
+    String newSSID = HTTP.arg("ssidAP");
+    String newPass = HTTP.arg("passwordAP");
+    if (newSSID.length() == 0) newSSID = jsonRead(configWiFi, "ssidAP");
+    if (newPass.length() == 0) newPass = jsonRead(configWiFi, "passwordAP");
 
-  jsonWrite(configWiFi, "ssidAP", newSSID);
-  jsonWrite(configWiFi, "passwordAP", newPass);
-  saveConfig();
+    jsonWrite(configWiFi, "ssidAP", newSSID);
+    jsonWrite(configWiFi, "passwordAP", newPass);
+    saveConfig();
 
-  Wifi::instance().setAPSettings(newSSID, newPass);
-  Wifi::instance().requestRestartAP();
+    Wifi::instance().setAPSettings(newSSID, newPass);
+    Wifi::instance().requestRestartAP();
 
-  HTTP.send(200, "text/plain", "OK");
-});
+    HTTP.send(200, "text/plain", "OK");
+  });
 
 } // User_settings()
 
@@ -2428,7 +2428,7 @@ void handle_save_wifi() {
   delay(500);
   ESP.restart();
 
- // HTTP.send(200, "text/plain", "OK");
+  // HTTP.send(200, "text/plain", "OK");
 }
 
 void handle_use_static_ip() {
@@ -2554,7 +2554,7 @@ void handle_save_sound_settings() {
   }
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2573,7 +2573,7 @@ void handle_on_sound() {
   jsonWrite(configMP3, "on_sound", eff_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2591,7 +2591,7 @@ void handle_day_advert_on_sound() {
   jsonWrite(configMP3, "on_day_adv", day_advert_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2609,7 +2609,7 @@ void handle_night_advert_on_sound() {
   jsonWrite(configMP3, "on_night_adv", night_advert_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2627,7 +2627,7 @@ void handle_time_always() {
   jsonWrite(configMP3, "time_always", time_always);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2645,7 +2645,7 @@ void handle_weather_always() {
   jsonWrite(configMP3, "weather_always", weather_always);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2663,7 +2663,7 @@ void handle_day_weather_adv() {
   jsonWrite(configMP3, "on_day_wadv", day_weather_temp_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2681,7 +2681,7 @@ void handle_day_weather_desc() {
   jsonWrite(configMP3, "on_day_wdesc", day_weather_desc_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2699,7 +2699,7 @@ void handle_night_weather_adv() {
   jsonWrite(configMP3, "on_night_wadv", night_weather_temp_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2717,7 +2717,7 @@ void handle_night_weather_desc() {
   jsonWrite(configMP3, "on_night_wdesc", night_weather_desc_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2735,7 +2735,7 @@ void handle_alarm_advert_sound_on() {
   jsonWrite(configMP3, "on_alm_adv", alarm_advert_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2755,7 +2755,7 @@ void handle_weather_speak() {
     writeFile(F("config_mp3.json"), configMP3);
   }
   HTTP.send(200, "text/plain", weatherSpeakEnabled ? "1" : "0");
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2775,7 +2775,7 @@ void handle_time_speak() {
     writeFile(F("config_mp3.json"), configMP3);
   }
   HTTP.send(200, "text/plain", timeAnnounceEnabled ? "1" : "0");
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2793,7 +2793,7 @@ void handle_alarm_on_sound() {
   jsonWrite(configMP3, "on_alm_snd", alarm_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2811,7 +2811,7 @@ void handle_sunset_on_sound() {
   jsonWrite(configMP3, "on_sun_snd", sunset_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2831,7 +2831,7 @@ void handle_show_weather_desc() {
     writeFile(F("config_mp3.json"), configMP3);
   }
   HTTP.send(200, F("text/plain"), show_weather_desc ? "1" : "0");
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2852,7 +2852,7 @@ void handle_volume() {
     send_command(0x06, FEEDBACK, 0, eff_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2871,7 +2871,7 @@ void handle_alarm_volume() {
   if (mp3Enabled && dawnflag_sound) send_command(0x06, FEEDBACK, 0, alarm_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2890,7 +2890,7 @@ void handle_sunset_volume() {
   if (mp3Enabled && sunsetflag_sound) send_command(0x06, FEEDBACK, 0, sunset_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2908,7 +2908,7 @@ void handle_day_advert_volume() {
   jsonWrite(configMP3, "day_vol", day_advert_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2926,7 +2926,7 @@ void handle_night_advert_volume() {
   jsonWrite(configMP3, "night_vol", night_advert_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2945,7 +2945,7 @@ void handle_tim_h() {
   jsonWrite(configMP3, "tim_h", tmp);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2964,7 +2964,7 @@ void handle_tim_m() {
   jsonWrite(configMP3, "tim_m", tmp);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2983,7 +2983,7 @@ void handle_delay() {
   jsonWrite(configMP3, "delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3001,7 +3001,7 @@ void handle_weather_day_volume() {
   jsonWrite(configMP3, "weather_day_vol", weather_day_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3019,7 +3019,7 @@ void handle_weather_night_volume() {
   jsonWrite(configMP3, "weather_night_vol", weather_night_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3038,7 +3038,7 @@ void handle_weather_temp_delay() {
   jsonWrite(configMP3, "weather_temp_delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3057,7 +3057,7 @@ void handle_weather_desc_delay() {
   jsonWrite(configMP3, "weather_desc_delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3072,7 +3072,7 @@ void handle_weather_desc_delay() {
 // --------------------- Озвучка ------------------------
 // Озвучка времени (по кнопке)
 void handle_play_time() {
-  if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
+  if (mp3Enabled && mp3_player_connect == 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
     Time::instance().forcesync();
     previous_folder = mp3_folder;
     mp3_pending_time_advert = true;
@@ -3086,7 +3086,7 @@ void handle_play_time() {
 // Озвучка погоды (по кнопке)
 void handle_play_weather() {
 #if USE_WEATHER
-  if (mp3Enabled && mp3_player_connect >= 4 && eff_sound_on && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
+  if (mp3Enabled && mp3_player_connect >= 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
     mp3_pending_weather_advert = true;
     mp3_pending_weather_force = true;
     HTTP.send(200, "text/plain", "OK");
@@ -3150,7 +3150,7 @@ void handle_folder_down() {
     delay(mp3_delay);
   }
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3165,7 +3165,7 @@ void handle_folder_up() {
     delay(mp3_delay);
   }
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3180,7 +3180,7 @@ void handle_folder_select() {
     delay(mp3_delay);
   }
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3195,7 +3195,7 @@ void handle_equalizer() {
   }
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3248,7 +3248,7 @@ void handle_br() {
   Eeprom::instance().EepromPut(modes);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3276,7 +3276,7 @@ void handle_sp() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3304,7 +3304,7 @@ void handle_sc() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3331,7 +3331,7 @@ void handle_brm() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3358,7 +3358,7 @@ void handle_brp() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3385,7 +3385,7 @@ void handle_spm() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3412,7 +3412,7 @@ void handle_spp() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3439,7 +3439,7 @@ void handle_scm() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3466,7 +3466,7 @@ void handle_scp() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3577,7 +3577,7 @@ void handle_eff_sel() {
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -3662,7 +3662,7 @@ void handle_night_time() {
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 /*
-void handle_save_time() {
+  void handle_save_time() {
   String day_hour_str = HTTP.arg("day_time_hour");
   String day_min_str = HTTP.arg("day_time_minute");
   String night_hour_str = HTTP.arg("night_time_hour");
@@ -3705,18 +3705,18 @@ void handle_save_time() {
 
   getBrightnessForPrintTime();
 
-#if USE_DAWN
+  #if USE_DAWN
   if (ONflag && !dawnFlag)
-#else
+  #else
   if (ONflag)
-#endif
+  #endif
     SetBrightness(modes[currentMode].Brightness);
 
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
   HTTP.send(200, F("text/plain"), F("OK"));
-} */
+  } */
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -4388,7 +4388,7 @@ void handle_cycle_on() {
 
   saveConfig();
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-  
+
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {
     Mqtt::instance().needToPublish = true;
@@ -5506,7 +5506,7 @@ void handle_run_text ()  {
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
-#endif      
+#endif
 
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {
@@ -5833,7 +5833,7 @@ void handle_clock_vert() {
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
-#endif       
+#endif
 
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {
@@ -6006,7 +6006,7 @@ void handle_clock_y_offset() {
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
-#endif       
+#endif
 
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {

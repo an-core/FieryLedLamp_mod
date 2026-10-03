@@ -16,6 +16,7 @@ class Eeprom {
     }
 
 // --------------------------------------------------------------------
+
     void InitEepromSettings(ModeType* modes, void (*restoreDefaultSettings)()) {
       if (!LittleFS.begin()) {
         Serial.println(F("Ошибка LittleFS"));

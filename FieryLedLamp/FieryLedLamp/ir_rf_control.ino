@@ -140,8 +140,12 @@ void Mute() {
 #if IR_LOG
       SYSLOG.add("Звук включен");
 #endif
+
+      if (ONflag) {
+        set_mp3_play_now = true;
+      }
     }
-  } else  {
+  } else {
     showWarning(CRGB::Red, 1000, 250U);
 #if IR_LOG
     SYSLOG.add("mp3 плеер не подключен");
@@ -149,7 +153,7 @@ void Mute() {
   }
   jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
   timeout_save_file_changes = millis();
-  bitSet (save_file_changes, 0);
+  bitSet(save_file_changes, 0);
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -542,8 +546,8 @@ void Digit_Handle(uint8_t digit) {
     loadingFlag = true;
     if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
 
-    #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4) {
+#if USE_MP3_PLAYER
+    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;

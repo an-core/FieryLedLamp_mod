@@ -342,10 +342,14 @@ void mp3_loop() {
 // ------------------------------------------------------------------------------------
 // Устанавливает mp3PlayState = MP3_PLAY_SEND_PAUSE или MP3_PLAY_SEND_VOLUME
 // Дальнейшие шаги (пауза, громкость, выбор папки) делает mp3PlayTick()
-// folder = 0 - логика «стоп»
+// folder = 0 - логика "стоп"
 
 void play_sound_async(uint8_t folder) {
   if (isAnnouncing) return;
+
+  if (!eff_sound_on && folder != 0 && !alarm_sound_flag && !sunset_sound_flag) {
+    return;
+  }
 
   if (!folder) {
     // 0 - стоп
@@ -415,7 +419,7 @@ void mp3_restore_after_announce(bool restoreEffect) {
 // ------------------------------------------------------------------------------------
 // force = true - игнорировать настройки day_advert_sound_on / night_advert_sound_on (ручной вызов через кнопку, пульт, web)
 // force = false - проверять настройки (автоматическая озвучка по таймеру)
-// Играет: пауза -> громкость -> mute on -> час -> mute off -> пауза ADVERT_TIMER_H -> минуты -> пауза ADVERT_TIMER_M → восстановление воспроизведения
+// Играет: пауза -> громкость -> mute on -> час -> mute off -> пауза ADVERT_TIMER_H -> минуты -> пауза ADVERT_TIMER_M -> восстановление воспроизведения
 
 void play_time_ADVERT(bool force) {
   if (mp3_player_connect != 4) return;
@@ -756,7 +760,7 @@ uint16_t weatherAdvertWaitTime() {
 // ЗАПУСК ОЗВУЧКИ ТЕМПЕРАТУРЫ ПОГОДЫ (вспомогательная)
 // ------------------------------------------------------------------------------------
 // Не используется в текущей логике (заменена на play_weather)
-// Оставлена на всякий случай для совместимости
+// Оставлена на всякий случай
 
 void start_weather_temp_ADVERT(int8_t temp, bool speakDescription) {
   if (mp3_player_connect != 4 || advert_flag || weather_advert_flag || isAnnouncing) return;

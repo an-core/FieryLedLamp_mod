@@ -34,7 +34,7 @@ void IR_Receive_Handle() {
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4) {
+    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;

@@ -25,6 +25,8 @@ void loadLocalAuthSettings() {
 #endif
 }
 
+// --------------------------------------------------------------------
+
 static const char* public_prefixes[] = {
   "/index.htm", "/index.html", "/index.htm.gz", "/index.html.gz",
   "/update.htm", "/update.html", "/update.htm.gz", "/update.html.gz",
@@ -41,6 +43,8 @@ static const char* public_prefixes[] = {
   "/vendor/", "/lib/", "/modules/",
   nullptr
 };
+
+// --------------------------------------------------------------------
 
 bool isPublicResource(const String &path) {
   String p = path;
@@ -73,10 +77,14 @@ bool isPublicResource(const String &path) {
   return false;
 }
 
+// --------------------------------------------------------------------
+
 bool isLocalClient() {
   IPAddress ip = HTTP.client().remoteIP();
   return (ip[0] == 192 && ip[1] == 168) || (ip[0] == 10) || (ip[0] == 172 && ip[1] >= 16 && ip[1] <= 31);
 }
+
+// --------------------------------------------------------------------
 
 bool requireFileManagerAuth(bool allowLocalWithoutPass = true) {
   IPAddress clientIP = HTTP.client().remoteIP();
@@ -99,6 +107,8 @@ bool requireFileManagerAuth(bool allowLocalWithoutPass = true) {
   return true;
 }
 
+// --------------------------------------------------------------------
+
 String getContentType(String filename) {
   if (HTTP.hasArg("download")) return F("application/octet-stream");
   else if (filename.endsWith(".htm"))  return F("text/html");
@@ -118,12 +128,16 @@ String getContentType(String filename) {
   return F("text/plain");
 }
 
+// --------------------------------------------------------------------
+
 bool isDangerousPath(const String& path) {
   if (path.length() == 0) return true;
   String p = path;
   p.toLowerCase();
   return p.indexOf("..") >= 0 || p.indexOf("\\") >= 0 || p.startsWith("/.") || p.indexOf("/./") >= 0 || p.indexOf("//") >= 0;
 }
+
+// --------------------------------------------------------------------
 
 bool isProtectedFile(const String& path) {
   String p = path;
@@ -134,11 +148,15 @@ bool isProtectedFile(const String& path) {
   return false;
 }
 
+// --------------------------------------------------------------------
+
 bool isForbiddenExtension(const String& filename) {
   String name = filename;
   name.toLowerCase();
   return name.endsWith(".bin") || name.endsWith(".elf") || name.endsWith(".uf2") || name.endsWith(".hex") || name.endsWith(".db") || name.endsWith(".sqlite") || name.endsWith(".key") || name.endsWith(".pem") || name.endsWith(".env");
 }
+
+// --------------------------------------------------------------------
 
 bool handleFileRead(String path) {
   if (isDangerousPath(path)) {
@@ -179,6 +197,8 @@ bool handleFileRead(String path) {
   file.close();
   return true;
 }
+
+// --------------------------------------------------------------------
 
 void handleFileUpload() {
   if (!requireFileManagerAuth(true)) return;
@@ -255,6 +275,8 @@ void handleFileUpload() {
   }
 }
 
+// --------------------------------------------------------------------
+
 void handleJsonUpload() {
 #if USE_OTA
   if (Ota::instance().isOtaActive()) {
@@ -287,6 +309,8 @@ void handleJsonUpload() {
     }
   }
 }
+
+// --------------------------------------------------------------------
 
 bool removeRecursive(const String& path) {
   bool isDir = false;
@@ -341,6 +365,8 @@ bool removeRecursive(const String& path) {
   return LittleFS.rmdir(dirPath);
 }
 
+// --------------------------------------------------------------------
+
 bool copyFile(const String& src, const String& dst) {
   File s = LittleFS.open(src, "r");
   File d = LittleFS.open(dst, "w");
@@ -361,6 +387,8 @@ bool copyFile(const String& src, const String& dst) {
   d.close();
   return true;
 }
+
+// --------------------------------------------------------------------
 
 bool copyDirRecursive(const String& src, const String& dst) {
   if (!LittleFS.mkdir(dst)) return false;
@@ -394,6 +422,8 @@ bool copyDirRecursive(const String& src, const String& dst) {
   dir.close();
   return true;
 }
+
+// --------------------------------------------------------------------
 
 void handleFileDelete() {
   if (!requireFileManagerAuth(true)) return;
@@ -441,6 +471,8 @@ void handleFileDelete() {
     HTTP.send(500, F("text/plain"), F("Delete failed"));
   }
 }
+
+// --------------------------------------------------------------------
 
 void handleFileCreate() {
   if (!requireFileManagerAuth(true)) return;
@@ -495,6 +527,8 @@ void handleFileCreate() {
     HTTP.send(500, F("text/plain"), F("Create failed"));
   }
 }
+
+// --------------------------------------------------------------------
 
 void handleFileList() {
   if (!requireFileManagerAuth(true)) return;
