@@ -4167,21 +4167,61 @@ void snakeGameRoutine() {
 // @ Wa1den
 // ===============
 
-static const CRGB marioPalette[] = {CRGB::Black, CRGB(200U, 30U, 10U), CRGB(230U, 130U, 50U), CRGB(60U, 25U, 6U), CRGB(30U, 70U, 230U), CRGB(15U, 110U, 25U), CRGB(6U, 45U, 10U), CRGB(150U, 230U, 80U)};
+static const CRGB marioPalette[] = {
+  CRGB::Black,                // 0 - фон
+  CRGB(230U, 40U, 30U),       // 1 - ярко-красный (кепка, рубашка)
+  CRGB(255U, 200U, 150U),     // 2 - светлая кожа (лицо)
+  CRGB(70U, 35U, 10U),        // 3 - тёмно-коричневый (волосы, усы, ботинки)
+  CRGB(40U, 80U, 240U),       // 4 - насыщенный синий (комбинезон)
+  CRGB(30U, 140U, 40U),       // 5 - зелёный (тело гриба)
+  CRGB(15U, 70U, 20U),        // 6 - тёмно-зелёный (низ гриба)
+  CRGB(200U, 250U, 120U)      // 7 - светло-жёлто-зелёный (глаз гриба)
+};
 
+// персонаж 7x8: кадры 0 - шаг, 1 - ноги вместе, 2 - прыжок
 static const uint8_t marioSprite[3][8][7] PROGMEM = {
-  { {0, 0, 1, 1, 1, 1, 0}, {0, 1, 1, 1, 1, 1, 1}, {0, 3, 2, 2, 3, 2, 0}, {0, 3, 2, 2, 2, 2, 0}, {0, 1, 4, 4, 4, 1, 0}, {0, 0, 4, 4, 4, 0, 0}, {0, 4, 4, 0, 0, 4, 0}, {3, 3, 0, 0, 0, 3, 3} },
-  { {0, 0, 1, 1, 1, 1, 0}, {0, 1, 1, 1, 1, 1, 1}, {0, 3, 2, 2, 3, 2, 0}, {0, 3, 2, 2, 2, 2, 0}, {0, 1, 4, 4, 4, 1, 0}, {0, 0, 4, 4, 4, 0, 0}, {0, 0, 4, 4, 0, 0, 0}, {0, 0, 3, 3, 0, 0, 0} },
-  { {0, 0, 1, 1, 1, 1, 0}, {0, 1, 1, 1, 1, 1, 1}, {0, 3, 2, 2, 3, 2, 0}, {0, 3, 2, 2, 2, 2, 0}, {0, 1, 4, 4, 4, 1, 0}, {0, 0, 4, 4, 4, 0, 0}, {0, 4, 4, 0, 4, 4, 0}, {3, 3, 0, 0, 0, 3, 3} }
+  // кадр 0 - шаг
+  {{0,1,1,1,1,1,0},   // кепка
+   {1,1,1,1,1,1,1},   // козырёк
+   {0,3,2,2,3,2,0},   // волосы / глаз
+   {0,3,3,3,3,3,0},   // усы
+   {0,1,4,4,4,1,0},   // рукава / комбинезон
+   {0,0,4,4,4,0,0},
+   {0,4,4,0,0,4,0},   // широкий шаг
+   {3,3,0,0,0,3,3}},  // ботинки
+  // кадр 1 - ноги вместе
+  {{0,1,1,1,1,1,0},
+   {1,1,1,1,1,1,1},
+   {0,3,2,2,3,2,0},
+   {0,3,3,3,3,3,0},
+   {0,1,4,4,4,1,0},
+   {0,0,4,4,4,0,0},
+   {0,0,4,4,0,0,0},
+   {0,0,3,3,0,0,0}},
+  // кадр 2 - прыжок
+  {{0,1,1,1,1,1,0},
+   {1,1,1,1,1,1,1},
+   {0,3,2,2,3,2,0},
+   {0,3,3,3,3,3,0},
+   {0,1,4,4,4,1,0},
+   {0,0,4,4,4,0,0},
+   {0,4,4,0,4,4,0},
+   {3,3,0,0,0,3,3}}
 };
 
 static const uint8_t goombaSprite[2][3][3] PROGMEM = {
-  { {5, 5, 5}, {7, 5, 7}, {6, 0, 6} },
-  { {5, 5, 5}, {7, 5, 7}, {0, 6, 0} }
+  { {5,5,5}, {7,5,7}, {6,0,6} },
+  { {5,5,5}, {7,5,7}, {0,6,0} }
 };
 
+// точка с заворотом по горизонтали и защитой координат
 void marioDrawPix(int16_t x, int16_t y, CRGB color) {
-  drawPixelXY((int8_t)(((x % (int16_t)matrixWidth) + matrixWidth) % matrixWidth), (int8_t)y, color);
+  if (matrixWidth == 0U) return;
+  if (y < 0 || y >= (int16_t)matrixHeight) return;
+  x %= (int16_t)matrixWidth;
+  if (x < 0) x += (int16_t)matrixWidth;
+  if (x > 127 || y > 127) return; // int8_t в drawPixelXY
+  drawPixelXY((int8_t)x, (int8_t)y, color);
 }
 
 #define MARIO_PARTICLES (8U)
@@ -4262,13 +4302,16 @@ void marioRoutine() {
     if (partY[i] < 0.5F) partLife[i] = 0U;
   }
 
-  dimAll(0); // вместо ledsClear
+  FastLED.clear();
 
+  // земля
   uint8_t gs = (uint8_t)groundShift;
   for (uint8_t x = 0U; x < matrixWidth; x++) {
-    drawPixelXY(x, 0U, (((x + gs) & 0x03) == 0U) ? CRGB(70U, 35U, 10U) : CRGB(14U, 7U, 2U));
+    drawPixelXY((int8_t)x, 0,
+                (((x + gs) & 0x03) == 0U) ? CRGB(70U, 35U, 10U) : CRGB(14U, 7U, 2U));
   }
 
+  // препятствие
   if (obsX < 13.4F) {
     int16_t ox = cx + (int16_t)floorf(obsX + 0.5F);
     if (obsType == 0U) {
@@ -4291,13 +4334,16 @@ void marioRoutine() {
     }
   }
 
+  // осколки
   for (uint8_t i = 0U; i < MARIO_PARTICLES; i++) {
     if (partLife[i] == 0U) continue;
     CRGB c = CRGB(210U, 95U, 25U);
     c.nscale8(partLife[i] * 10U);
-    marioDrawPix(cx + (int16_t)floorf(partX[i] + 0.5F), (int16_t)(partY[i] + 0.5F), c);
+    marioDrawPix(cx + (int16_t)floorf(partX[i] + 0.5F),
+                 (int16_t)(partY[i] + 0.5F), c);
   }
 
+  // персонаж
   uint8_t frame = (jumpOffset > 0) ? 2U : ((millis() / 120U) & 0x01);
   for (uint8_t r = 0U; r < 8U; r++) {
     for (uint8_t c = 0U; c < 7U; c++) {
