@@ -1,4 +1,4 @@
-## Модифицированная прошивка FieryLedLamp с поддержкой эффектов jinx (.out)!
+## Модифицированная прошивка FieryLedLamp с поддержкой эффектов JINX (.out)!
 # Платформы: ESP32 / ESP32-S3!
 
 # [fieryledlamp-web-flasher](https://an-core.github.io/fieryledlamp-web-flasher/) - прошивка esp через браузер!
