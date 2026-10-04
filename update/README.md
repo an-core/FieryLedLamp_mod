@@ -1,4 +1,4 @@
-<p align="center">Информация по бинарникам</p>
+<p align="center">Информация по бинарникам модифицированной прошивки</p>
 <p align="center">
 <img width="667" height="686" alt="esp32s3" src="https://github.com/user-attachments/assets/43eaaef6-a760-4ee6-918a-391650eba63e" />
 </p>
