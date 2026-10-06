@@ -5,7 +5,8 @@
 			"name": "21 keys (white)",
 			"codes": {
 				"IR_ON_OFF": "0xFF629D",
-				"IR_MUTE": "0xFF906F",
+				"IR_MUTE": "0xFFC23D",
+				"IR_EQ": "0xFF906F",
 				"IR_PREV": "0xFF22DD",
 				"IR_NEXT": "0xFF02FD",
 				"IR_WEATHER": "0xFFA25D",
@@ -26,7 +27,6 @@
 				"IR_9": "0xFF52AD",
 				"IR_0": 5,
 				"IR_CYCLE": 0,
-				"IR_EQ": 1,
 				"IR_SP_UP": 3,
 				"IR_SP_DOWN": 4,
 				"IR_FAV_ADD": 6,
