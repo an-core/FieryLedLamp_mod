@@ -17,7 +17,6 @@
 // feedback - 0 = не ждать ответа, 1 = ждать (возвращает ответ плеера)
 // dat1, dat2 - параметры команды (старший и младший байт)
 // Возвращает: ответ плеера (или 0xFF00, 0xEF00, -1 при ошибке/таймауте)
-// ВНИМАНИЕ: блокирующая (delay(3) на каждый байт + read_command с таймаутом)
 
 int16_t send_command(int8_t cmd, uint8_t feedback, uint8_t dat1, uint8_t dat2) {
   uint8_t mp3_send_buf[8] = {0x7E, 0xFF, 0x06, cmd, feedback, dat1, dat2, 0xEF};
@@ -52,7 +51,6 @@ int16_t send_command(int8_t cmd, uint8_t feedback, uint8_t dat1, uint8_t dat2) {
 // ------------------------------------------------------------------------------------
 // mp3_read_timeout - таймаут ожидания ответа (мс)
 // Возвращает: значение из ответа (uint16) или -1 при таймауте/ошибке
-// ВНИМАНИЕ: блокирующая (delay(1) в цикле ожидания)
 
 int16_t read_command (uint32_t mp3_read_timeout) {
   int tmp;
@@ -288,7 +286,7 @@ void mp3_setup() {
 } // void mp3_setup()
 
 // ====================================================================================
-// ОСНОВНОЙ ЦИКЛ MP3 (вызывается из mp3Task на ядре 0)
+// ОСНОВНОЙ ЦИКЛ (вызывается из mp3Task на ядре 0)
 // ------------------------------------------------------------------------------------
 // 1. Обрабатывает рассвет/закат (handleDawnMp3, handleSunsetMp3)
 // 2. Управляет воспроизведением: если звук включён и плеер на паузе/остановлен, запускает play_sound_async с папкой текущего эффекта
@@ -318,15 +316,11 @@ void mp3_loop() {
   } else {
     set_mp3_play_now = false;
   }
+
   if (!isAnnouncing && !advert_flag && !weather_advert_flag) {
-    if (set_mp3_play_now && (mp3_stop || pause_on)) {
+    if (set_mp3_play_now && (mp3_stop || pause_on) && mp3PlayState == MP3_PLAY_IDLE) {
       if (mp3_folder != 0) {
-        if (effects_folders[currentMode] != 0) {
-          mp3_folder = effects_folders[currentMode];
-        }
-        if (mp3PlayState == MP3_PLAY_IDLE) {
-          play_sound_async(mp3_folder);
-        }
+        play_sound_async(mp3_folder);
       }
     } else if (!set_mp3_play_now && !mp3_stop) {
       mp3_send_command_nowait(0x0E, 0, 0, 0);
@@ -338,7 +332,7 @@ void mp3_loop() {
 } // void mp3_loop()
 
 // ====================================================================================
-// НЕБЛОКИРУЮЩИЙ ЗАПУСК ПАПКИ MP3
+// НЕБЛОКИРУЮЩИЙ ЗАПУСК ПАПКИ
 // ------------------------------------------------------------------------------------
 // Устанавливает mp3PlayState = MP3_PLAY_SEND_PAUSE или MP3_PLAY_SEND_VOLUME
 // Дальнейшие шаги (пауза, громкость, выбор папки) делает mp3PlayTick()
@@ -346,13 +340,13 @@ void mp3_loop() {
 
 void play_sound_async(uint8_t folder) {
   if (isAnnouncing) return;
+  if (!eff_sound_on && folder != 0 && !alarm_sound_flag && !sunset_sound_flag) return;
 
-  if (!eff_sound_on && folder != 0 && !alarm_sound_flag && !sunset_sound_flag) {
+  if (mp3PlayPendingFolder == folder && (mp3PlayState != MP3_PLAY_IDLE || !mp3_stop)) {
     return;
   }
 
   if (!folder) {
-    // 0 - стоп
     mp3PlayState = MP3_PLAY_SEND_PAUSE;
     mp3PlayNeedPause = true;
     mp3PlayPendingFolder = 0;
@@ -372,7 +366,6 @@ void play_sound_async(uint8_t folder) {
 // restoreEffect = true - снять паузу и вернуть прежний трек
 // restoreEffect = false - полная остановка плеера
 // Также сбрасывает isAnnouncing = false
-// ВНИМАНИЕ: блокирующая (delay(50..100))
 
 void mp3_restore_after_announce(bool restoreEffect) {
   if (mp3_player_connect != 4) return;
