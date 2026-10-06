@@ -8,6 +8,8 @@ static constexpr const char* NTP_SERVER_PRIMARY = "pool.ntp.org";
 static constexpr const char* NTP_SERVER_SECONDARY = "time.nist.gov";
 static constexpr const char* NTP_SERVER_GOOGLE = "time.google.com";
 
+// ----------------------------------------------------------------------
+
 Time::Time() : initialized(false) {
   sntp_set_time_sync_notification_cb([](struct timeval * tv) {
     Time::onSNTPTimeSync(tv);
@@ -28,13 +30,18 @@ Time::Time() : initialized(false) {
   });
 } // Time::Time() : initialized(false)
 
+// ----------------------------------------------------------------------
+
 void Time::onSNTPTimeSync(struct timeval* tv) {
   Time::instance().internalTimeSyncNotify();
 }
+// ----------------------------------------------------------------------
 
 void Time::internalTimeSyncNotify() {
   if (timecb) timecb();
 }
+
+// ----------------------------------------------------------------------
 
 void Time::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
   switch (event) {
@@ -74,10 +81,14 @@ void Time::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
   } // switch (event)
 } // void Time::onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info)
 
+// ----------------------------------------------------------------------
+
 void Time::forcesync() {
   disable();
   enable();
 }
+
+// ----------------------------------------------------------------------
 
 void Time::enable() {
   if (initialized) return;
@@ -89,6 +100,8 @@ void Time::enable() {
   initialized = true;
 }
 
+// ----------------------------------------------------------------------
+
 void Time::disable() {
   if (!initialized) return;
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
@@ -98,6 +111,8 @@ void Time::disable() {
 #endif
   initialized = false;
 }
+
+// ----------------------------------------------------------------------
 
 void Time::ntpodhcp(bool enable) {
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
@@ -119,6 +134,8 @@ void Time::ntpodhcp(bool enable) {
 #endif
 } // void Time::ntpodhcp(bool enable)
 
+// ----------------------------------------------------------------------
+
 void Time::tzsetup(const char* tz) {
   if (!tz || !*tz) tz = "MSK-3";
 
@@ -138,6 +155,8 @@ void Time::tzsetup(const char* tz) {
   forcesync();
 }
 
+// ----------------------------------------------------------------------
+
 void Time::setcustomntp(const char* ntp) {
   if (!ntp || !*ntp) return;
   userntp = ntp;
@@ -147,6 +166,8 @@ void Time::setcustomntp(const char* ntp) {
   sntp_setservername(CUSTOM_NTP_INDEX, const_cast<char*>(userntp.c_str()));
 #endif
 }
+
+// ----------------------------------------------------------------------
 
 String Time::getserver(uint8_t idx) {
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
@@ -167,18 +188,26 @@ String Time::getserver(uint8_t idx) {
   return String();
 } // String Time::getserver(uint8_t idx)
 
+// ----------------------------------------------------------------------
+
 void Time::attach_callback(std::function<void()> callback) {
   timecb = std::move(callback);
 }
+
+// ----------------------------------------------------------------------
 
 time_t Time::now() {
   return time(nullptr);
 }
 
+// ----------------------------------------------------------------------
+
 bool Time::isTimeSet() const {
   time_t t = now();
   return (t > 946684800UL);
 }
+
+// ----------------------------------------------------------------------
 
 String Time::getFormattedShortTime() {
   char buffer[6];
@@ -189,6 +218,8 @@ String Time::getFormattedShortTime() {
   return String(buffer);
 }
 
+// ----------------------------------------------------------------------
+
 void Time::getDateTimeString(String& buf, const time_t _tstamp) {
   char tmpBuf[20];
   time_t timestamp = (_tstamp != 0) ? _tstamp : now();
@@ -197,6 +228,8 @@ void Time::getDateTimeString(String& buf, const time_t _tstamp) {
   sprintf_P(tmpBuf, PSTR("%04u-%02u-%02uT%02u:%02u"), tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min);
   buf.concat(tmpBuf);
 }
+
+// ----------------------------------------------------------------------
 
 time_t Time::setTime(const char* datetimestr) {
   if (!datetimestr) return 0;
@@ -213,6 +246,8 @@ time_t Time::setTime(const char* datetimestr) {
   return t;
 }
 
+// ----------------------------------------------------------------------
+
 long int Time::getOffset() const {
   time_t t = now();
   struct tm tm;
@@ -226,8 +261,12 @@ long int Time::getOffset() const {
 #endif
 }
 
+// ----------------------------------------------------------------------
+
 void Time::setOffset(int /*val*/) {
 }
+
+// ----------------------------------------------------------------------
 
 int Time::hour(time_t t) {
   struct tm tm;
@@ -235,17 +274,23 @@ int Time::hour(time_t t) {
   return tm.tm_hour;
 }
 
+// ----------------------------------------------------------------------
+
 int Time::minute(time_t t) {
   struct tm tm;
   localtime_r(&t, &tm);
   return tm.tm_min;
 }
 
+// ----------------------------------------------------------------------
+
 int Time::weekday(time_t t) {
   struct tm tm;
   localtime_r(&t, &tm);
   return tm.tm_wday;
 }
+
+// ----------------------------------------------------------------------
 
 bool Time::isLeapYear(uint16_t year) {
   return (year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0));
