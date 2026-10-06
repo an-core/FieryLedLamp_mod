@@ -14,8 +14,6 @@ Wifi::Wifi()
   , forcedAPActive(false)
   , apActive(false)
   , internetAvailable(false)
-  , internetCheckPending(false)
-  , internetCheckStart(0)
   , noInternetStartTime(0)
   , wifiTimeoutMs(30000)
   , reconnectIntervalMs(30000)
@@ -60,21 +58,14 @@ void Wifi::restartAP() {
 // ----------------------------------------------------------
 
 void Wifi::begin() {
-  xTaskCreatePinnedToCore(
-  [](void* arg) {
-    static_cast<Wifi*>(arg)->internetCheckTask();
-  },
-  "wifi_inet", 4096, this, 1, &internetCheckTaskHandle, 0);
-
+  static bool initialized = false;
+  if (initialized) return;
+  initialized = true;
   xTaskCreatePinnedToCore(
   [](void* arg) {
     static_cast<Wifi*>(arg)->wifiManagerTask();
   },
-  "wifi_mgr", 4096, this, 1, &wifiManagerTaskHandle, 0);
-
-  static bool initialized = false;
-  if (initialized) return;
-  initialized = true;
+  "wifi_mgr", 4096, this, 2, &wifiManagerTaskHandle, 0);
 
   String main_ssid = jsonRead(configWiFi, "ssid");
   String main_pass = jsonRead(configWiFi, "password");
@@ -193,52 +184,21 @@ void Wifi::loop() {
   }
 
   unsigned long now = millis();
-
   manageConnection();
 
   if (!apActive && !forcedAPActive && !connectInProgress) {
     if (now - lastQuickCheck >= reconnectIntervalMs) {
       lastQuickCheck = now;
       if (WiFi.status() != WL_CONNECTED) {
-#if WIFI_LOG
-        SYSLOG.add("WiFi отключен - инициируется переподключение");
-#endif
         initSTA();
       }
     }
-  }
-
-  if (connected && (now - lastInternetCheck >= 10000UL)) {
-    lastInternetCheck = now;
-    if (!internetCheckPending) {
-      checkInternetAsync();
-    }
-  }
-
-  if (internetCheckDone) {
-    internetCheckDone = false;
-    onInternetCheckResult(internetCheckResultFlag);
   }
 
   if ((apActive || forcedAPActive) && !connectInProgress && !connected && hasAnyNetworks()) {
     if (now - lastReconnectAttempt >= checkIntervalMs) {
       lastReconnectAttempt = now;
       initSTA();
-    }
-  }
-
-  if (!forcedAPActive && !apActive && connected) {
-    if (!internetAvailable) {
-      if (noInternetStartTime == 0) noInternetStartTime = now;
-      else if (now - noInternetStartTime >= forcedApTimeoutMs && forcedApTimeoutMs > 0) {
-#if WIFI_LOG
-        SYSLOG.add("Нет интернета %lu сек - включаем AP", forcedApTimeoutMs / 1000);
-#endif
-        startForcedAP();
-        return;
-      }
-    } else {
-      noInternetStartTime = 0;
     }
   }
 
@@ -266,9 +226,9 @@ void Wifi::setAPAlways(bool enable) {
 void Wifi::ensureAP() {
   if (!apActive && !forcedAPActive && !isConnected()) {
 #if WIFI_LOG
-    SYSLOG.add("ensureAP: нет WiFi, запускаем AP");
+    SYSLOG.add("ensureAP: нет WiFi, запрашиваем AP");
 #endif
-    startForcedAP();
+    needStartForcedAP = true;
   }
 }
 
@@ -296,57 +256,21 @@ int32_t Wifi::getRSSI() const {
 
 // ----------------------------------------------------------
 
-void Wifi::checkInternetAsync() {
-  if (internetCheckPending) return;
-  if (WiFi.status() != WL_CONNECTED) {
-    internetAvailable = false;
-    return;
-  }
-  internetCheckPending = true;
-  internetCheckRequest = true;
-}
-
-// ----------------------------------------------------------
-
-void Wifi::internetCheckTask() {
+void deferredTasksTask(void* pv) {
   esp_task_wdt_delete(NULL);
   for (;;) {
-    if (internetCheckRequest) {
-      internetCheckRequest = false;
-      bool result = false;
-      if (WiFi.status() == WL_CONNECTED) {
-        WiFiClient client;
-        client.setTimeout(2000);
-        if (client.connect(IPAddress(8, 8, 8, 8), 53)) {
-          result = true;
-        }
-        client.stop();
+    if (g_flagAutoTz) {
+      g_flagAutoTz = false;
+      if (Wifi::instance().isConnected()) {
+        autoDetectTimezone();
       }
-      internetCheckResultFlag = result;
-      internetCheckDone = true;
-      internetCheckPending = false;
     }
-    vTaskDelay(pdMS_TO_TICKS(50));
+    vTaskDelay(pdMS_TO_TICKS(100));
   }
 }
 
-// ----------------------------------------------------------
-
-void Wifi::onInternetCheckResult(bool has) {
-  internetAvailable = has;
-  internetCheckPending = false;
-  if (has) {
-#if WIFI_LOG
-    SYSLOG.add("Интернет доступен");
-#endif
-    if (!myTime.isTimeSet()) {
-      initTimeAndTimezone();
-    }
-  } else {
-#if WIFI_LOG
-    SYSLOG.add("Интернет недоступен");
-#endif
-  }
+void initDeferredTasks() {
+  xTaskCreatePinnedToCore(deferredTasksTask, "deferred", 8192, NULL, 1, NULL, 1);
 }
 
 // ----------------------------------------------------------
@@ -451,7 +375,29 @@ void Wifi::wifiManagerTask() {
       continue;
     }
 
+    if (needStartForcedAP) {
+      needStartForcedAP = false;
+      startForcedAP();
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
+    }
+
+    if (needStopForcedAP) {
+      needStopForcedAP = false;
+      stopForcedAP();
+      vTaskDelay(pdMS_TO_TICKS(200));
+      continue;
+    }
+
+    if (needInitSTA) {
+      needInitSTA = false;
+      WiFi.disconnect();
+      delay(10);
+      initSTA();
+    }
+
     if (wifiRunActive) {
+      vTaskDelay(pdMS_TO_TICKS(100));
       wl_status_t status = (wl_status_t)wifiMulti.run();
 
 #if WIFI_LOG
@@ -464,10 +410,7 @@ void Wifi::wifiManagerTask() {
 
       if (status == WL_CONNECTED) {
         wifiRunActive = false;
-        vTaskDelay(pdMS_TO_TICKS(200));
-        continue;
       }
-
       vTaskDelay(pdMS_TO_TICKS(200));
     } else {
       vTaskDelay(pdMS_TO_TICKS(200));
@@ -483,7 +426,7 @@ void Wifi::manageConnection() {
     staState = STA_CONNECTED;
     connectInProgress = false;
     wifiRunActive = false;
-    if (forcedAPActive) stopForcedAP();
+    if (forcedAPActive) needStopForcedAP = true;
 #if WIFI_LOG
     SYSLOG.add("WiFi уже подключён");
 #endif
@@ -513,13 +456,10 @@ void Wifi::forceReconnect() {
 #if WIFI_LOG
   SYSLOG.add("Принудительное переподключение WiFi");
 #endif
-  WiFi.disconnect();
-  delay(10);
-  wifiRunActive = false;
+  needInitSTA = true;
   connectInProgress = false;
-  staState = STA_IDLE;
   connected = false;
-  initSTA();
+  staState = STA_IDLE;
 }
 
 // ----------------------------------------------------------

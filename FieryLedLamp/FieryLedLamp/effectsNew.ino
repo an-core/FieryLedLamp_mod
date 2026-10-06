@@ -1556,93 +1556,6 @@ void ByEffect() {
   step++;
 }
 
-// =================================================================== СТРОБ, ХАОС, ДИФУЗИЯ ===========================================================
-//             © SlingMaster
-// =====================================
-
-void StrobeAndDiffusion() {
-  const uint8_t SIZE = 3U;
-  const uint8_t DELTA = 1U;
-  uint8_t STEP = 2U;
-
-  if (loadingFlag) {
-#if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
-    if (selectedSettings) {
-      setModeSettings(1U + random8(100U), 1U + random8(150U));
-    }
-#endif
-    loadingFlag = false;
-    FPSdelay = 25U;
-    hue2 = 1;
-    FastLED.clear();
-  }
-
-  STEP = floor((255 - modes[currentMode].Speed) / 64) + 1U;
-
-  if (modes[currentMode].Scale > 50) {
-    // diffusion ---
-    blurScreen(beatsin8(3, 64, 80));
-    FPSdelay = LOW_DELAY;
-    STEP = 1U;
-    if (modes[currentMode].Scale < 75) {
-      FPSdelay = 30;
-      VirtualSnow(1);
-    }
-  } else {
-    // strob -------
-    if (modes[currentMode].Scale > 25) {
-      dimAll(200);
-      FPSdelay = 30;
-    } else {
-      dimAll(240);
-      FPSdelay = 40;
-    }
-  }
-
-  const uint8_t rows = (matrixHeight + 1) / 3U;
-  deltaHue = floor(modes[currentMode].Speed / 64) * 64;
-  bool dir = false;
-
-  for (uint8_t y = 0; y < rows; y++) {
-    uint8_t yy = y * 3 + DELTA;
-    if (yy < matrixHeight) {
-      if (dir) {
-        if ((step % STEP) == 0) {
-          drawPixelXY(matrixWidth - 1, yy, CHSV(step, 255U, 255U));
-        } else {
-          drawPixelXY(matrixWidth - 1, yy, CHSV(170U, 255U, 1U));
-        }
-      } else {
-        if ((step % STEP) == 0) {
-          drawPixelXY(0, yy, CHSV((step + deltaHue), 255U, 255U));
-        } else {
-          drawPixelXY(0, yy, CHSV(0U, 255U, 0U));
-        }
-      }
-    }
-
-    // сдвигаем слои
-    if (dir) {  // <==
-      for (uint16_t x = 1; x < matrixWidth; x++) {
-        drawPixelXY(x - 1, yy, getPixColorXY(x, yy));
-      }
-    } else {    // ==>
-      for (uint16_t x = 1; x < matrixWidth; x++) {
-        drawPixelXY(matrixWidth - x, yy, getPixColorXY(matrixWidth - x - 1, yy));
-      }
-    }
-    dir = !dir;
-  }
-
-  if (hue2 == 1) {
-    step++;
-    if (step >= 254) hue2 = 0;
-  } else {
-    step--;
-    if (step < 1) hue2 = 1;
-  }
-}
-
 // ========================================================================== ФЕЙЕРВЕРК ===============================================================
 //             © SlingMaster
 // =====================================
@@ -2207,8 +2120,8 @@ void FlowerRuta() {
         int16_t dy = y - centerY;
         float angle = atan2(dy, dx);
         if (angle < 0) angle += 2 * PI;
-        noise3d[0][x][y] = (angle / (2 * PI)) * 255.0f;
-        noise3d[1][x][y] = hypot(dx, dy);
+        noise3d[0][x][y] = (uint8_t)roundf((angle / (2 * PI)) * 255.0f);
+        noise3d[1][x][y] = (uint8_t)roundf(hypot(dx, dy));
       }
     }
 
@@ -2230,12 +2143,15 @@ void FlowerRuta() {
 
   scale++;
 
+  const uint16_t maxDim = max(matrixWidth, matrixHeight);
+
   for (uint16_t x = 0; x < matrixWidth; x++) {
     for (uint16_t y = 0; y < matrixHeight; y++) {
-      uint8_t angle  = noise3d[0][x][y];
+      uint8_t angle = noise3d[0][x][y];
       uint8_t radius = noise3d[1][x][y];
-      uint8_t brightness = sin8( sin8( scale + angle * petals + (radius * 255 / max(matrixWidth, matrixHeight))) + scale * 4 + sin8( scale * 4 - radius * 255 / max(matrixWidth, matrixHeight)) + angle * petals);
-      uint8_t hueVal = colorSpeed + radius * (255 / max(matrixWidth, matrixHeight));
+      uint8_t radiusScaled = (uint8_t)((uint16_t)radius * 255U / maxDim);
+      uint8_t brightness = sin8(sin8(scale + angle * petals + radiusScaled) + scale * 4 + sin8(scale * 4 - radiusScaled) + angle * petals);
+      uint8_t hueVal = colorSpeed + radiusScaled;
 
       leds[XY(x, y)] = CHSV(hueVal, 255, brightness);
     }
@@ -2687,9 +2603,9 @@ void PlanetEarth() {
 //             © SlingMaster
 // ==================================
 
-uint8_t nextColor(uint8_t posY, uint8_t base, uint8_t next ) {
+uint8_t nextColor(uint8_t posY, uint8_t base, uint8_t next) {
   const byte posLine = (matrixHeight > 16) ? 4 : 3;
-  if ((posY + 1 == posLine) | (posY == posLine)) {
+  if ((posY + 1 == posLine) || (posY == posLine)) {
     return next;
   } else {
     return base;
@@ -2711,16 +2627,17 @@ void Bamboo() {
   uint8_t posY;
   static uint8_t colLine;
   const float STP = 0.2;
+
   if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
     if (selectedSettings) {
-      // scale | speed
       setModeSettings(random8(100U), random8(128, 255U));
     }
 #endif
     loadingFlag = false;
     index = STP;
-    uint8_t idx = map(modes[currentMode].Scale, 5, 95, 0U, 6U);;
+
+    uint8_t idx = (uint8_t)constrain(map(modes[currentMode].Scale, 5, 95, 0U, 6U), 0, 6);
     colLine = gamma[idx];
     step = 0U;
   }
@@ -2729,21 +2646,21 @@ void Bamboo() {
     if (modes[currentMode].Scale < 50U) {
       if (step % 128 == 0U) {
         deltaX += STP * ((direct) ? -1 : 1);
-        if ((deltaX > 1) | (deltaX < -1)) direct = !direct;
+        if ((deltaX > 1) || (deltaX < -1)) direct = !direct;
       }
     } else {
       deltaX = 0;
     }
-    posY = y;
+
     for (int x = 0; x < matrixWidth + SX; x++) {
       if (y == posLine) {
-        drawPixelXYF(x , y - 1, CHSV(colLine, 255U, 128U));
+        drawPixelXYF(x, y - 1, CHSV(colLine, 255U, 128U));
         drawPixelXYF(x, y, CHSV(colLine, 255U, 96U));
         if (matrixHeight > 16) {
           drawPixelXYF(x, y - 2, CHSV(colLine, 10U, 64U));
         }
       }
-      if ((x % SX == 0U) & (y % SY == 0U)) {
+      if ((x % SX == 0U) && (y % SY == 0U)) {
         for (int i = 1; i < (SY - 3); i++) {
           if (i < 3) {
             posY = y - i + 1 - DELTA + index;
@@ -4010,11 +3927,11 @@ void earthRoutine() {
   }
 }
 
-// ===================================================================== ЭФФЕКТ ЗМЕЙКА ================================================================
+// ========================================================================== ЗМЕЙКА ==================================================================
 // @ Wa1den
 // ===============
 
-#define MAX_SNAKE_LENGTH 1024
+#define MAX_SNAKE_LENGTH 4096
 
 void snakeGameRoutine() {
   static uint8_t snakeX[MAX_SNAKE_LENGTH]; // тело змейки, индекс 0 - голова
@@ -4033,6 +3950,7 @@ void snakeGameRoutine() {
 #endif
     loadingFlag = false;
     blinkPhase = 1U; // старт через ветку перезапуска ниже
+    framePulse = 0;
   }
 
   framePulse += 12U;
@@ -4077,9 +3995,11 @@ void snakeGameRoutine() {
     if (nyRaw < 0 || nyRaw >= (int8_t)matrixHeight) { // вертикаль - стенки
       continue;
     }
+    
     uint8_t ny = (uint8_t)nyRaw;
 
     bool occupied = false; // проверка на столкновение с телом
+    
     for (uint16_t i = 0U; i < snakeLen; i++) {
       if (snakeX[i] == nx && snakeY[i] == ny) {
         occupied = true;
@@ -4090,7 +4010,8 @@ void snakeGameRoutine() {
 
     uint8_t dxRight = (uint8_t)((foodX - nx + matrixWidth) % matrixWidth);
     uint8_t dxWrap = min(dxRight, (uint8_t)(matrixWidth - dxRight));
-    uint8_t dist = dxWrap + abs((int8_t)foodY - (int8_t)ny);
+    uint8_t dist = dxWrap + abs((int16_t)foodY - (int16_t)ny);
+    
     if (dist < bestDist) { // строгое "меньше": при равенстве побеждает движение прямо
       bestDist = dist;
       bestDir = c;
@@ -4109,21 +4030,27 @@ void snakeGameRoutine() {
 
   bool ate = (newX == foodX && newY == foodY);
   uint16_t shift = ate ? snakeLen : snakeLen - 1U; // при еде хвост не отбрасывается - змейка растёт
+  
   for (uint16_t i = shift; i > 0U; i--) {
     snakeX[i] = snakeX[i - 1U];
     snakeY[i] = snakeY[i - 1U];
   }
   snakeX[0] = newX;
   snakeY[0] = newY;
+  
   if (ate) {
     snakeLen++;
-    if (snakeLen >= (uint16_t)(matrixWidth * matrixHeight)) { // вся матрица заполнена - победа
-      blinkPhase = 7U;
-      return;
+    uint16_t winLimit = (uint16_t)(matrixWidth * matrixHeight);
+    if (winLimit > MAX_SNAKE_LENGTH - 1U) winLimit = MAX_SNAKE_LENGTH - 1U;
+    
+    if (snakeLen >= winLimit) {
+        blinkPhase = 7U;
+        return;
     }
 
     uint8_t tries = 0U;
     bool occupied;
+    
     do { // новая еда на свободной клетке
       foodX = random8(matrixWidth);
       foodY = random8(matrixHeight);
@@ -4163,7 +4090,7 @@ void snakeGameRoutine() {
   drawPixelXY(foodX, foodY, CHSV(hue + 128U, 255U, 120U + (sin8(framePulse) >> 1)));
 }
 
-// ========================================================================== ЭФФЕКТ МАРИО ============================================================
+// ============================================================================ МАРИО =================================================================
 // @ Wa1den
 // ===============
 

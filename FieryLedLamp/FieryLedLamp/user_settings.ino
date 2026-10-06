@@ -149,7 +149,7 @@ void User_settings() {
   HTTP.on("/sd_type", handle_sd_type);
 
   HTTP.on("/get_module_states", HTTP_GET, []() {
-    DynamicJsonDocument doc(256);
+    DynamicJsonDocument doc(512);
     doc["button_enable"] = buttonEnabled ? "1" : "0";
     doc["ir_enable"] = irEnabled ? "1" : "0";
     doc["rf_enable"] = rfEnabled ? "1" : "0";
@@ -158,6 +158,11 @@ void User_settings() {
     doc["mp3_enable"] = mp3Enabled ? "1" : "0";
     doc["sd_enable"] = sdEnabled ? "1" : "0";
     doc["sd_type"] = String(sdType);
+#if MULTI_MATRIX
+    doc["multi_matrix"] = "1";
+#else
+    doc["multi_matrix"] = "0";
+#endif
     String response;
     serializeJson(doc, response);
     HTTP.send(200, "application/json", response);
@@ -535,15 +540,12 @@ void User_settings() {
     NTP_SERVER2 = new_ntp2;
 
     myTime.ntpodhcp(false);
-    myTime.tzsetup(current_tz.c_str());
 
     if (new_ntp3.length() > 0) {
       myTime.setcustomntp(new_ntp3.c_str());
     }
 
-    if (Wifi::instance().isConnected()) {
-      myTime.forcesync();
-    }
+    myTime.tzsetup(current_tz.c_str());
 
     HTTP.send(200, "text/plain", "OK");
   });
@@ -562,18 +564,8 @@ void User_settings() {
     jsonWrite(configSetup, "tz", "");
     jsonWrite(configSetup, "use_auto_tz", "1");
     saveConfig();
-    autoDetectTimezone();
-
-    String detectedTz = jsonRead(configSetup, "tz");
-    if (detectedTz.length() > 0) {
-      myTime.tzsetup(detectedTz.c_str());
-      if (Wifi::instance().isConnected()) {
-        myTime.forcesync();
-      }
-      HTTP.send(200, "text/plain", "AUTO_OK");
-    } else {
-      HTTP.send(500, "text/plain", "AUTO_FAILED");
-    }
+    g_flagAutoTz = true;
+    HTTP.send(200, "text/plain", "AUTO_OK");
   });
 
   // установка времени с клиента
@@ -644,43 +636,35 @@ void User_settings() {
       jsonWrite(configSetup, "tz", "");
       jsonWrite(configSetup, "use_auto_tz", "1");
       saveConfig();
-      autoDetectTimezone();
-      String detectedTz = jsonRead(configSetup, "tz");
-      if (detectedTz.length() > 0) {
-        myTime.tzsetup(detectedTz.c_str());
-      } else {
-        myTime.tzsetup("MSK-3");
-      }
-    } else {
-      bool isPreset = false;
-      const char* presets[] = {"MSK-3", "SAMT-4", "YEKT-5", "OMST-6", "KRAT-7", "IRKT-8", "YAKT-9", "VLAT-10", "MAGT-11", "PETT-12", "ALMT-5"};
-      for (int i = 0; i < 11; i++) {
-        if (newTz == presets[i]) {
-          isPreset = true;
-          break;
-        }
-      }
-
-      String posixTz = newTz;
-      if (!isPreset) {
-        posixTz = ianaToPosix(newTz);
-        if (posixTz == newTz && !isValidPosixFormat(newTz)) {
-          HTTP.send(400, "text/plain", "INVALID_TZ_FORMAT");
-          return;
-        }
-      }
-
-      jsonWrite(configSetup, "tz", posixTz);
-      jsonWrite(configSetup, "tz_custom", newTz);
-      jsonWrite(configSetup, "tz_is_custom", isPreset ? "0" : "1");
-      jsonWrite(configSetup, "use_auto_tz", "0");
-      saveConfig();
-      myTime.tzsetup(posixTz.c_str());
+      g_flagAutoTz = true;
+      HTTP.send(200, "text/plain", "OK_TZ_SET");
+      return;
     }
 
-    if (Wifi::instance().isConnected()) {
-      myTime.forcesync();
+    bool isPreset = false;
+    const char* presets[] = {"MSK-3", "SAMT-4", "YEKT-5", "OMST-6", "KRAT-7", "IRKT-8", "YAKT-9", "VLAT-10", "MAGT-11", "PETT-12", "ALMT-5"};
+    for (int i = 0; i < 11; i++) {
+      if (newTz == presets[i]) {
+        isPreset = true;
+        break;
+      }
     }
+
+    String posixTz = newTz;
+    if (!isPreset) {
+      posixTz = ianaToPosix(newTz);
+      if (posixTz == newTz && !isValidPosixFormat(newTz)) {
+        HTTP.send(400, "text/plain", "INVALID_TZ_FORMAT");
+        return;
+      }
+    }
+
+    jsonWrite(configSetup, "tz", posixTz);
+    jsonWrite(configSetup, "tz_custom", newTz);
+    jsonWrite(configSetup, "tz_is_custom", isPreset ? "0" : "1");
+    jsonWrite(configSetup, "use_auto_tz", "0");
+    saveConfig();
+    myTime.tzsetup(posixTz.c_str());
 
     HTTP.send(200, "text/plain", "OK_TZ_SET");
   });
@@ -728,9 +712,6 @@ void User_settings() {
     saveConfig();
 
     myTime.tzsetup(posixTz.c_str());
-    if (Wifi::instance().isConnected()) {
-      myTime.forcesync();
-    }
 
     HTTP.send(200, "text/plain", "OK_TZ_SET");
   });

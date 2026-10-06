@@ -854,7 +854,8 @@ uint8_t wrapY(int16_t y) {
 }
 
 void rain(uint8_t backgroundDepth, uint8_t maxBrightness, uint8_t spawnFreq, uint8_t tailLength, CRGB rainColor, bool splashes, bool clouds, bool storm) {
-  dimAll(tailLength);
+  constrainCurrentEffectScale(100);
+  dimAll(tailLength, leds);
 
   CRGBPalette16 rain_p(CRGB(0, 0, 0), rainColor);
   CRGBPalette16 rainClouds_p(CRGB(0, 0, 0), CRGB(15, 24, 24), CRGB(9, 15, 15), CRGB(0, 0, 0));
@@ -897,50 +898,53 @@ void rain(uint8_t backgroundDepth, uint8_t maxBrightness, uint8_t spawnFreq, uin
     }
 
     if (storm) {
-      uint8_t* lightning = (uint8_t*)malloc(matrixWidth * matrixHeight);
-      if (lightning) {
-        memset(lightning, 0, matrixWidth * matrixHeight);
+    static uint8_t* lightning = nullptr;
+    static uint16_t prevLightningDim = 0;
+    uint16_t needed = matrixWidth * matrixHeight;
 
-        if (random16() < 72) {
-          uint16_t startX = random16(matrixWidth);
-          uint16_t startY = matrixHeight - 1;
-          lightning[startX + startY * matrixWidth] = 255;
-
-          for (uint16_t ly = matrixHeight - 1; ly > 1; ly--) {
-            for (uint16_t lx = 1; lx < matrixWidth - 1; lx++) {
-              if (lightning[lx + ly * matrixWidth] == 255) {
-                lightning[lx + ly * matrixWidth] = 0;
-                uint8_t dir = random8(4);
-
-                CRGB col = (dir == 1 || dir == 3) ? CRGB(128, 128, 128) : CRGB(72, 72, 80);
-
-                switch (dir) {
-                  case 0:
-                    leds[XY(lx + 1, ly - 1)] = col;
-                    lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
-                    break;
-                  case 1:
-                    leds[XY(lx, ly - 1)] = col;
-                    lightning[lx + (ly - 1) * matrixWidth] = 255;
-                    break;
-                  case 2:
-                    leds[XY(lx - 1, ly - 1)] = col;
-                    lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
-                    break;
-                  case 3:
-                    leds[XY(lx - 1, ly - 1)] = col;
-                    lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
-                    leds[XY(lx + 1, ly - 1)] = col;
-                    lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
-                    break;
-                }
-              }
-            }
-          }
-        }
-        free(lightning);
-      }
+    if (!lightning || needed != prevLightningDim) {
+        if (lightning) free(lightning);
+        lightning = (uint8_t*)malloc(needed);
+        prevLightningDim = needed;
     }
+    if (lightning) {
+        memset(lightning, 0, needed);
+        if (random16() < 72) {
+            uint16_t startX = random16(matrixWidth);
+            uint16_t startY = matrixHeight - 1;
+            lightning[startX + startY * matrixWidth] = 255;
+            for (uint16_t ly = matrixHeight - 1; ly > 1; ly--) {
+                for (uint16_t lx = 1; lx < matrixWidth - 1; lx++) {
+                    if (lightning[lx + ly * matrixWidth] == 255) {
+                        lightning[lx + ly * matrixWidth] = 0;
+                        uint8_t dir = random8(4);
+                        CRGB col = (dir == 1 || dir == 3) ? CRGB(128, 128, 128) : CRGB(72, 72, 80);
+                        switch (dir) {
+                            case 0:
+                                leds[XY(lx + 1, ly - 1)] = col;
+                                lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
+                                break;
+                            case 1:
+                                leds[XY(lx, ly - 1)] = col;
+                                lightning[lx + (ly - 1) * matrixWidth] = 255;
+                                break;
+                            case 2:
+                                leds[XY(lx - 1, ly - 1)] = col;
+                                lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
+                                break;
+                            case 3:
+                                leds[XY(lx - 1, ly - 1)] = col;
+                                lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
+                                leds[XY(lx + 1, ly - 1)] = col;
+                                lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
+                                break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
     if (clouds) {
       const uint16_t noiseScale = 250;
@@ -1063,27 +1067,28 @@ void magmaRoutine() {
 }
 
 // ============================================================= ЦВЕТНОЙ ДОЖДЬ / ПРОСТОЙ ДОЖДЬ / ГРОЗА ================================================
-CRGB solidRainColor = CRGB(60, 80, 90); // Базовый цвет для эффекта
+
+CRGB solidRainColor = CRGB(60, 80, 90);
+
 void coloredRain() {
-  if (loadingFlag) {
+    if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
-    if (selectedSettings) {
-      uint8_t tmp = 1U + random8(255U);
-      if ((tmp % 4U == 0U) && (tmp % 8U != 0U)) tmp--;
-      setModeSettings(tmp, 165U + random8(76U));
-    }
+        if (selectedSettings) {
+            uint8_t tmp = 1U + random8(255U);
+            if ((tmp % 4U == 0U) && (tmp % 8U != 0U)) tmp--;
+            setModeSettings(tmp, 165U + random8(76U));
+        }
 #endif
-    loadingFlag = false;
-  }
+        loadingFlag = false;
+    }
 
-  uint8_t scaleVal = myScale8(modes[currentMode].Scale);
+    constrainCurrentEffectScale(100U);   // <-- ограничить Scale до 100
 
-  if (modes[currentMode].Scale > 247U) {
-    rain(60, 200, map8(42, 5, 100), scaleVal, solidRainColor, false, false, false);
-  } else {
-    uint8_t hue = (uint8_t)((float)(modes[currentMode].Scale - 1) * 2.6);
-    rain(60, 200, map8(42, 5, 100), scaleVal, CHSV(hue, 255U, 255U), false, false, false);
-  }
+    uint8_t scaleVal = myScale8(modes[currentMode].Scale);
+    uint8_t hue = (uint8_t)(modes[currentMode].Scale * 2.55f);
+
+    rain(60, 200, map8(42, 5, 100), scaleVal,
+         CHSV(hue, 255U, 255U), false, false, false);
 }
 
 void simpleRain() {
@@ -1095,6 +1100,8 @@ void simpleRain() {
 #endif
     loadingFlag = false;
   }
+
+  constrainCurrentEffectScale(100U);
 
   rain(60, 180, (modes[currentMode].Scale - 1) * 2.58f, 30, solidRainColor, true, true, false);
 }
@@ -1108,6 +1115,8 @@ void stormyRain() {
 #endif
     loadingFlag = false;
   }
+
+  constrainCurrentEffectScale(100U);
 
   rain(60, 160, (modes[currentMode].Scale - 1) * 2.58f, 30, solidRainColor, true, true, true);
 }
@@ -2364,6 +2373,92 @@ void colorsRoutine2() {
     }
     else
       hue2++;
+}
+
+// =================================================================== СТРОБ, ХАОС, ДИФУЗИЯ ===========================================================
+//             © SlingMaster
+// =====================================
+
+void StrobeAndDiffusion() {
+  const uint8_t DELTA = 1U; // центровка по вертикали
+  uint8_t STEP = 2U;
+
+  if (loadingFlag) {
+#if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
+    if (selectedSettings) {
+      setModeSettings(1U + random8(100U), 1U + random8(150U));
+    }
+#endif
+    loadingFlag = false;
+    FPSdelay = 25U;
+    hue2 = 1;
+    FastLED.clear();
+  }
+
+  STEP = floor((255 - modes[currentMode].Speed) / 64) + 1U;
+
+  if (modes[currentMode].Scale > 50) {
+    // diffusion
+    blurScreen(beatsin8(3, 64, 80), leds);
+    FPSdelay = LOW_DELAY;
+    STEP = 1U;
+    if (modes[currentMode].Scale < 75) {
+      FPSdelay = 30;
+      VirtualSnow(1);
+    }
+  } else {
+    // strobe
+    if (modes[currentMode].Scale > 25) {
+      dimAll(200, leds);
+      FPSdelay = 30;
+    } else {
+      dimAll(240, leds);
+      FPSdelay = 40;
+    }
+  }
+
+  const uint8_t rows = (matrixHeight + 1) / 3U;
+  deltaHue = floor(modes[currentMode].Speed / 64) * 64;
+  bool dir = false;
+
+  for (uint8_t y = 0; y < rows; y++) {
+    uint8_t yy = y * 3 + DELTA;
+    if (yy >= matrixHeight) continue;
+
+    if (dir) {
+      if ((step % STEP) == 0) {
+        drawPixelXY(matrixWidth - 1, yy, CHSV(step, 255U, 255U));
+      } else {
+        drawPixelXY(matrixWidth - 1, yy, CHSV(170U, 255U, 1U));
+      }
+    } else {
+      if ((step % STEP) == 0) {
+        drawPixelXY(0, yy, CHSV((step + deltaHue), 255U, 255U));
+      } else {
+        drawPixelXY(0, yy, CHSV(0U, 255U, 0U));
+      }
+    }
+
+    // сдвиг слоёв
+    if (dir) {
+      for (uint16_t x = 1; x < matrixWidth; x++) {
+        drawPixelXY(x - 1, yy, getPixColorXY(x, yy));
+      }
+    } else {
+      for (uint16_t x = 1; x < matrixWidth; x++) {
+        drawPixelXY(matrixWidth - x, yy, getPixColorXY(matrixWidth - x - 1, yy));
+      }
+    }
+    dir = !dir;
+  }
+
+  if (hue2 == 1) {
+    step++;
+    if (step >= 254) hue2 = 0;
+  } else {
+    step--;
+    if (step < 1) hue2 = 1;
+  }
 }
 
 // ============================================================================ МАТРИЦА ===============================================================

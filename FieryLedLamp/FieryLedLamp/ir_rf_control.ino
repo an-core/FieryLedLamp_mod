@@ -547,7 +547,7 @@ void Digit_Handle(uint8_t digit) {
     if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
 
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;

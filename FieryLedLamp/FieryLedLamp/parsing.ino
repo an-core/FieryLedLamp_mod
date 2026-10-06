@@ -69,7 +69,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             if (++temp >= MODE_AMOUNT) temp = 0;
             currentMode = eff_num_correct[temp];
 #if USE_MP3_PLAYER
-            if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
@@ -84,7 +84,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             if (++temp >= MODE_AMOUNT) temp = 0;
             currentMode = eff_num_correct[temp];
 #if USE_MP3_PLAYER
-            if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
@@ -98,7 +98,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
           if (++temp >= MODE_AMOUNT) temp = 0;
           currentMode = eff_num_correct[temp];
 #if USE_MP3_PLAYER
-          if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+          if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
             uint8_t newFolder = effects_folders[currentMode];
             if (mp3_folder != newFolder) {
               mp3_folder = newFolder;
@@ -116,7 +116,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             temp--;
             currentMode = eff_num_correct[temp];
 #if USE_MP3_PLAYER
-            if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
@@ -132,7 +132,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             temp--;
             currentMode = eff_num_correct[temp];
 #if USE_MP3_PLAYER
-            if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
               uint8_t newFolder = effects_folders[currentMode];
               if (mp3_folder != newFolder) {
                 mp3_folder = newFolder;
@@ -147,7 +147,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
           temp--;
           currentMode = eff_num_correct[temp];
 #if USE_MP3_PLAYER
-          if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+          if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
             uint8_t newFolder = effects_folders[currentMode];
             if (mp3_folder != newFolder) {
               mp3_folder = newFolder;
@@ -207,7 +207,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       }
 
 #if USE_MP3_PLAYER
-      if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+      if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
         uint8_t newFolder = effects_folders[currentMode];
         if (mp3_folder != newFolder) {
           mp3_folder = newFolder;

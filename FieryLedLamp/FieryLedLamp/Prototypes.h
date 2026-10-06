@@ -158,6 +158,7 @@ void sendAlarms(char *outputBuffer);
 void sendSunsets(char *outputBuffer);
 void sendTimer(char *outputBuffer);
 bool FileCopy(const String& SourceFile, const String& TargetFile);
+void autoDetectTimezone();
 // ------------------------------------------------------
 // effectsSupport
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
@@ -166,6 +167,7 @@ void setModeSettings(uint8_t Scale, uint8_t Speed);
 uint16_t XY(uint8_t x, uint8_t y);
 void blurScreen(fract8 blur_amount, CRGB *LEDarray = leds);
 void dimAll(uint8_t value, CRGB *LEDarray = leds);
+void constrainCurrentEffectScale(uint8_t maxScale);
 void setNoise(uint16_t x, uint16_t y, uint8_t val);
 uint8_t safeGetNoise(uint8_t layer, uint8_t x, uint8_t y);
 void safeSetNoise(uint8_t layer, uint8_t x, uint8_t y, uint8_t val);

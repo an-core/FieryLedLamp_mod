@@ -69,23 +69,18 @@ class Wifi {
     void wifiManagerTask();
     TaskHandle_t wifiManagerTaskHandle = nullptr;
 
-    void internetCheckTask();
-    TaskHandle_t internetCheckTaskHandle = nullptr;
-
-    volatile bool internetCheckRequest = false;
-    volatile bool internetCheckDone = false;
-    volatile bool internetCheckResultFlag = false;
-
     volatile bool wifiRunActive = false;
     volatile bool needRestartAP = false;
     volatile bool needSetAPAlways = false;
     volatile bool apAlwaysNewValue = false;
 
+    volatile bool needStartForcedAP = false;
+    volatile bool needStopForcedAP = false;
+    volatile bool needInitSTA = false;
+
     void initAP();
     void initSTA();
     void manageConnection();
-    void checkInternetAsync();
-    void onInternetCheckResult(bool has);
 
     WiFiMulti wifiMulti;
     WiFiState staState;
@@ -95,8 +90,6 @@ class Wifi {
     bool forcedAPActive;
     bool apActive;
     bool internetAvailable;
-    bool internetCheckPending;
-    unsigned long internetCheckStart;
     unsigned long noInternetStartTime;
 
     IPAddress staticIP, gateway, subnet, dns1;

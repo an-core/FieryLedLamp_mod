@@ -128,6 +128,17 @@ void buttonTick() {
     }
     loadingFlag = true;
 
+    #if USE_MP3_PLAYER
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+        uint8_t newFolder = effects_folders[currentMode];
+        if (mp3_folder != newFolder) {
+            mp3_folder = newFolder;
+            mp3_folder_last = mp3_folder;
+            mp3_pending_play = true;
+        }
+    }
+#endif
+
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
@@ -164,7 +175,7 @@ void buttonTick() {
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;
@@ -217,7 +228,7 @@ void buttonTick() {
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;
@@ -323,7 +334,7 @@ void buttonTick() {
   // Озвучка времени
   if (clickCount == btn_click_time) {
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       mp3_pending_time_advert = true;
       mp3_pending_time_force = true;
     } else
@@ -340,7 +351,7 @@ void buttonTick() {
   if (clickCount == btn_click_weather) {
 #if USE_WEATHER
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       mp3_pending_weather_advert = true;
       mp3_pending_weather_force = true;
     } else
@@ -358,7 +369,7 @@ void buttonTick() {
   // Вкл/Выкл звук
   if (clickCount == btn_click_sound) {
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       eff_sound_on = eff_sound_on ? 0 : eff_volume;
       showWarning(eff_sound_on ? CRGB::Blue : CRGB::Yellow, 1000, 250U);
       jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
@@ -542,7 +553,7 @@ void buttonTick() {
               Button_Holding = true;
               currentMode = EFF_ANIMATION;
 #if USE_MP3_PLAYER
-              if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+              if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
                 uint8_t newFolder = effects_folders[currentMode];
                 if (mp3_folder != newFolder) {
                   mp3_folder = newFolder;

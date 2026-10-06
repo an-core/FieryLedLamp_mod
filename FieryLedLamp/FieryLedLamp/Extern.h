@@ -7,6 +7,8 @@
 #include "IRManager.h"
 // ---------------------
 
+extern volatile bool g_flagForceSync;
+extern volatile bool g_flagAutoTz;
 extern bool displayIpAtStart;
 extern bool sd_card_present;
 extern uint8_t effSdIndex;

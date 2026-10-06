@@ -311,7 +311,7 @@ bool setCustomTimezone(String customTz) {
 
   myTime.tzsetup(posixTz.c_str());
   if (Wifi::instance().isConnected()) {
-    myTime.forcesync();
+    g_flagForceSync = true;
   }
 
 #if GENERAL_LOG
@@ -339,6 +339,7 @@ void autoDetectTimezone() {
   String ianaTz = "";
 
   if (https.begin(client, "http://ip-api.com/json")) {
+    https.setTimeout(3000);
     int httpCode = https.GET();
     if (httpCode == HTTP_CODE_OK) {
       String payload = https.getString();
@@ -353,6 +354,7 @@ void autoDetectTimezone() {
   }
 
   if (ianaTz.length() == 0 && https.begin(client, "https://ipapi.co/timezone/")) {
+    https.setTimeout(3000);
     int httpCode = https.GET();
     if (httpCode == HTTP_CODE_OK) {
       ianaTz = https.getString();
@@ -397,7 +399,6 @@ void initTimeAndTimezone() {
     if (!myTime.isTimeSet() && (millis() - lastSyncAttempt < 5000UL)) return;
   }
   firstRun = false;
-
   lastSyncAttempt = millis();
 
   String n1 = jsonRead(configSetup, "ntp1");
@@ -405,8 +406,6 @@ void initTimeAndTimezone() {
 
   String n2 = jsonRead(configSetup, "ntp2");
   if (n2.length() > 0) NTP_SERVER2 = n2;
-
-  configTime(0, 0, NTP_SERVER1.c_str(), NTP_SERVER2.c_str(), "time.google.com");
 
   String saved_tz = jsonRead(configSetup, "tz");
   saved_tz.trim();
@@ -418,8 +417,6 @@ void initTimeAndTimezone() {
   } else {
     myTime.tzsetup(saved_tz.c_str());
   }
-
-  myTime.forcesync();
 }
 
 // ******************************************************************************************************************************************************

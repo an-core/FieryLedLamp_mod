@@ -11,21 +11,23 @@
 // *** поддержа использования нескольких последовательно соединённых одинаковых матриц включена по умолчанию
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 
-#define FONT_SIZE 0            // Шрифт текста бегущей строки (настраивается в WEB): 0 - маленький 5х8, 1 - средний 8х13, 2 - крупный 10х16
-#define STATIC_FONT 0          // Шрифт для статики на матрице (часы, дата, погода): 0 - 3x5, 1 - 5x8, 2 - 8x13, 3 - 10x16
 #define LED_CHIP 0             // Тип чипа (настраивается в WEB): 0 - WS2812B (WS2811, SK6812), 1 - APA102 (SK9822)
 #define WIDTH  (16)            // Ширина одной матрицы (настраивается в WEB)
 #define HEIGHT (16)            // Высота одной матрицы (настраивается в WEB)
+#define MULTI_MATRIX 0         // Поддержка использования нескольких последовательно соединённых матриц: 0 - одна матрица, 1 - несколько матриц
 #define SEG_MATRIX_W 1         // Количество матриц по горизонтали (настраивается в WEB)
 #define SEG_MATRIX_H 1         // Количество матриц по вертикали (настраивается в WEB)
 #define COLOR_ORDER 0          // Порядок цветов светодиодов (настраивается в WEB): 0 - GRB, 1 - RGB, 2 - BRG, 3 - RBG, 4 - GBR, 5 - BGR
 #define MATRIX_TYPE 0          // Тип матрицы (настраивается в WEB): 0 - Змейка, 1 - Параллельно
 #define MATRIX_ORIENTATION 0   // Ориентация матрицы (настраивается в WEB): 0-7 (см. комментарий ниже)
-// MATRIX_ORIENTATION:
+// ================== MATRIX_ORIENTATION ==================
 // 0 - Левый Нижний-вправо        4 - Правый Верхний-влево
 // 1 - Левый Нижний-вверх         5 - Правый Верхний-вниз
 // 2 - Левый Верхний-вправо       6 - Правый Нижний-влево
 // 3 - Левый Верхний-вниз         7 - Правый Нижний-вверх
+// -----------------------------------------------------------------------------------------------------------------------------------------------------
+#define FONT_SIZE 0            // Шрифт текста бегущей строки (настраивается в WEB): 0 - маленький 5х8, 1 - средний 8х13, 2 - крупный 10х16
+#define STATIC_FONT 0          // Шрифт для статики на матрице (часы, дата, погода): 0 - 3x5, 1 - 5x8, 2 - 8x13, 3 - 10x16
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 #define USE_WEATHER 1          // Использовать получение данных погоды: 0 - нет, 1 - да
 #define USE_DAWN 1             // Использовать Будильник "Рассвет": 0 - нет, 1 - да
@@ -35,7 +37,7 @@
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 #define USE_MQTT 1             // Использовать MQTT: 0 - нет, 1 - да (доп. настройки см. ниже)
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-#define USE_OTA 1              // Использовать обновление прошивки по воздуху: 0 - нет, 1 - да
+#define USE_OTA 0              // Использовать обновление прошивки по воздуху: 0 - нет, 1 - да
 #define BACKUP_CFG_FILES 1     // Использовать резервное копирование настроек: 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 #define USE_ANIMATIONS 0       // Использовать встроенные анимационные эффекты (Сердце, Марио): 0 - нет, 1 - да
@@ -43,9 +45,32 @@
 #define STATUS_DEVICE 1        // Включить модальное окно Статусы устройств: 0 - нет, 1 - да
 #define SOFT_INFO 1            // Включить модальное окно Информация о ПО (в т.ч. информация о памяти): 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-#define DEBUG_ENABLED 0        // Использовать систему отладки: 0 - нет, 1 - да (доп. настройки см. ниже - стр.335-354)
+#define DEBUG_ENABLED 0        // Использовать систему отладки: 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-
+// Система отладки (включите логи, которые нужно посмотреть на WEB странице или в мониторе порта)
+#if DEBUG_ENABLED
+  #define SYSLOG SystemLog::instance()
+  #define WIFI_LOG 0        // WiFi подключение
+  #define MATRIX_LOG 0      // Матрица (буферы)
+  #define EFF_LOG 1         // Эффекты
+  #define MQTT_LOG 0        // MQTT
+  #define MP3_LOG 0         // MP3 плеер
+  #define BUTTON_LOG 0      // Кнопка
+  #define IR_LOG 0          // Пульт IR
+  #define RF_LOG 0          // Пульт RF
+  #define ST7789_LOG 0      // Дисплей ST7789
+  #define TM1637_LOG 0      // Дисплей TM1637
+  #define WEATHER_LOG 0     // Погода
+  #define SUNSET_LOG 0      // Закат
+  #define DAWN_LOG 0        // Рассвет
+  #define SCHEDULE_LOG 0    // Расписание
+  #define SD_LOG 0          // SD карта
+  #define MEMORY_LOG 0      // Память
+  #define TELNET_LOG 0      // Telnet
+  #define MULTILAMP_LOG 0   // Режим "Мультилампа" (синхронное управление несколькоми лампамм)
+  #define UPDATE_LOG 0      // Обновление прошивки
+  #define GENERAL_LOG 0     // Общие логи
+#endif
 // ============================================================== ПОДКЛЮЧЕНИЕ К ESP32 / ESP32-S3 =======================================================
 #ifdef ESP32_USED
 // -------------------------------------------------------------
@@ -264,7 +289,6 @@
 #define MAX_MATRIX_WIDTH (128)  // Максимальная ширина матрицы
 #define MAX_MATRIX_HEIGHT (128) // Максимальная высота матрицы
 #define MAX_LEDS (MAX_MATRIX_WIDTH * MAX_MATRIX_HEIGHT)
-#define MULTI_MATRIX 1          // Поддержка использования нескольких последовательно соединённых матриц: 0 - одна матрица, 1 - несколько матриц
 #define SEGMENTS (1U)           // Сколько диодов в одном "пикселе" (для матрицы из кусков ленты)
 #define BRIGHTNESS (40U)        // Стандартная максимальная яркость
 #define CURRENT_LIMIT (4000U)   // Лимит тока (мА)
@@ -334,30 +358,6 @@ const uint32_t WEATHER_UPDATE_INTERVAL = 600000UL; // Интервал обно�
 #define FILEMANAGER_USERNAME "ledlamp"  // можно оставить, либо изменить
 #define FILEMANAGER_PASSWORD "12345"    // лучше изменить на другой
 // --------------------------------------------------------------------------------------------------
-// Система отладки (включите логи, которые нужно посмотреть на WEB странице или в мониторе порта)
-#if DEBUG_ENABLED
-  #define SYSLOG SystemLog::instance()
-  #define WIFI_LOG 0        // WiFi подключение
-  #define MATRIX_LOG 0      // Матрица (буферы)
-  #define EFF_LOG 1         // Эффекты
-  #define MQTT_LOG 0        // MQTT
-  #define MP3_LOG 0         // MP3 плеер
-  #define BUTTON_LOG 0      // Кнопка
-  #define IR_LOG 0          // Пульт IR
-  #define RF_LOG 0          // Пульт RF
-  #define ST7789_LOG 0      // Дисплей ST7789
-  #define TM1637_LOG 0      // Дисплей TM1637
-  #define WEATHER_LOG 0     // Погода
-  #define SUNSET_LOG 0      // Закат
-  #define DAWN_LOG 0        // Рассвет
-  #define SCHEDULE_LOG 0    // Расписание
-  #define SD_LOG 0          // SD карта
-  #define MEMORY_LOG 0      // Память
-  #define TELNET_LOG 0      // Telnet
-  #define MULTILAMP_LOG 0   // Режим "Мультилампа" (синхронное управление несколькоми лампамм)
-  #define UPDATE_LOG 0      // Обновление прошивки
-  #define GENERAL_LOG 0     // Общие логи
-#endif
 
 // =====================================================================================================================================================
 // Вызов эффектов осуществляется в файле effetTicker
@@ -409,95 +409,94 @@ const uint32_t WEATHER_UPDATE_INTERVAL = 600000UL; // Интервал обно�
 #define EFF_FOREST              ( 45U)    // Лес
 #define EFF_LUMENJER            ( 46U)    // Люмeньep
 #define EFF_MAGMA               ( 47U)    // Магма
-#define EFF_MARIO               ( 48U)    // Марио (игра)
-#define EFF_PAINTS              ( 49U)    // Масляные краски
-#define EFF_MATRIX              ( 50U)    // Матрица
-#define EFF_TWINKLES            ( 51U)    // Мерцание
-#define EFF_METEOR              ( 52U)    // Метеор
-#define EFF_METABALLS           ( 53U)    // Метоболз
-#define EFF_WEB_TOOLS           ( 54U)    // Мечта дизайнера
-#define EFF_MOSAIC              ( 55U)    // Мозайка
-#define EFF_BUTTERFLYS          ( 56U)    // Moтыльки
-#define EFF_BBALLS              ( 57U)    // Мячики
-#define EFF_BALLS_BOUNCE        ( 58U)    // Мячики без границ
-#define EFF_CHRISTMAS_TREE      ( 59U)    // Новогодняя Елка
-#define EFF_NEW_STARS           ( 60U)    // Новые Звёзды
-#define EFF_NIGHTCITY           ( 61U)    // Ночной Город
-#define EFF_FIRE                ( 62U)    // Огонь
-#define EFF_FIRE_2012           ( 63U)    // Огонь 2012
-#define EFF_FIRE_2018           ( 64U)    // Огонь 2018
-#define EFF_FIRE_2020           ( 65U)    // Огонь 2020
-#define EFF_FIRE_2021           ( 66U)    // Огонь 2021
-#define EFF_FIREFLY_TOP         ( 67U)    // Огoнь верховой
-#define EFF_FIREFLY             ( 68U)    // Огoнь парящий
-#define EFF_FIRESPARKS          ( 69U)    // Огонь с искрами
-#define EFF_COLOR_RAIN          ( 70U)    // Осадки
-#define EFF_OSCILLATING         ( 71U)    // Осциллятор
-#define EFF_CLOUDS              ( 72U)    // Облака
-#define EFF_OCEAN               ( 73U)    // Океан
-#define EFF_OCTOPUS             ( 74U)    // Осьминог
-#define EFF_RAINBOW_STRIPE      ( 75U)    // Павлин
-#define EFF_HOURGLASS           ( 76U)    // Песочные часы
-#define EFF_PAINTBALL           ( 77U)    // Пейнтбол
-#define EFF_PICASSO             ( 78U)    // Пикассо
-#define EFF_PLASMA              ( 79U)    // Плазма
-#define EFF_SPIDER              ( 80U)    // Плазменная лампа
-#define EFF_PLASMA_WAVES        ( 81U)    // Плазменные волны
-#define EFF_FLAME               ( 82U)    // Пламя
-#define EFF_PLANETEARTH         ( 83U)    // Планета Земля
-#define EFF_BY_EFFECT           ( 84U)    // Побочный эффект
-#define EFF_POPCORN             ( 85U)    // Попкорн
-#define EFF_PRISMATA            ( 86U)    // Призмата
-#define EFF_ATTRACT             ( 87U)    // Притяжение
-#define EFF_LEAPERS             ( 88U)    // Пpыгyны
-#define EFF_PULSE               ( 89U)    // Пульс
-#define EFF_PULSE_WHITE         ( 90U)    // Пульс белый
-#define EFF_PULSE_RAINBOW       ( 91U)    // Пульс радужный
-#define EFF_RADIAL_WAWE         ( 92U)    // Радиальная волна
-#define EFF_RAINBOW_VER         ( 93U)    // Радуга
-#define EFF_RAINBOW             ( 94U)    // Радуга 3D
-#define EFF_RAINBOW_SPOT        ( 95U)    // Радужное Пятно
-#define EFF_RAINBOW_RINGS       ( 96U)    // Радужные кольца
-#define EFF_SNAKE               ( 97U)    // Радужный змей
-#define EFF_RAIN                ( 98U)    // Разноцветный дождь
-#define EFF_DANDELIONS          ( 99U)    // Разноцветные одуванчики
-#define EFF_RIVERS              (100U)    // Реки Ботсваны
-#define EFF_LIGHTERS            (101U)    // Светлячки
-#define EFF_LIGHTER_TRACES      (102U)    // Светлячки со шлейфом
-#define EFF_FEATHER_CANDLE      (103U)    // Свеча
-#define EFF_AURORA              (104U)    // Северное сияние
-#define EFF_SERPENTINE          (105U)    // Серпантин
-#define EFF_SCANNER             (106U)    // Сканер
-#define EFF_SINUSOID3           (107U)    // Синусоид
-#define EFF_COLORS              (108U)    // Смена цвета
-#define EFF_SNOW                (109U)    // Снегопад
-#define EFF_SPECTRUM            (110U)    // Спектрум
-#define EFF_SPIRO               (111U)    // Спирали
-#define EFF_FLOCK               (112U)    // Стая
-#define EFF_FLOCK_N_PR          (113U)    // Стая и хищник
-#define EFF_ARROWS              (114U)    // Стрелки
-#define EFF_STROBE              (115U)    // Строб.Хаос.Дифузия
-#define EFF_SHADOWS             (116U)    // Тени
-#define EFF_PACIFIC             (117U)    // Тихий океан
-#define EFF_TORNADO             (118U)    // Торнадо
-#define EFF_SIMPLE_RAIN         (119U)    // Tyчкa в банке
-#define EFF_FIREWORK            (120U)    // Фейерверк
-#define EFF_FIREWORK_2          (121U)    // Фейерверк 2
-#define EFF_FAIRY               (122U)    // Фея
-#define EFF_TRICOLOR            (123U)    // Флаг (Триколор)
-#define EFF_FONTAN              (124U)    // Фонтан
-#define EFF_COLOR               (125U)    // Цвет
-#define EFF_COLORED_PYTHON      (126U)    // Цветной Питон
-#define EFF_SAND                (127U)    // Цветные драже
-#define EFF_COLOR_FRIZZLES      (128U)    // Цветные кудри
-#define EFF_LOTUS               (129U)    // Цветок лотоса
-#define EFF_TURBULENCE          (130U)    // Цифровая турбулентность
-#define EFF_SPHERES             (131U)    // Шapы
-#define EFF_NEXUS               (132U)    // Nexus
-#define EFF_COLOR_FADED         (133U)    // Цвет с затуханием  
-#define EFF_CLOCK               (134U)    // Часы
-#define EFF_SD                  (135U)    // эффекты .out
-#define MODE_AMOUNT             (136U)    // Количество эффектов
+#define EFF_PAINTS              ( 48U)    // Масляные краски
+#define EFF_MATRIX              ( 49U)    // Матрица
+#define EFF_TWINKLES            ( 50U)    // Мерцание
+#define EFF_METEOR              ( 51U)    // Метеор
+#define EFF_METABALLS           ( 52U)    // Метоболз
+#define EFF_WEB_TOOLS           ( 53U)    // Мечта дизайнера
+#define EFF_MOSAIC              ( 54U)    // Мозайка
+#define EFF_BUTTERFLYS          ( 55U)    // Moтыльки
+#define EFF_BBALLS              ( 56U)    // Мячики
+#define EFF_BALLS_BOUNCE        ( 57U)    // Мячики без границ
+#define EFF_CHRISTMAS_TREE      ( 58U)    // Новогодняя Елка
+#define EFF_NEW_STARS           ( 59U)    // Новые Звёзды
+#define EFF_NIGHTCITY           ( 60U)    // Ночной Город
+#define EFF_FIRE                ( 61U)    // Огонь
+#define EFF_FIRE_2012           ( 62U)    // Огонь 2012
+#define EFF_FIRE_2018           ( 63U)    // Огонь 2018
+#define EFF_FIRE_2020           ( 64U)    // Огонь 2020
+#define EFF_FIRE_2021           ( 65U)    // Огонь 2021
+#define EFF_FIREFLY_TOP         ( 66U)    // Огoнь верховой
+#define EFF_FIREFLY             ( 67U)    // Огoнь парящий
+#define EFF_FIRESPARKS          ( 68U)    // Огонь с искрами
+#define EFF_COLOR_RAIN          ( 69U)    // Осадки
+#define EFF_OSCILLATING         ( 70U)    // Осциллятор
+#define EFF_CLOUDS              ( 71U)    // Облака
+#define EFF_OCEAN               ( 72U)    // Океан
+#define EFF_OCTOPUS             ( 73U)    // Осьминог
+#define EFF_RAINBOW_STRIPE      ( 74U)    // Павлин
+#define EFF_HOURGLASS           ( 75U)    // Песочные часы
+#define EFF_PAINTBALL           ( 76U)    // Пейнтбол
+#define EFF_PICASSO             ( 77U)    // Пикассо
+#define EFF_PLASMA              ( 78U)    // Плазма
+#define EFF_SPIDER              ( 79U)    // Плазменная лампа
+#define EFF_PLASMA_WAVES        ( 80U)    // Плазменные волны
+#define EFF_FLAME               ( 81U)    // Пламя
+#define EFF_PLANETEARTH         ( 82U)    // Планета Земля
+#define EFF_BY_EFFECT           ( 83U)    // Побочный эффект
+#define EFF_POPCORN             ( 84U)    // Попкорн
+#define EFF_PRISMATA            ( 85U)    // Призмата
+#define EFF_ATTRACT             ( 86U)    // Притяжение
+#define EFF_LEAPERS             ( 87U)    // Пpыгyны
+#define EFF_PULSE               ( 88U)    // Пульс
+#define EFF_PULSE_WHITE         ( 89U)    // Пульс белый
+#define EFF_PULSE_RAINBOW       ( 90U)    // Пульс радужный
+#define EFF_RADIAL_WAWE         ( 91U)    // Радиальная волна
+#define EFF_RAINBOW_VER         ( 92U)    // Радуга
+#define EFF_RAINBOW             ( 93U)    // Радуга 3D
+#define EFF_RAINBOW_SPOT        ( 94U)    // Радужное Пятно
+#define EFF_RAINBOW_RINGS       ( 95U)    // Радужные кольца
+#define EFF_SNAKE               ( 96U)    // Радужный змей
+#define EFF_RAIN                ( 97U)    // Разноцветный дождь
+#define EFF_DANDELIONS          ( 98U)    // Разноцветные одуванчики
+#define EFF_RIVERS              ( 99U)    // Реки Ботсваны
+#define EFF_LIGHTERS            (100U)    // Светлячки
+#define EFF_LIGHTER_TRACES      (101U)    // Светлячки со шлейфом
+#define EFF_FEATHER_CANDLE      (102U)    // Свеча
+#define EFF_AURORA              (103U)    // Северное сияние
+#define EFF_SERPENTINE          (104U)    // Серпантин
+#define EFF_SCANNER             (105U)    // Сканер
+#define EFF_SINUSOID3           (106U)    // Синусоид
+#define EFF_COLORS              (107U)    // Смена цвета
+#define EFF_SNOW                (108U)    // Снегопад
+#define EFF_SPECTRUM            (109U)    // Спектрум
+#define EFF_SPIRO               (110U)    // Спирали
+#define EFF_FLOCK               (111U)    // Стая
+#define EFF_FLOCK_N_PR          (112U)    // Стая и хищник
+#define EFF_ARROWS              (113U)    // Стрелки
+#define EFF_STROBE              (114U)    // Строб.Хаос.Дифузия
+#define EFF_SHADOWS             (115U)    // Тени
+#define EFF_PACIFIC             (116U)    // Тихий океан
+#define EFF_TORNADO             (117U)    // Торнадо
+#define EFF_SIMPLE_RAIN         (118U)    // Tyчкa в банке
+#define EFF_FIREWORK            (119U)    // Фейерверк
+#define EFF_FIREWORK_2          (120U)    // Фейерверк 2
+#define EFF_FAIRY               (121U)    // Фея
+#define EFF_TRICOLOR            (122U)    // Флаг (Триколор)
+#define EFF_FONTAN              (123U)    // Фонтан
+#define EFF_COLOR               (124U)    // Цвет
+#define EFF_COLORED_PYTHON      (125U)    // Цветной Питон
+#define EFF_SAND                (126U)    // Цветные драже
+#define EFF_COLOR_FRIZZLES      (127U)    // Цветные кудри
+#define EFF_LOTUS               (128U)    // Цветок лотоса
+#define EFF_TURBULENCE          (129U)    // Цифровая турбулентность
+#define EFF_SPHERES             (130U)    // Шapы
+#define EFF_NEXUS               (131U)    // Nexus
+#define EFF_COLOR_FADED         (132U)    // Цвет с затуханием  
+#define EFF_CLOCK               (133U)    // Часы
+#define EFF_SD                  (134U)    // эффекты .out
+#define MODE_AMOUNT             (135U)    // Количество эффектов
 
 // --------------------------------------------------------------------------------------------------
 // Массив настроек эффектов по умолчанию
@@ -509,7 +508,7 @@ static const uint8_t defaultSettings[][3] PROGMEM = {
   {  20, 215,  60}, // Аленький цветочек
   {  20,  11,   3}, // Бабочка
   {  25, 185,  63}, // Бассейн
-  {  20, 215,  49}, // Бамбук
+  {  20, 239, 100}, // Бамбук
   {  35,  20,  60}, // Безумие
   {  20, 150,  50}, // Блуждающий кубик
   {  30, 212,  54}, // Водопад
@@ -525,8 +524,8 @@ static const uint8_t defaultSettings[][3] PROGMEM = {
   {  25, 195, 100}, // Дым
   {  25, 190,  30}, // Дым разноцветный
   {  30, 170,  25}, // Дымовые шашки
-  {  20, 110,   1}, // Жидкая лампа
-  {  20, 124,  39}, // Жидкая лампа авто
+  {  20,  80,   1}, // Жидкая лампа
+  {  20,  60,  39}, // Жидкая лампа авто
   {  30, 195,  70}, // Завиток
   {  25, 215,  99}, // Звезды
   {  15,   8,  21}, // Зебра
@@ -551,7 +550,6 @@ static const uint8_t defaultSettings[][3] PROGMEM = {
   {  15,  15,  95}, // Лес
   {  20, 200,  40}, // Люмeньep
   {  16, 205,  13}, // Магма
-  {  14, 150,  50}, // Марио (игра)
   {  15, 195,  50}, // Масляные краски
   {  25, 186,  23}, // Матрица
   {  25, 235,   4}, // Мерцание
@@ -573,7 +571,7 @@ static const uint8_t defaultSettings[][3] PROGMEM = {
   {  26, 214,  15}, // Огoнь верховой
   {  30, 214,  15}, // Огoнь парящий
   {  30,  80,  64}, // Огонь с искрами
-  {  20, 205,  69}, // Осадки
+  {  20, 223,  66}, // Осадки
   {  15, 208,  42}, // Осциллятор
   {  20,  15,  34}, // Облака
   {  20,   8,  12}, // Океан
@@ -649,7 +647,7 @@ static const uint8_t default_effects_folders[MODE_AMOUNT] PROGMEM = {
   51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75,
   76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100,
   101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120,
-  121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135
+  121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134
 };
 
 // ******************************************************************************************************************************************************

@@ -121,7 +121,20 @@ void Time::ntpodhcp(bool enable) {
 
 void Time::tzsetup(const char* tz) {
   if (!tz || !*tz) tz = "MSK-3";
-  configTzTime(tz, NTP_SERVER_PRIMARY, NTP_SERVER_SECONDARY, NTP_SERVER_GOOGLE);
+
+  setenv("TZ", tz, 1);
+  tzset();
+
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  esp_sntp_setservername(0, NTP_SERVER_PRIMARY);
+  esp_sntp_setservername(1, NTP_SERVER_SECONDARY);
+  esp_sntp_setservername(2, NTP_SERVER_GOOGLE);
+#else
+  sntp_setservername(0, const_cast<char*>(NTP_SERVER_PRIMARY));
+  sntp_setservername(1, const_cast<char*>(NTP_SERVER_SECONDARY));
+  sntp_setservername(2, const_cast<char*>(NTP_SERVER_GOOGLE));
+#endif
+
   forcesync();
 }
 

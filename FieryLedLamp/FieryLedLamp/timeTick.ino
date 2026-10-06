@@ -218,7 +218,7 @@ void timeTick() {
 #endif
 
 #if USE_MP3_PLAYER
-    if (mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
       send_command(0x0E, 0, 0, 0);
       delay(20);
       mp3_stop = true;
