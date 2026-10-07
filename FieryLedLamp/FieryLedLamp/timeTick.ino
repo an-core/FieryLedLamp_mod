@@ -10,9 +10,6 @@ void timeTick() {
   secsTimer = millis();
 
   if (!myTime.isTimeSet()) {
-#if USE_TM1637
-    if (!DisplayFlag) display.displayByte(_dash, _dash, _dash, _dash);
-#endif
     return;
   }
 

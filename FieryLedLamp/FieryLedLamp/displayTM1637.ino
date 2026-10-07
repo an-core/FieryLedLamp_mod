@@ -31,15 +31,10 @@ static void displayDate() {
 }
 
 static void displayClock() {
-  static uint32_t callCount = 0;
-  callCount++;
-  static uint32_t lastLog = 0;
-  if (millis() - lastLog > 1000) {
-#if TM1637_LOG
-    SYSLOG.add("CLOCK calls/sec: %u", callCount);
-#endif
-    callCount = 0;
-    lastLog = millis();
+  if (!myTime.isTimeSet()) {
+    display.resetPoints();
+    display.displayByte(_dash, _dash, _dash, _dash);
+    return;
   }
   clockTicker_blink();
 }
