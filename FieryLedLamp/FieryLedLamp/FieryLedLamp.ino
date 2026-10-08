@@ -568,6 +568,7 @@ RCSwitch rfReceiver = RCSwitch();                // Объект RF-приёмн
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 // мп3 плеер
 #if USE_MP3_PLAYER
+volatile bool announceSessionActive = false;
 uint8_t mp3_init_step = 0;                       // Текущий шаг инициализации DFPlayer
 bool mp3Initialized = false;                     // Плеер успешно инициализирован
 uint8_t mp3_player_connect = 0;                  // Статус подключения: 0=нет, 4=OK, 5=без карты

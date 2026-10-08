@@ -317,8 +317,8 @@ void mp3_loop() {
     set_mp3_play_now = false;
   }
 
-  if (!isAnnouncing && !advert_flag && !weather_advert_flag) {
-    if (set_mp3_play_now && (mp3_stop || pause_on) && mp3PlayState == MP3_PLAY_IDLE) {
+  if (!isAnnouncing && !advert_flag && !weather_advert_flag && !announceSessionActive) {
+    if (set_mp3_play_now && (mp3_stop || pause_on)) {
       if (mp3_folder != 0) {
         play_sound_async(mp3_folder);
       }
@@ -414,7 +414,7 @@ void mp3_restore_after_announce(bool restoreEffect) {
 // force = false - проверять настройки (автоматическая озвучка по таймеру)
 // Играет: пауза -> громкость -> mute on -> час -> mute off -> пауза ADVERT_TIMER_H -> минуты -> пауза ADVERT_TIMER_M -> восстановление воспроизведения
 
-void play_time_ADVERT(bool force) {
+void play_time_ADVERT(bool force, bool restoreAfter) {
   if (mp3_player_connect != 4) return;
 
   if (advert_flag
@@ -489,7 +489,15 @@ void play_time_ADVERT(bool force) {
   send_command(0x13, FEEDBACK, 0, pt_m + 100);
   delay(ADVERT_TIMER_M);
   delay(350);
-  mp3_restore_after_announce(true);
+
+  if (restoreAfter) {
+    mp3_restore_after_announce(true);
+  } else {
+    mp3_stop = true;
+    pause_on = true;
+    set_mp3_play_now = false;
+    isAnnouncing = false;
+  }
   advert_flag = false;
   advert_hour = false;
   if (force) manual_time_request = false;
@@ -875,7 +883,8 @@ void play_weather(bool force) {
 
 void mp3Task(void *pvParameters) {
   esp_task_wdt_delete(NULL);
-
+  static uint32_t announceSessionTimer = 0;
+  
   while (true) {
     if (!mp3Initialized && mp3Enabled) {
       mp3_setup();
@@ -884,6 +893,23 @@ void mp3Task(void *pvParameters) {
     if (mp3_pending_play) {
       mp3_pending_play = false;
       play_sound_async(mp3_folder);
+    }
+
+    if (mp3_pending_time_advert || mp3_pending_weather_advert) {
+      if (!announceSessionActive) {
+        announceSessionTimer = millis();
+      }
+      announceSessionActive = true;
+    }
+
+    if (announceSessionActive && (millis() - announceSessionTimer > 60000)) {
+      announceSessionActive = false;
+      advert_flag = false;
+      weather_advert_flag = false;
+      isAnnouncing = false;
+#if MP3_LOG
+      SYSLOG.add("Сброс announceSessionActive по таймауту");
+#endif
     }
 
     if (mp3_pending_time_advert) {
@@ -906,6 +932,10 @@ void mp3Task(void *pvParameters) {
       mp3_pending_weather_force = false;
     }
 #endif
+
+    if (!advert_flag && !weather_advert_flag && !isAnnouncing && !mp3_pending_time_advert && !mp3_pending_weather_advert) {
+      announceSessionActive = false;
+    }
 
     if (mp3Enabled && mp3Initialized) {
       mp3_loop();
