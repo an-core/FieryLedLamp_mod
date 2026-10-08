@@ -363,30 +363,25 @@ void play_sound_async(uint8_t folder) {
 // ====================================================================================
 // ВОССТАНОВЛЕНИЕ ВОСПРОИЗВЕДЕНИЯ ПОСЛЕ ОЗВУЧКИ (время/погода/будильник/закат)
 // ------------------------------------------------------------------------------------
-// restoreEffect = true - снять паузу и вернуть прежний трек
-// restoreEffect = false - полная остановка плеера
-// Также сбрасывает isAnnouncing = false
+// restoreEffect = true - вернуть громкость эффекта (трек всё время играл беззвучно, не прерывался)
+// restoreEffect = false - полная остановка плеера (если эффект не играл до озвучки)
+// Сбрасывает isAnnouncing = false
 
 void mp3_restore_after_announce(bool restoreEffect) {
   if (mp3_player_connect != 4) return;
 
-  send_command(0x1A, FEEDBACK, 0, 1); // mute on
-  delay(60);
-
   if (restoreEffect && eff_sound_on && wasPlayingBeforeAnnounce) {
-    // просто снимается пауза
-    send_command(0x0D, FEEDBACK, 0, 0);
-    delay(100);
     send_command(0x06, FEEDBACK, 0, eff_volume);
+    delay(30);
+    send_command(0x1A, FEEDBACK, 0, 0);   // mute off
     delay(50);
     mp3_stop = false;
     pause_on = false;
     set_mp3_play_now = true;
 #if MP3_LOG
-    SYSLOG.add("Мелодия продолжена с прерванного места");
+    SYSLOG.add("Громкость эффекта восстановлена");
 #endif
   } else {
-    // полная остановка
     send_command(0x0E, FEEDBACK, 0, 0);
     delay(50);
     send_command(0x16, FEEDBACK, 0, 0);
@@ -399,8 +394,6 @@ void mp3_restore_after_announce(bool restoreEffect) {
 #endif
   }
 
-  send_command(0x1A, FEEDBACK, 0, 0); // mute off
-  delay(50);
   wasPlayingBeforeAnnounce = false;
   saved_mp3_folder = 0;
   saved_mp3_track = 0;
@@ -412,7 +405,7 @@ void mp3_restore_after_announce(bool restoreEffect) {
 // ------------------------------------------------------------------------------------
 // force = true - игнорировать настройки day_advert_sound_on / night_advert_sound_on (ручной вызов через кнопку, пульт, web)
 // force = false - проверять настройки (автоматическая озвучка по таймеру)
-// Играет: пауза -> громкость -> mute on -> час -> mute off -> пауза ADVERT_TIMER_H -> минуты -> пауза ADVERT_TIMER_M -> восстановление воспроизведения
+// Логика: заглушить эффект (громкость 0, без паузы) -> озвучить час -> пауза -> озвучить минуты -> вернуть громкость эффекта
 
 void play_time_ADVERT(bool force, bool restoreAfter) {
   if (mp3_player_connect != 4) return;
@@ -442,18 +435,14 @@ void play_time_ADVERT(bool force, bool restoreAfter) {
     if (isDay && !day_advert_sound_on) return;
     if (!isDay && !night_advert_sound_on) return;
   }
-  if (eff_sound_on && !mp3_stop) {  // пауза перед озвучкой (+ запоминание трека)
-    saved_mp3_track = send_command(0x4C, 1, 0, 0);
-    delay(50);
-    saved_mp3_folder = mp3_folder;
+  if (eff_sound_on && !mp3_stop) {
     wasPlayingBeforeAnnounce = true;
-    send_command(0x0E, FEEDBACK, 0, 0);
-    pause_on = true;
-    delay(120);
+    send_command(0x1A, FEEDBACK, 0, 1); // mute on
+    delay(50);
+    send_command(0x06, FEEDBACK, 0, 0); // громкость 0
+    delay(30);
   } else {
     wasPlayingBeforeAnnounce = false;
-    saved_mp3_folder = 0;
-    saved_mp3_track = 0;
   }
 
   time_t now = time(nullptr);
@@ -478,13 +467,17 @@ void play_time_ADVERT(bool force, bool restoreAfter) {
   localtime_r(&t, &tm);
   bool isDay = (tm.tm_hour >= (NIGHT_HOURS_STOP / 60)) && (tm.tm_hour < (NIGHT_HOURS_START / 60));
   uint8_t advert_volume = isDay ? day_advert_volume : night_advert_volume;
+
+  send_command(0x1A, FEEDBACK, 0, 1);
+  delay(mp3_delay);
+
   send_command(0x06, FEEDBACK, 0, advert_volume);
   delay(mp3_delay);
-  send_command(0x1A, FEEDBACK, 0, 1); // mute on
-  delay(mp3_delay);
+
+  // трек часа
   send_command(0x13, FEEDBACK, 0, pt_h);
   delay(mp3_delay);
-  send_command(0x1A, FEEDBACK, 0, 0);
+  send_command(0x1A, FEEDBACK, 0, 0); // mute off
   delay(ADVERT_TIMER_H);
   send_command(0x13, FEEDBACK, 0, pt_m + 100);
   delay(ADVERT_TIMER_M);
@@ -666,7 +659,7 @@ uint16_t weatherAdvertDescTrackByText(String s) {
 // ДОБАВЛЕНИЕ ТРЕКОВ ОПИСАНИЯ ПОГОДЫ ПО ТЕКСТУ
 // ------------------------------------------------------------------------------------
 // Сначала пробует точное совпадение (weatherAdvertDescTrackByText)
-// Если не найдено - ищет по ключевым словам (индексOf): «сильн», «дожд», «снег» и т.д.
+// Если не найдено - ищет по ключевым словам (индексOf): "сильн", "дожд", "снег" и т.д.
 
 void weatherAdvertAddDescTracks(const String& desc) {
   if (desc.length() == 0) {
@@ -761,7 +754,7 @@ uint16_t weatherAdvertWaitTime() {
 // ЗАПУСК ОЗВУЧКИ ТЕМПЕРАТУРЫ ПОГОДЫ (вспомогательная)
 // ------------------------------------------------------------------------------------
 // Не используется в текущей логике (заменена на play_weather)
-// Оставлена на всякий случай
+// Оставлена на всякий случай (пока что)
 
 void start_weather_temp_ADVERT(int8_t temp, bool speakDescription) {
   if (mp3_player_connect != 4 || advert_flag || weather_advert_flag || isAnnouncing) return;
@@ -784,11 +777,12 @@ void start_weather_temp_ADVERT(int8_t temp, bool speakDescription) {
 // ------------------------------------------------------------------------------------
 // force = true - игнорировать настройки day_weather_temp_on / night_weather_temp_on и day_weather_desc_on / night_weather_desc_on (ручной вызов)
 // force = false - проверять настройки (автоматическая озвучка)
-// Логика: пауза текущей мелодии -> mute on -> треки по очереди (температура, описание) -> пауза ADVERT_TIMER_1 между треками -> ADVERT_TIMER_2 в конце -> восстановление воспроизведения
+// Логика такова: пауза текущей мелодии -> mute on -> треки по очереди (температура, описание) -> пауза ADVERT_TIMER_1 между треками -> ADVERT_TIMER_2 в конце -> восстановление воспроизведения
 
 void play_weather(bool force) {
   if (mp3_player_connect != 4) return;
   if (isAnnouncing || advert_flag || weather_advert_flag) return;
+
   // определение дня/ночи
   time_t t = Time::instance().now();
   struct tm tm;
@@ -806,19 +800,6 @@ void play_weather(bool force) {
     if (isDay && !day_weather_desc_on) needDescription = false;
     if (!isDay && !night_weather_desc_on) needDescription = false;
   }
-  if (eff_sound_on && !mp3_stop) { // пауза перед озвучкой (+ запоминание трека)
-    saved_mp3_track = send_command(0x4C, 1, 0, 0);
-    delay(50);
-    saved_mp3_folder = mp3_folder;
-    wasPlayingBeforeAnnounce = true;
-    send_command(0x0E, FEEDBACK, 0, 0); // пауза
-    pause_on = true;
-    delay(120);
-  } else {
-    wasPlayingBeforeAnnounce = false;
-    saved_mp3_folder = 0;
-    saved_mp3_track = 0;
-  }
 
   weather_advert_count = 0;
   weatherAdvertAddTrack(weatherTempTrack(Weather::instance().getTemperature()));
@@ -826,6 +807,15 @@ void play_weather(bool force) {
     weatherAdvertAddDescTracks(Weather::instance().getCondition());
   }
   if (weather_advert_count == 0) return;
+
+  // глушим эффект
+  if (eff_sound_on && !mp3_stop) {
+    wasPlayingBeforeAnnounce = true;
+    send_command(0x1A, FEEDBACK, 0, 1); // mute on, громкость не затрагивается
+    delay(50);
+  } else {
+    wasPlayingBeforeAnnounce = false;
+  }
 
   isAnnouncing = true;
   weather_advert_flag = true;
@@ -836,10 +826,9 @@ void play_weather(bool force) {
 #endif
 
   uint8_t vol = isDay ? weather_day_volume : weather_night_volume;
-  send_command(0x06, FEEDBACK, 0, vol);
-  delay(mp3_delay);
-
   send_command(0x1A, FEEDBACK, 0, 1); // mute on
+  delay(mp3_delay);
+  send_command(0x06, FEEDBACK, 0, vol); // громкость
   delay(mp3_delay);
 
   for (uint8_t i = 0; i < weather_advert_count; i++) {
@@ -884,7 +873,7 @@ void play_weather(bool force) {
 void mp3Task(void *pvParameters) {
   esp_task_wdt_delete(NULL);
   static uint32_t announceSessionTimer = 0;
-  
+
   while (true) {
     if (!mp3Initialized && mp3Enabled) {
       mp3_setup();
