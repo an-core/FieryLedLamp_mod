@@ -3538,21 +3538,25 @@ void handle_eff_sel() {
   loadingFlag = true;
   effTimer = millis() - 1000;
 
+#if USE_MP3_PLAYER
   if (mp3Enabled && mp3Initialized && !mp3_stop) {
     mp3_send_command_nowait(0x0E, 0, 0, 0);
     mp3_stop = true;
     pause_on = true;
   }
+#endif
 
   effectsTick();
   FastLED.show();
 
+#if USE_MP3_PLAYER
   if (eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
     if (effects_folders[currentMode] != 0) {
       mp3_folder = effects_folders[currentMode];
       play_sound_async(mp3_folder);
     }
   }
+#endif
 
   if (random_on && Favorites::instance().FavoritesRunning) {
     selectedSettings = 1U;
@@ -4515,21 +4519,25 @@ void handle_eff() {
 
   effTimer = millis() - 1000;
 
+#if USE_MP3_PLAYER
   if (mp3Enabled && mp3Initialized && !mp3_stop) {
     mp3_send_command_nowait(0x0E, 0, 0, 0);  // stop
     mp3_stop = true;
     pause_on = true;
   }
+#endif
 
   effectsTick();
   FastLED.show();
 
+#if USE_MP3_PLAYER
   if (eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
     if (effects_folders[currentMode] != 0) {
       mp3_folder = effects_folders[currentMode];
       play_sound_async(mp3_folder);
     }
   }
+#endif
 
   if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
 
