@@ -3550,7 +3550,7 @@ void handle_eff_sel() {
   FastLED.show();
 
 #if USE_MP3_PLAYER
-  if (eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
+  if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
     if (effects_folders[currentMode] != 0) {
       mp3_folder = effects_folders[currentMode];
       play_sound_async(mp3_folder);
@@ -4531,7 +4531,7 @@ void handle_eff() {
   FastLED.show();
 
 #if USE_MP3_PLAYER
-  if (eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
+  if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
     if (effects_folders[currentMode] != 0) {
       mp3_folder = effects_folders[currentMode];
       play_sound_async(mp3_folder);
