@@ -350,67 +350,57 @@ void performUpdateCheck() {
     }
   }
 
-   // Проверка обновления
+  // Проверка обновления
   {
-    const char* updateFiles[] = {
-      "bin_ESP32.zip",
-      "bin_ESP32-S3.zip"
-    };
-    const size_t updateFilesCount = sizeof(updateFiles) / sizeof(updateFiles[0]);
+    // выбор архива по варианту платформы
+    String fileName;
+#if FIRMWARE_VARIANT == 1
+    fileName = "bin_ESP32-S3.zip"; // 1 = ESP32-S3
+#elif FIRMWARE_VARIANT == 2
+    fileName = "bin_ESP32.zip"; // 2 = ESP32
+#else
+#error "FIRMWARE_VARIANT не определён или неизвестен"
+#endif
+
+    String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
+
+    WiFiClientSecure client;
+    client.setInsecure();
+    client.setTimeout(HTTPS_TIMEOUT_COMMIT_MS);
+
+    HTTPClient http;
+    http.setTimeout(HTTPS_TIMEOUT_COMMIT_MS);
 
     bool hasUpdate = false;
     String updateVersion = "";
     String fullDateTimeForDisplay = "";
-    String latestFileDateTimeMSK = "";
-    String latestFileName = "";
 
-    String buildDateTimeMSK = buildDateTimeString();
+    if (http.begin(client, commitUrl)) {
+      http.addHeader("User-Agent", "FieryLedLamp");
+      http.addHeader("Accept", "application/vnd.github.v3+json");
 
-    for (size_t i = 0; i < updateFilesCount; i++) {
-      String fileName = updateFiles[i];
-      String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
+      if (http.GET() == HTTP_CODE_OK) {
+        String payload = http.getString();
+        DynamicJsonDocument commitDoc(8192);
 
-      WiFiClientSecure client;
-      client.setInsecure();
-      client.setTimeout(HTTPS_TIMEOUT_COMMIT_MS);
+        if (!deserializeJson(commitDoc, payload)) {
+          String commitDate = commitDoc[0]["commit"]["author"]["date"].as<String>();
+          if (commitDate.length() > 0) {
+            String fileDateTimeMSK = convertUTCtoMSK(commitDate.substring(0, 19) + "+00:00");
+            String buildDateTimeMSK = buildDateTimeString();
 
-      HTTPClient http;
-      http.setTimeout(HTTPS_TIMEOUT_COMMIT_MS);
+            hasUpdate = (fileDateTimeMSK > buildDateTimeMSK);
 
-      if (http.begin(client, commitUrl)) {
-        http.addHeader("User-Agent", "FieryLedLamp");
-        http.addHeader("Accept", "application/vnd.github.v3+json");
-
-        if (http.GET() == HTTP_CODE_OK) {
-          String payload = http.getString();
-          DynamicJsonDocument commitDoc(8192);
-
-          if (!deserializeJson(commitDoc, payload)) {
-            String commitDate = commitDoc[0]["commit"]["author"]["date"].as<String>();
-            if (commitDate.length() > 0) {
-              String fileDateTimeMSK = convertUTCtoMSK(commitDate.substring(0, 19) + "+00:00");
-
-              if (fileDateTimeMSK > latestFileDateTimeMSK) {
-                latestFileDateTimeMSK = fileDateTimeMSK;
-                latestFileName = fileName;
-              }
+            if (hasUpdate) {
+              updateVersion = fileName;
+              fullDateTimeForDisplay = formatDateTimeForDisplay(fileDateTimeMSK);
             }
           }
         }
-        http.end();
       }
-      client.stop();
-
-      vTaskDelay(pdMS_TO_TICKS(300));
+      http.end();
     }
-
-    if (latestFileDateTimeMSK.length() > 0) {
-      hasUpdate = (latestFileDateTimeMSK > buildDateTimeMSK);
-      if (hasUpdate) {
-        updateVersion = latestFileName;
-        fullDateTimeForDisplay = formatDateTimeForDisplay(latestFileDateTimeMSK);
-      }
-    }
+    client.stop();
 
     doc["has_update"] = hasUpdate;
     if (hasUpdate) {
@@ -420,7 +410,7 @@ void performUpdateCheck() {
     }
   }
 
-// ---------------------------------------------------------------------
+  // ---------------------------------------------------------------------
   serializeJson(doc, resp);
   updateCache.response = resp;
   updateCache.timestamp = millis();
