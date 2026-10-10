@@ -37,8 +37,10 @@ const TProgmemRGBPalette16 *curPalette = palette_arr[0];
 const TProgmemRGBPalette16 *firePalettes[] = {&WoodFireColors_p, &NormalFire_p, &NormalFire2_p, &LithiumFireColors_p, &SodiumFireColors_p, &CopperFireColors_p, &AlcoholFireColors_p, &RubidiumFireColors_p, &PotassiumFireColors_p};
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
+// *****************************************************************************************************************************************************
 
 // ========================================================================= КОНФЕТТИ =================================================================
+
 void sparklesRoutine() {
 #define FADE_OUT_SPEED (70U) // скорость затухания
   if (loadingFlag) {
@@ -81,6 +83,7 @@ void fadePixel(uint8_t i, uint8_t j, uint8_t step) {
 }
 
 // ================================================================ НОВЫЙ ОГОНЬ / ВОДОПАД =============================================================
+
 void fire2012WithPalette() {
 #define COOLINGNEW 32
 #define SPARKINGNEW 80 // 30 // 120 // 90 // 60
@@ -134,6 +137,7 @@ void fire2012WithPalette() {
 }
 
 // ======================================================================== ОГОНЬ ====================================================================
+
 static const uint8_t valueMask[8][16] PROGMEM = {
   {0  , 0  , 0  , 32 , 32 , 0  , 0  , 0  , 0  , 0  , 0  , 32 , 32 , 0  , 0  , 0  },
   {0  , 0  , 0  , 64 , 64 , 0  , 0  , 0  , 0  , 0  , 0  , 64 , 64 , 0  , 0  , 0  },
@@ -166,50 +170,25 @@ uint8_t getMaskValue(const uint8_t mask[8][16], uint8_t y, uint8_t x, uint8_t fi
   return pgm_read_byte(&mask[maskY][maskX]);
 }
 
-#define SPARKLES (1U)   // вылетающие угольки вкл/выкл
-#define UNIVERSE_FIRE   // универсальный огонь 2-в-1 Цветной+Белый
+#define SPARKLES 1 // вылетающие угольки вкл/выкл
+#define FIRE_HEIGHT 8U // высота зоны огня
 
 void fireRoutine() {
   bool isColored = (modes[currentMode].Scale < 100);
 
-  uint8_t fireHeight = matrixHeight / 2;
-  if (fireHeight < 2) fireHeight = 2;
-  if (fireHeight > matrixHeight) fireHeight = matrixHeight;
-  uint8_t sparkleStart = fireHeight;
-
-  static uint16_t lastWidth = 0, lastHeight = 0;
-  bool sizeChanged = (lastWidth != matrixWidth || lastHeight != matrixHeight);
-
-  if (loadingFlag || sizeChanged || lastWidth == 0) {
+  if (loadingFlag) {
     loadingFlag = false;
-
-    if (sizeChanged || lastWidth == 0) {
-      lastWidth = matrixWidth;
-      lastHeight = matrixHeight;
-
-      for (uint8_t x = 0; x < matrixWidth; x++) {
-        line[x] = random(127, 255);
-      }
-      for (uint8_t y = 0; y < fireHeight; y++) {
-        for (uint8_t x = 0; x < matrixWidth; x++) {
-          matrixValue[y][x] = 0;
-        }
-      }
-      for (uint8_t y = 0; y < matrixHeight; y++) {
-        shiftHue[y] = 0;
-        shiftValue[y] = 0;
-      }
-      pcnt = 0;
-    }
-  }
-
-  if (pcnt >= 30) {
-    shiftUp(fireHeight);
     generateLine();
     pcnt = 0;
   }
 
-  drawFrame(pcnt, isColored, fireHeight, sparkleStart);
+  if (pcnt >= 30) {
+    shiftUp();
+    generateLine();
+    pcnt = 0;
+  }
+
+  drawFrame(pcnt, isColored);
   pcnt += 25;
 }
 
@@ -219,89 +198,68 @@ void generateLine() {
   }
 }
 
-void shiftUp(uint8_t fireHeight) {
-  for (uint8_t y = fireHeight - 1; y > 0; y--) {
-    for (uint8_t x = 0; x < matrixWidth; x++) {
-      matrixValue[y][x] = matrixValue[y - 1][x];
+void shiftUp() {
+  for (uint8_t y = FIRE_HEIGHT - 1U; y > 0U; y--) {
+    for (uint8_t x = 0U; x < matrixWidth; x++) {
+      matrixValue[y][x] = matrixValue[y - 1U][x];
     }
   }
-  for (uint8_t x = 0; x < matrixWidth; x++) {
-    matrixValue[0][x] = line[x];
+  for (uint8_t x = 0U; x < matrixWidth; x++) {
+    matrixValue[0U][x] = line[x];
   }
 }
 
-void drawFrame(uint8_t pcnt, bool isColored, uint8_t fireHeight, uint8_t sparkleStart) {
+void drawFrame(uint8_t pcnt, bool isColored) {
   int32_t nextv;
   uint8_t baseHue = (float)(modes[currentMode].Scale - 1U) * 2.6;
   uint8_t baseSat = (modes[currentMode].Scale < 100) ? 255U : 0U;
 
-  // смещение для нижней строки
+  // нижняя строка
   deltaHue = random(0U, 2U) ? constrain(shiftHue[0] + random(0U, 2U) - random(0U, 2U), 15U, 17U) : shiftHue[0];
   shiftHue[0] = deltaHue;
   deltaValue = random(0U, 3U) ? constrain(shiftValue[0] + random(0U, 2U) - random(0U, 2U), 15U, 17U) : shiftValue[0];
   shiftValue[0] = deltaValue;
 
-  // строка 0 - очаг (нижняя)
-  for (uint8_t x = 0; x < matrixWidth; x++) {
-    nextv = ((100.0 - pcnt) * matrixValue[0][x] + pcnt * line[x]) / 100.0 - getMaskValue(valueMask, 0, x, fireHeight, matrixWidth);
-    CRGB color = CHSV(
-                   baseHue + getMaskValue(hueMask, 0, x, fireHeight, matrixWidth), baseSat, (uint8_t)max(0, nextv));
+  for (uint8_t x = 0U; x < matrixWidth; x++) {
+    nextv = (((100.0 - pcnt) * matrixValue[0][x] + pcnt * line[x]) / 100.0) - pgm_read_byte(&valueMask[0][(x + deltaValue) % 16U]);
+    CRGB color = CHSV(baseHue + pgm_read_byte(&hueMask[0][(x + deltaHue) % 16U]), baseSat,(uint8_t)max(0, nextv));
     leds[XY(x, 0)] = color;
   }
 
-  // остальные строки огня
-  for (uint8_t y = fireHeight - 1; y > 0; y--) {
+  // остальные строки
+  for (uint8_t y = matrixHeight - 1U; y > 0U; y--) {
     deltaHue = shiftHue[y];
     shiftHue[y] = shiftHue[y - 1];
     deltaValue = shiftValue[y];
     shiftValue[y] = shiftValue[y - 1];
 
-    for (uint8_t x = 0; x < matrixWidth; x++) {
-      nextv = ((100.0 - pcnt) * matrixValue[y][x] + pcnt * matrixValue[y - 1][x]) / 100.0 - getMaskValue(valueMask, y, x, fireHeight, matrixWidth);
-      CRGB color = CHSV(
-                     baseHue + getMaskValue(hueMask, y, x, fireHeight, matrixWidth), baseSat, (uint8_t)max(0, nextv));
-      leds[XY(x, y)] = color;
-    }
-  }
-
-#if SPARKLES
-  if (sparkleStart < matrixHeight) {
-    // стирание строки искр
-    for (uint8_t y = sparkleStart + 1; y < matrixHeight; y++) {
-      for (uint8_t x = 0; x < matrixWidth; x++) {
-        uint8_t newX = (random(0, 4)) ? x : (x + matrixWidth + random(0U, 2U) - random(0U, 2U)) % matrixWidth;
-        uint32_t pix = getPixColorXY(x, y - 1);
-        if (pix > 0) {
-          CRGB spark = pix;
-          spark.fadeToBlackBy(64);
-          drawPixelXY(newX, y, spark);
-        }
+    if (y > FIRE_HEIGHT) {
+      for (uint8_t x = 0U; x < matrixWidth; x++) {
+        drawPixelXY(x, y, 0U);
       }
     }
 
-    // первая строка искр - из огня
-    for (uint8_t x = 0; x < matrixWidth; x++) {
-      if (random(0, 40) == 0 && getPixColorXY(x, sparkleStart - 1) != 0) {
-        CRGB spark = getPixColorXY(x, sparkleStart - 1);
-        spark.fadeToBlackBy(160); // приглушить на ~63%
-        drawPixelXY(x, sparkleStart, spark);
+    for (uint8_t x = 0U; x < matrixWidth; x++) {
+      if (y < FIRE_HEIGHT) {
+        nextv = (((100.0 - pcnt) * matrixValue[y][x] + pcnt * matrixValue[y - 1][x]) / 100.0) - pgm_read_byte(&valueMask[y][(x + deltaValue) % 16U]);
+        CRGB color = CHSV(baseHue + pgm_read_byte(&hueMask[y][(x + deltaHue) % 16U]), baseSat,(uint8_t)max(0, nextv));
+        leds[XY(x, y)] = color;
       }
-    }
-
-    // остальные строки искр - движение вверх
-    for (uint8_t y = sparkleStart + 1; y < matrixHeight; y++) {
-      for (uint8_t x = 0; x < matrixWidth; x++) {
+      else if (y == FIRE_HEIGHT && SPARKLES) {
+        if (random(0, 20) == 0 && getPixColorXY(x, y - 1U) != 0U) drawPixelXY(x, y, getPixColorXY(x, y - 2U));
+        else
+          drawPixelXY(x, y, 0U);
+      }
+      else if (SPARKLES) {
         uint8_t newX = (random(0, 4)) ? x : (x + matrixWidth + random(0U, 2U) - random(0U, 2U)) % matrixWidth;
-        if (getPixColorXY(x, y - 1) > 0) {
-          drawPixelXY(newX, y, getPixColorXY(x, y - 1));
-        }
+        if (getPixColorXY(x, y - 1U) > 0U) drawPixelXY(newX, y, getPixColorXY(x, y - 1U));
       }
     }
   }
-#endif
 }
 
 // ======================================================================== ОГОНЬ 2012 ================================================================
+
 void fire2012again() {
   if (!noise3d || !noise3d[0]) return;
   if (loadingFlag) {
@@ -353,6 +311,7 @@ void fire2012again() {
 }
 
 // ======================================================================== ОГОНЬ 2018 ================================================================
+
 void Fire2018_2() {
   static uint16_t lastWidth = 0, lastHeight = 0;
   if (matrixWidth == 0 || matrixHeight == 0) return;
@@ -461,6 +420,7 @@ void Fire2018_2() {
 }
 
 // ======================================================================== ОГОНЬ 2020 ================================================================
+
 void fire2020Routine2() {
 #define SPARKLES_NUM (matrixWidth / 8U)
   if (!noise3d || !leds || matrixWidth == 0 || matrixHeight == 0) {
@@ -571,6 +531,7 @@ void Fire2021Routine() {
     else
       curPalette = firePalettes[deltaValue]; // (uint8_t)(modes[currentMode].Scale/100.0F * ((sizeof(firePalettes)/sizeof(TProgmemRGBPalette16 *))-0.01F))];
     deltaValue = (modes[currentMode].Scale - 1U) % 11U + 1U;
+    
     if (modes[currentMode].Speed & 0x01) {
       ff_x = modes[currentMode].Speed;
       deltaHue2 = FIXED_SCALE_FOR_Y;
@@ -699,12 +660,14 @@ void  FireSparks() {
 
 // ============================================================================== ПЛАМЯ ==============================================================
 void wu_pixel_maxV(int16_t item) {
+
 #define FLAME_MAX_DY 256
 #define FLAME_MIN_DY 128
 #define FLAME_MAX_DX 32
 #define FLAME_MIN_DX -32
 #define FLAME_MAX_VALUE 255
 #define FLAME_MIN_VALUE 176
+ 
   if (!noise3d || !leds || matrixWidth == 0 || matrixHeight == 0) {
     FastLED.clear();
     FastLED.show();
@@ -898,53 +861,53 @@ void rain(uint8_t backgroundDepth, uint8_t maxBrightness, uint8_t spawnFreq, uin
     }
 
     if (storm) {
-    static uint8_t* lightning = nullptr;
-    static uint16_t prevLightningDim = 0;
-    uint16_t needed = matrixWidth * matrixHeight;
+      static uint8_t* lightning = nullptr;
+      static uint16_t prevLightningDim = 0;
+      uint16_t needed = matrixWidth * matrixHeight;
 
-    if (!lightning || needed != prevLightningDim) {
+      if (!lightning || needed != prevLightningDim) {
         if (lightning) free(lightning);
         lightning = (uint8_t*)malloc(needed);
         prevLightningDim = needed;
-    }
-    if (lightning) {
+      }
+      if (lightning) {
         memset(lightning, 0, needed);
         if (random16() < 72) {
-            uint16_t startX = random16(matrixWidth);
-            uint16_t startY = matrixHeight - 1;
-            lightning[startX + startY * matrixWidth] = 255;
-            for (uint16_t ly = matrixHeight - 1; ly > 1; ly--) {
-                for (uint16_t lx = 1; lx < matrixWidth - 1; lx++) {
-                    if (lightning[lx + ly * matrixWidth] == 255) {
-                        lightning[lx + ly * matrixWidth] = 0;
-                        uint8_t dir = random8(4);
-                        CRGB col = (dir == 1 || dir == 3) ? CRGB(128, 128, 128) : CRGB(72, 72, 80);
-                        switch (dir) {
-                            case 0:
-                                leds[XY(lx + 1, ly - 1)] = col;
-                                lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
-                                break;
-                            case 1:
-                                leds[XY(lx, ly - 1)] = col;
-                                lightning[lx + (ly - 1) * matrixWidth] = 255;
-                                break;
-                            case 2:
-                                leds[XY(lx - 1, ly - 1)] = col;
-                                lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
-                                break;
-                            case 3:
-                                leds[XY(lx - 1, ly - 1)] = col;
-                                lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
-                                leds[XY(lx + 1, ly - 1)] = col;
-                                lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
-                                break;
-                        }
-                    }
+          uint16_t startX = random16(matrixWidth);
+          uint16_t startY = matrixHeight - 1;
+          lightning[startX + startY * matrixWidth] = 255;
+          for (uint16_t ly = matrixHeight - 1; ly > 1; ly--) {
+            for (uint16_t lx = 1; lx < matrixWidth - 1; lx++) {
+              if (lightning[lx + ly * matrixWidth] == 255) {
+                lightning[lx + ly * matrixWidth] = 0;
+                uint8_t dir = random8(4);
+                CRGB col = (dir == 1 || dir == 3) ? CRGB(128, 128, 128) : CRGB(72, 72, 80);
+                switch (dir) {
+                  case 0:
+                    leds[XY(lx + 1, ly - 1)] = col;
+                    lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
+                    break;
+                  case 1:
+                    leds[XY(lx, ly - 1)] = col;
+                    lightning[lx + (ly - 1) * matrixWidth] = 255;
+                    break;
+                  case 2:
+                    leds[XY(lx - 1, ly - 1)] = col;
+                    lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
+                    break;
+                  case 3:
+                    leds[XY(lx - 1, ly - 1)] = col;
+                    lightning[(lx - 1) + (ly - 1) * matrixWidth] = 255;
+                    leds[XY(lx + 1, ly - 1)] = col;
+                    lightning[(lx + 1) + (ly - 1) * matrixWidth] = 255;
+                    break;
                 }
+              }
             }
+          }
         }
+      }
     }
-}
 
     if (clouds) {
       const uint16_t noiseScale = 250;
@@ -1071,24 +1034,24 @@ void magmaRoutine() {
 CRGB solidRainColor = CRGB(60, 80, 90);
 
 void coloredRain() {
-    if (loadingFlag) {
+  if (loadingFlag) {
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
-        if (selectedSettings) {
-            uint8_t tmp = 1U + random8(255U);
-            if ((tmp % 4U == 0U) && (tmp % 8U != 0U)) tmp--;
-            setModeSettings(tmp, 165U + random8(76U));
-        }
-#endif
-        loadingFlag = false;
+    if (selectedSettings) {
+      uint8_t tmp = 1U + random8(255U);
+      if ((tmp % 4U == 0U) && (tmp % 8U != 0U)) tmp--;
+      setModeSettings(tmp, 165U + random8(76U));
     }
+#endif
+    loadingFlag = false;
+  }
 
-    constrainCurrentEffectScale(100U);   // <-- ограничить Scale до 100
+  constrainCurrentEffectScale(100U);   // <-- ограничить Scale до 100
 
-    uint8_t scaleVal = myScale8(modes[currentMode].Scale);
-    uint8_t hue = (uint8_t)(modes[currentMode].Scale * 2.55f);
+  uint8_t scaleVal = myScale8(modes[currentMode].Scale);
+  uint8_t hue = (uint8_t)(modes[currentMode].Scale * 2.55f);
 
-    rain(60, 200, map8(42, 5, 100), scaleVal,
-         CHSV(hue, 255U, 255U), false, false, false);
+  rain(60, 200, map8(42, 5, 100), scaleVal,
+       CHSV(hue, 255U, 255U), false, false, false);
 }
 
 void simpleRain() {
