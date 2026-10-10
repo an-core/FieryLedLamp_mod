@@ -96,25 +96,37 @@ void dimAll(uint8_t value, CRGB *LEDarray) {
 
 // ----------------------------------------------------------------------------
 void setNoise(uint16_t x, uint16_t y, uint8_t val) {
-  if (!noise || x >= prevMaxNoiseDim || y >= prevMaxNoiseDim || !noise[x] || !noise[y]) return;
+  if (!noise3d || !noise3d[0]) return;
+  if (x >= matrixWidth || y >= matrixHeight) return;
+  if (!noise3d[0][x]) return;
   noise3d[0][x][y] = val;
 }
 
 // ----------------------------------------------------------------------------
 uint8_t safeGetNoise(uint8_t layer, uint8_t x, uint8_t y) {
-  if (!noise3d || !noise3d[layer] || !noise3d[layer][x]) return 0;
+  if (!noise3d) return 0;
+  if (layer >= NUM_LAYERSMAX) return 0;
+  if (!noise3d[layer]) return 0;
+  if (x >= matrixWidth || y >= matrixHeight) return 0;
+  if (!noise3d[layer][x]) return 0;
   return noise3d[layer][x][y];
 }
 
 // ----------------------------------------------------------------------------
 void safeSetNoise(uint8_t layer, uint8_t x, uint8_t y, uint8_t val) {
-  if (!noise3d || !noise3d[layer] || !noise3d[layer][x]) return;
+  if (!noise3d) return;
+  if (layer >= NUM_LAYERSMAX) return;
+  if (!noise3d[layer]) return;
+  if (x >= matrixWidth || y >= matrixHeight) return;
+  if (!noise3d[layer][x]) return;
   noise3d[layer][x][y] = val;
 }
 
 // ----------------------------------------------------------------------------
 uint8_t getNoise(uint16_t x, uint16_t y) {
-  if (!noise || x >= prevMaxNoiseDim || y >= prevMaxNoiseDim || !noise[x] || !noise[y]) return 0;
+  if (!noise3d || !noise3d[0]) return 0;
+  if (x >= matrixWidth || y >= matrixHeight) return 0;
+  if (!noise3d[0][x]) return 0;
   return noise3d[0][x][y];
 }
 
@@ -409,28 +421,16 @@ void gradientDownTop(uint8_t bottom, CHSV bottom_color, uint8_t top, CHSV top_co
 // ----------------------------------------------------------------------------
 // функция чтения бинарного файла изображения из файловой системы лампы
 void readBinFile(String fileName, size_t len) {
-
   File binFile = LittleFS.open("/" + fileName, "r");
-  if (!binFile) {
-    return;
-  }
+  if (!binFile) return;
+
   size_t size = binFile.size();
   if (size > len) {
     binFile.close();
     return;
   }
 
-  byte buffer[size];
-  uint16_t amount;
-
-  if (binFile == NULL) exit (1);
-  binFile.seek(0);
-
-  while (binFile.available()) {
-    amount = binFile.read(buffer, size);
-  }
-
-  memcpy(binImage, buffer, amount);
+  binFile.read(binImage, size);
   binFile.close();
 }
 
@@ -445,6 +445,10 @@ uint16_t getSizeValue(byte* buffer, byte b) {
 void drawScaledImage(uint16_t imgW, uint16_t imgH, uint16_t offsetX) {
   const uint16_t HEADER = 16;
   const uint16_t BYTES_PER_PIXEL = 2;
+  const size_t MAX_IMAGE_SIZE = sizeof(binImage);
+
+  if (imgW == 0 || imgH == 0) return;
+  if (HEADER + (size_t)imgW * imgH * BYTES_PER_PIXEL > MAX_IMAGE_SIZE) return;
 
   for (uint16_t y = 0; y < matrixHeight; y++) {
     uint16_t srcY = (y * imgH) / matrixHeight;
@@ -453,8 +457,10 @@ void drawScaledImage(uint16_t imgW, uint16_t imgH, uint16_t offsetX) {
     for (uint16_t x = 0; x < matrixWidth; x++) {
       uint16_t srcX = (offsetX + x) % imgW;
       uint16_t pixIndex = rowOffset + srcX * BYTES_PER_PIXEL;
+
       uint8_t b1 = binImage[pixIndex];
       uint8_t b2 = binImage[pixIndex + 1];
+
       uint8_t r = (b2 & 0xF8);
       uint8_t g = ((b2 & 0x07) << 5) | ((b1 & 0xE0) >> 3);
       uint8_t b = (b1 & 0x1F) << 3;
@@ -508,9 +514,9 @@ void fillNoiseLED() {
   uint16_t maxDim = prevMaxNoiseDim;
 
   for (uint16_t i = 0; i < maxDim; i++) {
+    if (noise[i] == nullptr) continue;
     int32_t ioffset = scale * (int32_t)i;
     for (uint16_t j = 0; j < maxDim; j++) {
-      if (noise[i] == nullptr) continue;
       int32_t joffset = scale * (int32_t)j;
       uint8_t data = inoise8(noiseX + ioffset, noiseY + joffset, noiseZ);
       data = qsub8(data, 16);

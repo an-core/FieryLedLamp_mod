@@ -330,18 +330,18 @@ void led_panel(bool drawStringThisTick) {
   // вывод на матрицу
   bool needShow = loadingFlag || anyTimerActive || (millis() - lastShow >= FRAME_MS);
   if (needShow) {
-    #if EFF_LOG
-  uint32_t t0 = millis();
+#if EFF_LOG
+    uint32_t t0 = millis();
 #endif
     FastLED.show();
-    #if EFF_LOG
-  uint32_t dt = millis() - t0;
-  if (dt > 10) SYSLOG.add("show: %u ms", dt);
+#if EFF_LOG
+    uint32_t dt = millis() - t0;
+    if (dt > 10) SYSLOG.add("show: %u ms", dt);
 #endif
     lastShow = millis();
     loadingFlag = false;
 
-    #if EFF_LOG
+#if EFF_LOG
     static uint32_t showCounter = 0;
     static uint32_t showTimer = 0;
     showCounter++;
@@ -399,7 +399,7 @@ void updateAutoHueModes() {
 // ======================================================================= IP-адрес НА МАТРИЦЕ =========================================================
 
 void showIPOnMatrix() {
-if (!displayIpAtStart) return;
+  if (!displayIpAtStart) return;
   static bool ipShown = false;
   if (ipShown) return;
 
@@ -596,6 +596,8 @@ cleanup:
 
 // выделенные буферы
 void freeAllBuffers(MatrixBuffers& buf, uint16_t width, uint16_t height, uint16_t used) {
+  safeDeleteArray(buf.leds);
+  safeDeleteArray(buf.effectBuffer);
   safeDeleteArray(buf.ledsbuff);
   safeDeleteArray(buf.line);
   safeDeleteArray(buf.shiftHue);
