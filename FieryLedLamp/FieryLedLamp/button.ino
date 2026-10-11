@@ -36,7 +36,7 @@ void buttonTick() {
 
 #if USE_DAWN || USE_SUNSET
     bool dawnOrSunsetActive = false;
-    
+
 #if USE_DAWN
     if (dawnFlag == 1) dawnOrSunsetActive = true;
 #endif // USE_DAWN
@@ -128,14 +128,14 @@ void buttonTick() {
     }
     loadingFlag = true;
 
-    #if USE_MP3_PLAYER
+#if USE_MP3_PLAYER
     if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-        uint8_t newFolder = effects_folders[currentMode];
-        if (mp3_folder != newFolder) {
-            mp3_folder = newFolder;
-            mp3_folder_last = mp3_folder;
-            mp3_pending_play = true;
-        }
+      uint8_t newFolder = effects_folders[currentMode];
+      if (mp3_folder != newFolder) {
+        mp3_folder = newFolder;
+        mp3_folder_last = newFolder;
+        mp3SendPlayFolder(newFolder);
+      }
     }
 #endif
 
@@ -179,8 +179,8 @@ void buttonTick() {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;
-        mp3_folder_last = mp3_folder;
-        mp3_pending_play = true;
+        mp3_folder_last = newFolder;
+        mp3SendPlayFolder(newFolder);
       }
     }
 #endif
@@ -232,8 +232,8 @@ void buttonTick() {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;
-        mp3_folder_last = mp3_folder;
-        mp3_pending_play = true;
+        mp3_folder_last = newFolder;
+        mp3SendPlayFolder(newFolder);
       }
     }
 #endif
@@ -557,8 +557,8 @@ void buttonTick() {
                 uint8_t newFolder = effects_folders[currentMode];
                 if (mp3_folder != newFolder) {
                   mp3_folder = newFolder;
-                  mp3_folder_last = mp3_folder;
-                  mp3_pending_play = true;
+                  mp3_folder_last = newFolder;
+                  mp3SendPlayFolder(newFolder);
                 }
               }
 #endif
@@ -676,7 +676,7 @@ void buttonTick() {
     startButtonHolding = false;
     Button_Holding = false;
     loadingFlag = true;
-    
+
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;

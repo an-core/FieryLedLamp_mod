@@ -62,10 +62,8 @@ void Wifi::begin() {
   if (initialized) return;
   initialized = true;
   xTaskCreatePinnedToCore(
-  [](void* arg) {
-    static_cast<Wifi*>(arg)->wifiManagerTask();
-  },
-  "wifi_mgr", 4096, this, 2, &wifiManagerTaskHandle, 0);
+  [](void* arg) { static_cast<Wifi*>(arg)->wifiManagerTask(); },
+  "wifi_mgr", 8192, this, 1, &wifiManagerTaskHandle, 0);
 
   String main_ssid = jsonRead(configWiFi, "ssid");
   String main_pass = jsonRead(configWiFi, "password");

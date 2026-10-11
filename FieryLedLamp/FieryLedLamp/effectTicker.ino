@@ -353,7 +353,7 @@ void changePower() {
     ONflag = false;
 #if USE_MP3_PLAYER
     if (mp3_player_connect == 4) {
-      mp3_send_command_nowait(0x0E, 0, 0, 0);
+      mp3SendCmd(0x0E, 0, 0, 0);
       mp3_stop = true;
       pause_on = true;
     }
@@ -393,7 +393,12 @@ void changePower() {
 
 #if USE_MP3_PLAYER
     if (mp3Enabled && eff_sound_on && mp3_player_connect == 4) {
-      mp3_folder = effects_folders[currentMode];
+      uint8_t newFolder = effects_folders[currentMode];
+      if (newFolder != 0) {
+        mp3_folder = newFolder;
+        mp3_folder_last = newFolder;
+        mp3SendPlayFolder(newFolder);
+      }
     }
 #endif
 
@@ -417,8 +422,8 @@ void changePower() {
     manualOverrideUntil = millis() + 300000UL;
 
 #if USE_MP3_PLAYER
-    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-      mp3_send_command_nowait(0x0E, 0, 0, 0);
+    if (mp3Enabled && mp3_player_connect == 4) {
+      mp3SendCmd(0x0E, 0, 0, 0);
       mp3_stop = true;
       pause_on = true;
     }
@@ -477,8 +482,10 @@ void Eff_Tick() {
 #if USE_MP3_PLAYER
   static uint8_t lastMode = 255;
   if (mp3Enabled && lastMode != currentMode && ONflag && eff_sound_on && mp3_player_connect == 4) {
-    mp3_folder = effects_folders[currentMode];
-    mp3_pending_play = true;
+    uint8_t folder = effects_folders[currentMode];
+    if (folder != 0) {
+      mp3SendPlayFolder(folder);
+    }
     lastMode = currentMode;
   }
 #endif

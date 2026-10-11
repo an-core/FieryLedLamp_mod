@@ -11,6 +11,29 @@
 // -----------------
 
 // ====================================================================================
+// ОТПРАВКА КОМАНДЫ ЧЕРЕЗ ОЧЕРЕДЬ (неблокирующая)
+// ------------------------------------------------------------------------------------
+// Безопасно вызывать из любого ядра. Обрабатывается в mp3Task (ядро 0)
+
+void mp3SendCmd(uint8_t cmd, uint8_t feedback, uint8_t dat1, uint8_t dat2) {
+  if (!mp3CmdQueue) return;
+  Mp3CmdMsg msg = { cmd, feedback, dat1, dat2 };
+  xQueueSend(mp3CmdQueue, &msg, 0);
+}
+
+// ====================================================================================
+// ОТПРАВКА СПЕЦ-КОМАНДЫ play_sound_async ЧЕРЕЗ ОЧЕРЕДЬ (неблокирующая)
+// ------------------------------------------------------------------------------------
+// cmd = 0xFF - маркер "вызвать play_sound_async(folder)"
+// dat1 = folder
+
+void mp3SendPlayFolder(uint8_t folder) {
+  if (!mp3CmdQueue) return;
+  Mp3CmdMsg msg = { 0xFF, 0, folder, 0 };
+  xQueueSend(mp3CmdQueue, &msg, 0);
+}
+
+// ====================================================================================
 // ОТПРАВКА КОМАНДЫ С ОЖИДАНИЕМ ОТВЕТА
 // ------------------------------------------------------------------------------------
 // cmd - код команды (0x06 = громкость, 0x0E = пауза, 0x13 = трек, 0x17 = папка и т.д.)
@@ -262,9 +285,9 @@ void mp3_setup() {
 
   if (initStep == 3) {
     send_command(0x07, FEEDBACK, 0, Equalizer);
-    delay(mp3_delay);
+    vTaskDelay(pdMS_TO_TICKS(mp3_delay));
     send_command(0x06, FEEDBACK, 0, eff_volume);
-    delay(mp3_delay);
+    vTaskDelay(pdMS_TO_TICKS(mp3_delay));
 
     if (tmp == 1 || tmp == 2 || tmp == 3) {
       mp3_player_connect = 4;
@@ -288,10 +311,11 @@ void mp3_setup() {
 // ====================================================================================
 // ОСНОВНОЙ ЦИКЛ (вызывается из mp3Task на ядре 0)
 // ------------------------------------------------------------------------------------
-// 1. Обрабатывает рассвет/закат (handleDawnMp3, handleSunsetMp3)
-// 2. Управляет воспроизведением: если звук включён и плеер на паузе/остановлен, запускает play_sound_async с папкой текущего эффекта
-// 3. Если звук выключен и плеер играет - ставит на паузу
-// 4. Тикает автомат mp3PlayTick
+// 1. Аварийная остановка плеера (0x16), если озвучка "залипла" (каждые 5 сек)
+// 2. Обрабатывает рассвет/закат (handleDawnMp3, handleSunsetMp3)
+// 3. Управляет воспроизведением: если звук включён и плеер на паузе/остановлен, запускает play_sound_async
+// 4. Если звук выключен и плеер играет - ставит на паузу
+// 5. Тикает автомат mp3PlayTick
 
 void mp3_loop() {
   if (isAnnouncing) return;
@@ -337,12 +361,13 @@ void mp3_loop() {
 // Устанавливает mp3PlayState = MP3_PLAY_SEND_PAUSE или MP3_PLAY_SEND_VOLUME
 // Дальнейшие шаги (пауза, громкость, выбор папки) делает mp3PlayTick()
 // folder = 0 - логика "стоп"
+// Если папка та же и воспроизведение идёт - выход без изменений
 
 void play_sound_async(uint8_t folder) {
   if (isAnnouncing) return;
   if (!eff_sound_on && folder != 0 && !alarm_sound_flag && !sunset_sound_flag) return;
 
-  if (mp3PlayPendingFolder == folder && (mp3PlayState != MP3_PLAY_IDLE || !mp3_stop)) {
+  if (mp3PlayPendingFolder == folder && mp3PlayState != MP3_PLAY_IDLE) {
     return;
   }
 
@@ -372,9 +397,7 @@ void mp3_restore_after_announce(bool restoreEffect) {
 
   if (restoreEffect && eff_sound_on && wasPlayingBeforeAnnounce) {
     send_command(0x06, FEEDBACK, 0, eff_volume);
-    delay(30);
-    send_command(0x1A, FEEDBACK, 0, 0);   // mute off
-    delay(50);
+    vTaskDelay(pdMS_TO_TICKS(200));
     mp3_stop = false;
     pause_on = false;
     set_mp3_play_now = true;
@@ -383,9 +406,9 @@ void mp3_restore_after_announce(bool restoreEffect) {
 #endif
   } else {
     send_command(0x0E, FEEDBACK, 0, 0);
-    delay(50);
+    vTaskDelay(pdMS_TO_TICKS(50));
     send_command(0x16, FEEDBACK, 0, 0);
-    delay(50);
+    vTaskDelay(pdMS_TO_TICKS(50));
     mp3_stop = true;
     pause_on = true;
     set_mp3_play_now = false;
@@ -437,10 +460,8 @@ void play_time_ADVERT(bool force, bool restoreAfter) {
   }
   if (eff_sound_on && !mp3_stop) {
     wasPlayingBeforeAnnounce = true;
-    send_command(0x1A, FEEDBACK, 0, 1); // mute on
-    delay(50);
     send_command(0x06, FEEDBACK, 0, 0); // громкость 0
-    delay(30);
+    vTaskDelay(pdMS_TO_TICKS(200));
   } else {
     wasPlayingBeforeAnnounce = false;
   }
@@ -468,20 +489,25 @@ void play_time_ADVERT(bool force, bool restoreAfter) {
   bool isDay = (tm.tm_hour >= (NIGHT_HOURS_STOP / 60)) && (tm.tm_hour < (NIGHT_HOURS_START / 60));
   uint8_t advert_volume = isDay ? day_advert_volume : night_advert_volume;
 
+  // mute on
   send_command(0x1A, FEEDBACK, 0, 1);
-  delay(mp3_delay);
-
-  send_command(0x06, FEEDBACK, 0, advert_volume);
-  delay(mp3_delay);
+  vTaskDelay(pdMS_TO_TICKS(mp3_delay));
 
   // трек часа
   send_command(0x13, FEEDBACK, 0, pt_h);
-  delay(mp3_delay);
-  send_command(0x1A, FEEDBACK, 0, 0); // mute off
-  delay(ADVERT_TIMER_H);
+  vTaskDelay(pdMS_TO_TICKS(mp3_delay));
+
+  // громкость озвучки
+  send_command(0x06, FEEDBACK, 0, advert_volume);
+  vTaskDelay(pdMS_TO_TICKS(mp3_delay));
+
+  // mute off
+  send_command(0x1A, FEEDBACK, 0, 0);
+  vTaskDelay(pdMS_TO_TICKS(ADVERT_TIMER_H));
+
   send_command(0x13, FEEDBACK, 0, pt_m + 100);
-  delay(ADVERT_TIMER_M);
-  delay(350);
+  vTaskDelay(pdMS_TO_TICKS(ADVERT_TIMER_M));
+  vTaskDelay(pdMS_TO_TICKS(350));
 
   if (restoreAfter) {
     mp3_restore_after_announce(true);
@@ -808,42 +834,48 @@ void play_weather(bool force) {
   }
   if (weather_advert_count == 0) return;
 
-  // глушим эффект
-  if (eff_sound_on && !mp3_stop) {
-    wasPlayingBeforeAnnounce = true;
-    send_command(0x1A, FEEDBACK, 0, 1); // mute on, громкость не затрагивается
-    delay(50);
-  } else {
-    wasPlayingBeforeAnnounce = false;
-  }
+  uint8_t vol = isDay ? weather_day_volume : weather_night_volume;
 
   isAnnouncing = true;
   weather_advert_flag = true;
   advert_flag = true;
 
+  // глушим эффект (громкость 0 + задержка)
+  if (eff_sound_on && !mp3_stop) {
+    wasPlayingBeforeAnnounce = true;
+    send_command(0x06, FEEDBACK, 0, 0);
+    vTaskDelay(pdMS_TO_TICKS(200));
+  } else {
+    wasPlayingBeforeAnnounce = false;
+  }
+
+  // mute on
+  send_command(0x1A, FEEDBACK, 0, 1);
+  vTaskDelay(pdMS_TO_TICKS(mp3_delay));
+
 #if MP3_LOG
   SYSLOG.add("Запущена погода (%d треков, force=%d)", weather_advert_count, force);
 #endif
 
-  uint8_t vol = isDay ? weather_day_volume : weather_night_volume;
-  send_command(0x1A, FEEDBACK, 0, 1); // mute on
-  delay(mp3_delay);
-  send_command(0x06, FEEDBACK, 0, vol); // громкость
-  delay(mp3_delay);
-
+  // === ВОСПРОИЗВОДИМ ТРЕКИ ===
   for (uint8_t i = 0; i < weather_advert_count; i++) {
     playWeatherAdvertTrack(weather_advert_tracks[i]);
-    delay(mp3_delay);
+    vTaskDelay(pdMS_TO_TICKS(mp3_delay));
+
     if (i == 0) {
-      send_command(0x1A, FEEDBACK, 0, 0); // mute off
-      delay(80);
+      // после первого трека — mute off + громкость озвучки
+      send_command(0x1A, FEEDBACK, 0, 0);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
+      send_command(0x06, FEEDBACK, 0, vol);
+      vTaskDelay(pdMS_TO_TICKS(80));
     }
+
     if (i < weather_advert_count - 1) {
-      delay(ADVERT_TIMER_1);
+      vTaskDelay(pdMS_TO_TICKS(ADVERT_TIMER_1));
     }
   }
 
-  delay(ADVERT_TIMER_2 + 400);
+  vTaskDelay(pdMS_TO_TICKS(ADVERT_TIMER_2 + 400));
   mp3_restore_after_announce(true);
 
   weather_advert_flag = false;
@@ -861,13 +893,13 @@ void play_weather(bool force) {
 // ЗАДАЧИ MP3 (выполняется на ядре 0, отдельно от loop() на ядре 1)
 // ------------------------------------------------------------------------------------
 // 1. Инициализирует плеер (mp3_setup), если он ещё не инициализирован
-// 2. Обрабатывает флаги от loop():
-//    - mp3_pending_play - переключить папку MP3 (смена эффекта)
-//    - mp3_pending_time_advert - озвучить время (force - из mp3_pending_time_force)
-//    - mp3_pending_weather_advert - озвучить погоду (force - из mp3_pending_weather_force)
-//    - перед озвучкой принудительно сбрасывает isAnnouncing, advert_flag, advert_hour, weather_advert_flag - защита от залипания
-// 3. Вызывает mp3_loop() и mp3_periodic_check() для регулярных задач
-// 4. vTaskDelay(5 мс) - отдаёт управление другим задачам
+// 2. Обрабатывает очередь команд от ядра 1 (mp3CmdQueue):
+//    - msg.cmd == 0xFF - специальная команда play_sound_async (msg.dat1 = папка)
+//    - иначе - обычная команда DFPlayer (send_command с параметрами msg)
+// 3. Обрабатывает флаги озвучки (mp3_pending_time_advert / mp3_pending_weather_advert)
+//    перед озвучкой принудительно сбрасывает isAnnouncing, advert_flag, advert_hour, weather_advert_flag
+// 4. Вызывает mp3_loop() и mp3_periodic_check() для регулярных задач
+// 5. vTaskDelay(20 мс) - отдаёт управление другим задачам
 // Отключён от watchdog, т.к. play_time_ADVERT/play_weather могут блокировать задачу на несколько секунд
 
 void mp3Task(void *pvParameters) {
@@ -879,9 +911,23 @@ void mp3Task(void *pvParameters) {
       mp3_setup();
     }
 
-    if (mp3_pending_play) {
-      mp3_pending_play = false;
-      play_sound_async(mp3_folder);
+    // обработка очереди команд от ядра 1
+    Mp3CmdMsg msg;
+    if (mp3CmdQueue && xQueueReceive(mp3CmdQueue, &msg, 0) == pdTRUE) {
+      if (msg.cmd == 0xFF) {
+        uint8_t newFolder = msg.dat1;
+        if (mp3PlayPendingFolder != newFolder) {
+          mp3PlayPendingFolder = 0;
+          mp3PlayState = MP3_PLAY_IDLE;
+        }
+        mp3_folder = newFolder;
+        play_sound_async(newFolder);
+      } else {
+        send_command(msg.cmd, msg.feedback, msg.dat1, msg.dat2);
+        if (msg.feedback) {
+          vTaskDelay(pdMS_TO_TICKS(mp3_delay));
+        }
+      }
     }
 
     if (mp3_pending_time_advert || mp3_pending_weather_advert) {
@@ -931,7 +977,7 @@ void mp3Task(void *pvParameters) {
       mp3_periodic_check();
     }
 
-    vTaskDelay(20 / portTICK_PERIOD_MS);
+    vTaskDelay(pdMS_TO_TICKS(20));
   }
 }
 

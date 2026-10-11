@@ -10,7 +10,7 @@ void IR_Power() {
     dawnFlag = 0;
 #if USE_MP3_PLAYER
     if (mp3Enabled && alarm_sound_flag) {
-      send_command(0x0E, 0, 0, 0);
+      mp3SendCmd(0x0E, 0, 0, 0);
       mp3_stop = true;
       alarm_sound_flag = false;
     }
@@ -49,7 +49,7 @@ void IR_Power() {
     sunsetFlag = 0;
 #if USE_MP3_PLAYER
     if (mp3Enabled && sunset_sound_flag) {
-      send_command(0x0E, 0, 0, 0);
+      mp3SendCmd(0x0E, 0, 0, 0);
       mp3_stop = true;
       sunset_sound_flag = false;
     }
@@ -129,27 +129,35 @@ void IR_Power() {
 // Вкл / Выкл звука
 void Mute() {
 #if USE_MP3_PLAYER
-  if (mp3Enabled && mp3_player_connect == 4) {
+  if (mp3Enabled && mp3_player_connect >= 4) {   // ← >= 4 вместо == 4
     if (eff_sound_on) {
       eff_sound_on = 0;
-#if IR_LOG
-      SYSLOG.add("Звук выключен");
-#endif
+      advert_flag = false;
+      weather_advert_flag = false;
+      isAnnouncing = false;
+      announceSessionActive = false;
+
+      mp3SendCmd(0x0E, FEEDBACK, 0, 0);
+      mp3_stop = true;
+      pause_on = true;
+      set_mp3_play_now = false;
     } else {
       eff_sound_on = eff_volume;
-#if IR_LOG
-      SYSLOG.add("Звук включен");
-#endif
-
       if (ONflag) {
-        set_mp3_play_now = true;
+        uint8_t newFolder = effects_folders[currentMode];
+        if (newFolder != 0) {
+          mp3_folder = newFolder;
+          mp3_folder_last = newFolder;
+          mp3SendCmd(0x06, FEEDBACK, 0, eff_volume);
+          mp3SendCmd(0x17, FEEDBACK, 0, newFolder);
+          mp3_stop = false;
+          pause_on = false;
+          set_mp3_play_now = true;
+        }
       }
     }
   } else {
     showWarning(CRGB::Red, 1000, 250U);
-#if IR_LOG
-    SYSLOG.add("mp3 плеер не подключен");
-#endif
   }
   jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
   timeout_save_file_changes = millis();
@@ -157,7 +165,7 @@ void Mute() {
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
-#endif // USE_MP3_PLAYER
+#endif
 }
 
 // Следующий эффект, предыдущий эффект
@@ -337,8 +345,7 @@ void Volum_Up_Down (bool direction) {
   if (mp3Enabled) {
     eff_volume = constrain(direction ? eff_volume + 1 : eff_volume - 1, 1, 30);
     jsonWrite(configMP3, "vol", eff_volume);
-    if (!dawnflag_sound) send_command(6, FEEDBACK, 0, eff_volume); // Громкость
-
+    if (!dawnflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, eff_volume); // Громкость
 #if USE_TM1637
     if (tm1637Enabled) {
       DisplayFlag = 3;
@@ -434,8 +441,7 @@ void Folder_Next_Prev(bool direction) {
       CurrentFolder = constrain(direction ? CurrentFolder + 1 : CurrentFolder - 1, 0, 99);
       jsonWrite(configSetup, "fold_sel", CurrentFolder);
       if (!pause_on && !mp3_stop && eff_sound_on) {
-        send_command(0x17, FEEDBACK, 0, CurrentFolder); // Включить непрерывное воспроизведение указанной папки
-        delay(mp3_delay);
+        mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder); // Включить непрерывное воспроизведение указанной папки
       }
     }
 
@@ -481,7 +487,7 @@ void IR_Equalizer() {
     Equalizer++;
     if (Equalizer > 5) Equalizer = 0;
     jsonWrite(configSetup, "eq", Equalizer);
-    send_command(0x07, FEEDBACK, 0, Equalizer);
+    mp3SendCmd(0x07, FEEDBACK, 0, Equalizer);
     timeout_save_file_changes = millis();
     bitSet (save_file_changes, 0);
 #if USE_TM1637
@@ -551,8 +557,8 @@ void Digit_Handle(uint8_t digit) {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;
-        mp3_folder_last = mp3_folder;
-        mp3_pending_play = true;
+        mp3_folder_last = newFolder;
+        mp3SendPlayFolder(newFolder);
       }
     }
 #endif

@@ -23,6 +23,8 @@ void load_schedule();
 #endif
 // ------------------------------------------------------
 #if USE_MP3_PLAYER
+void mp3SendCmd(uint8_t cmd, uint8_t feedback, uint8_t dat1, uint8_t dat2);
+void mp3SendPlayFolder(uint8_t folder);
 void play_by_name(const char* fullPath);
 void sendVolume(char *outputBuffer);
 void play_weather(bool manual = false);
@@ -159,6 +161,10 @@ void sendSunsets(char *outputBuffer);
 void sendTimer(char *outputBuffer);
 bool FileCopy(const String& SourceFile, const String& TargetFile);
 void autoDetectTimezone();
+void loadMultiMatrixSettings();
+#if MULTI_MATRIX
+void handle_multi_matrix_enable();
+#endif
 // ------------------------------------------------------
 // effectsSupport
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)

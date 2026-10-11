@@ -159,8 +159,10 @@ void User_settings() {
     doc["sd_enable"] = sdEnabled ? "1" : "0";
     doc["sd_type"] = String(sdType);
 #if MULTI_MATRIX
+    doc["multi_matrix_enable"] = multiMatrixEnabled ? "1" : "0";
     doc["multi_matrix"] = "1";
 #else
+    doc["multi_matrix_enable"] = "0";
     doc["multi_matrix"] = "0";
 #endif
     String response;
@@ -954,6 +956,9 @@ void User_settings() {
 
   HTTP.on("/m_t", handle_matrix_tipe);
   HTTP.on("/m_o", handle_matrix_orientation);
+#if MULTI_MATRIX
+  HTTP.on("/multi_matrix_enable", HTTP_GET, handle_multi_matrix_enable);
+#endif
 
   // чип светодиодов, порядок цветов
   HTTP.on("/save_led_settings", HTTP_GET, []() {
@@ -984,8 +989,7 @@ void User_settings() {
     if (changed) {
       writeFile(F("config_led_matrix.json"), configLED);
       HTTP.send(200, "text/plain", "OK_REBOOT");
-      delay(800);
-      ESP.restart();
+      pendingRestart = true;
     } else {
       HTTP.send(200, "text/plain", "NO_CHANGE");
     }
@@ -1122,8 +1126,7 @@ void User_settings() {
 
       if (needReboot) {
         HTTP.send(200, "text/plain", "OK_REBOOT");
-        delay(500);
-        ESP.restart();
+        pendingRestart = true;
       } else {
         HTTP.send(200, "text/plain", "OK");
       }
@@ -1502,8 +1505,7 @@ void User_settings() {
 
   HTTP.on("/stop_weather_sound", HTTP_GET, []() {
     if (mp3_player_connect == 4) {
-      send_command(0x0E, 0x01, 0, 0); // Стоп
-      delay(100);
+      mp3SendCmd(0x0E, 0x01, 0, 0);
       mp3_stop = true;
       pause_on = false;
       HTTP.send(200, "text/plain", "OK");
@@ -2169,8 +2171,7 @@ void User_settings() {
     if (LittleFS.exists("/auth_local.txt")) LittleFS.remove("/auth_local.txt");
 
     HTTP.send(200, "text/html", "<html><body>OK, restart...</body></html>");
-    delay(500);
-    ESP.restart();
+    pendingRestart = true;
   });
 
   // ----------------------------------------------------------------------- СИСТЕМНЫЕ ЛОГИ -------------------------------------------------------------
@@ -2236,8 +2237,7 @@ void User_settings() {
 
   HTTP.on("/restart", HTTP_GET, []() {
     HTTP.send(200, "text/plain", "OK");
-    delay(500);
-    ESP.restart();
+    pendingRestart = true;
   });
 
   HTTP.on("/display_ip", HTTP_GET, []() {  // Чекбокс "Показывать IP адрес при старте"
@@ -2404,10 +2404,9 @@ void handle_save_wifi() {
 
   saveConfig();
 
-  Wifi::instance().begin();
+  //Wifi::instance().begin();
   HTTP.send(200, "text/plain", "OK_REBOOT");
-  delay(500);
-  ESP.restart();
+  pendingRestart = true;
 
   // HTTP.send(200, "text/plain", "OK");
 }
@@ -2418,8 +2417,7 @@ void handle_use_static_ip() {
   saveConfig();
 
   HTTP.send(200, "text/plain", "OK_REBOOT");
-  delay(500);
-  ESP.restart();
+  pendingRestart = true;
 }
 
 void handle_set_static_ip() {
@@ -2434,8 +2432,7 @@ void handle_set_static_ip() {
     Wifi::instance().setStaticIP(ip, gateway, subnet, dns);
     saveConfig();
     HTTP.send(200, "text/plain", "OK_REBOOT");
-    delay(500);
-    ESP.restart();
+    pendingRestart = true;
     HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
   } else {
     HTTP.send(400, "text/plain", "Invalid IP format");
@@ -2830,7 +2827,7 @@ void handle_volume() {
   eff_volume = constrain(HTTP.arg("vol").toInt(), 0, 30);
   jsonWrite(configMP3, "vol", eff_volume);
   if (mp3Enabled && !dawnflag_sound && !sunsetflag_sound && !isAnnouncing)
-    send_command(0x06, FEEDBACK, 0, eff_volume);
+    mp3SendCmd(0x06, FEEDBACK, 0, eff_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
@@ -2849,7 +2846,7 @@ void handle_volume() {
 void handle_alarm_volume() {
   alarm_volume = constrain(HTTP.arg("alm_vol").toInt(), 0, 30);
   jsonWrite(configMP3, "alm_vol", alarm_volume);
-  if (mp3Enabled && dawnflag_sound) send_command(0x06, FEEDBACK, 0, alarm_volume);
+  if (mp3Enabled && dawnflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, alarm_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
@@ -2868,7 +2865,7 @@ void handle_alarm_volume() {
 void handle_sunset_volume() {
   sunset_volume = constrain(HTTP.arg("sun_vol").toInt(), 0, 30);
   jsonWrite(configMP3, "sun_vol", sunset_volume);
-  if (mp3Enabled && sunsetflag_sound) send_command(0x06, FEEDBACK, 0, sunset_volume);
+  if (mp3Enabled && sunsetflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, sunset_volume);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
@@ -3067,7 +3064,7 @@ void handle_play_time() {
 // Озвучка погоды (по кнопке)
 void handle_play_weather() {
 #if USE_WEATHER
-  if (mp3Enabled && mp3_player_connect >= 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
+  if (mp3Enabled && mp3_player_connect == 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
     mp3_pending_weather_advert = true;
     mp3_pending_weather_force = true;
     HTTP.send(200, "text/plain", "OK");
@@ -3087,7 +3084,7 @@ void handle_alarm_fold_sel() {
   if (mp3Enabled && alarm_sound_flag) {
     mp3_folder = AlarmFolder;
     mp3_folder_last = mp3_folder;
-    play_sound_async(mp3_folder);
+    mp3SendPlayFolder(mp3_folder);
   }
   HTTP.send(200, F("text/plain"), F("OK"));
 }
@@ -3100,7 +3097,7 @@ void handle_sunset_fold_sel() {
   if (mp3Enabled && sunset_sound_flag) {
     mp3_folder = SunsetFolder;
     mp3_folder_last = mp3_folder;
-    play_sound_async(mp3_folder);
+    mp3SendPlayFolder(mp3_folder);
   }
   HTTP.send(200, F("text/plain"), F("OK"));
 }
@@ -3127,8 +3124,7 @@ void handle_folder_down() {
   jsonWrite(configMP3, "fold_sel", CurrentFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && !pause_on && !mp3_stop && eff_sound_on && !isAnnouncing) {
-    send_command(0x17, FEEDBACK, 0, CurrentFolder);
-    delay(mp3_delay);
+    mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
   }
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
@@ -3142,8 +3138,7 @@ void handle_folder_up() {
   jsonWrite(configMP3, "fold_sel", CurrentFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && !pause_on && !mp3_stop && eff_sound_on && !isAnnouncing) {
-    send_command(0x17, FEEDBACK, 0, CurrentFolder);
-    delay(mp3_delay);
+    mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
   }
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
@@ -3157,8 +3152,7 @@ void handle_folder_select() {
   jsonWrite(configMP3, "fold_sel", CurrentFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && !pause_on && !mp3_stop && eff_sound_on && !isAnnouncing) {
-    send_command(0x17, FEEDBACK, 0, CurrentFolder);
-    delay(mp3_delay);
+    mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
   }
   HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
@@ -3166,13 +3160,14 @@ void handle_folder_select() {
   repeat_multiple_lamp_control = true;
 #endif
 }
+
 // ----------------------------------------------------------------------
 // Эквалайзер
 void handle_equalizer() {
   Equalizer = HTTP.arg("eq").toInt();
   jsonWrite(configMP3, "eq", Equalizer);
   if (mp3Enabled) {
-    send_command(0x07, FEEDBACK, 0, Equalizer);
+    mp3SendCmd(0x07, FEEDBACK, 0, Equalizer);
   }
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, F("text/plain"), F("OK"));
@@ -3540,7 +3535,7 @@ void handle_eff_sel() {
 
 #if USE_MP3_PLAYER
   if (mp3Enabled && mp3Initialized && !mp3_stop) {
-    mp3_send_command_nowait(0x0E, 0, 0, 0);
+    mp3SendCmd(0x0E, 0, 0, 0);
     mp3_stop = true;
     pause_on = true;
   }
@@ -3552,8 +3547,7 @@ void handle_eff_sel() {
 #if USE_MP3_PLAYER
   if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
     if (effects_folders[currentMode] != 0) {
-      mp3_folder = effects_folders[currentMode];
-      play_sound_async(mp3_folder);
+      mp3SendPlayFolder(effects_folders[currentMode]);
     }
   }
 #endif
@@ -4521,7 +4515,7 @@ void handle_eff() {
 
 #if USE_MP3_PLAYER
   if (mp3Enabled && mp3Initialized && !mp3_stop) {
-    mp3_send_command_nowait(0x0E, 0, 0, 0);  // stop
+    mp3SendCmd(0x0E, 0, 0, 0);
     mp3_stop = true;
     pause_on = true;
   }
@@ -4533,8 +4527,7 @@ void handle_eff() {
 #if USE_MP3_PLAYER
   if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
     if (effects_folders[currentMode] != 0) {
-      mp3_folder = effects_folders[currentMode];
-      play_sound_async(mp3_folder);
+      mp3SendPlayFolder(effects_folders[currentMode]);
     }
   }
 #endif
@@ -4940,6 +4933,40 @@ void handle_save_brightness() {
 }
 
 // ---------------------------------------------------------------------- НАСТРОЙКИ МАТРИЦЫ ------------------------------------------------------------
+
+// Включение/выключение мультиматрицы (рантайм)
+#if MULTI_MATRIX
+void handle_multi_matrix_enable() {
+  if (!HTTP.hasArg("value")) {
+    HTTP.send(400, "text/plain", "Missing value");
+    return;
+  }
+
+  bool newVal = (HTTP.arg("value") == "1" || HTTP.arg("value").equalsIgnoreCase("true"));
+
+  if (newVal == multiMatrixEnabled) {
+    HTTP.send(200, "text/plain", "NO_CHANGE");
+    return;
+  }
+
+  String configLED = readFile(F("config_led_matrix.json"), 8192);
+  if (configLED == "Failed" || configLED == "Large") configLED = "{}";
+
+  jsonWrite(configLED, "multi_matrix", newVal ? 1 : 0);
+  writeFile(F("config_led_matrix.json"), configLED);
+
+  multiMatrixEnabled = newVal;
+
+#if MATRIX_LOG
+  SYSLOG.add("multiMatrixEnabled: %d (restart)", multiMatrixEnabled);
+#endif
+
+  HTTP.send(200, "text/plain", "OK_REBOOT");
+  pendingRestart = true;
+}
+#endif
+
+// -----------------------------------
 
 void handle_matrix_tipe() {
   String configLED = readFile(F("config_led_matrix.json"), 8192);
@@ -7094,8 +7121,7 @@ void handle_reset_to_default() {
   }
 
   HTTP.send(200, "text/plain", "OK");
-  delay(100);
-  ESP.restart();
+  pendingRestart = true;
 }
 
 // ---------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ ЧЕРЕЗ ВЕБ --------------------------------------------------
@@ -7212,18 +7238,15 @@ void handle_mp3_enable() {
 
 #if USE_MP3_PLAYER
     if (mp3Enabled) {
-      if (mp3_player_connect != 4) {
-        mp3_setup();
-      }
+      // mp3_setup() вызывается автоматически в mp3Task, если !mp3Initialized
       if (mp3_stop || pause_on) {
-        send_command(0x0E, FEEDBACK, 0, 0);
+        mp3SendCmd(0x0E, FEEDBACK, 0, 0);
         mp3_stop = false;
         pause_on = false;
       }
     } else {
       if (mp3_player_connect == 4) {
-        send_command(0x0E, FEEDBACK, 0, 0);
-        delay(50);
+        mp3SendCmd(0x0E, FEEDBACK, 0, 0);
         mp3_stop = true;
         pause_on = true;
       }
@@ -7308,8 +7331,7 @@ void handle_sd_type() {
   saveConfig();
 
   HTTP.send(200, "text/plain", "OK_REBOOT");
-  delay(500);
-  ESP.restart();
+  pendingRestart = true;
 #else
   HTTP.send(200, "text/plain", "Not supported on this build");
 #endif

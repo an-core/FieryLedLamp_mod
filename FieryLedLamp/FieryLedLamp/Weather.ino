@@ -456,7 +456,7 @@ void Weather::startTask() {
   if (taskHandle != nullptr) return;
   xTaskCreatePinnedToCore(
     [](void* arg){ static_cast<Weather*>(arg)->taskLoop(); },
-    "weather", 8192, this, 1, &taskHandle, 0);
+    "weather", 12288, this, 1, &taskHandle, 0);
 }
 
 void Weather::taskLoop() {

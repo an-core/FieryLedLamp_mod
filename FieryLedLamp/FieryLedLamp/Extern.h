@@ -1,12 +1,17 @@
 // ***************************************************************************** Extern.h ***************************************************************
 #pragma once
 // --------------
+#include <Arduino.h>
+#include <HardwareSerial.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/queue.h>
 #include "Constants.h"
 #include "Types.h"
 #include "Time.h"
 #include "IRManager.h"
-// ---------------------
+// ---------------------------
 
+extern volatile bool pendingRestart;
 extern volatile bool g_flagForceSync;
 extern volatile bool g_flagAutoTz;
 extern bool displayIpAtStart;
@@ -120,7 +125,6 @@ extern bool st7789Enabled;
 extern bool mp3Enabled;
 extern bool sdEnabled;
 extern uint8_t sdType;
-
 // ------------------------------------------------------------------------------
 extern unsigned long lastClockFixedSwitch;
 extern bool timer_clock_fixed;
@@ -162,6 +166,7 @@ extern bool panelFlip;
 extern uint8_t segMatrix_w, segMatrix_h;
 extern uint16_t segWidth, segHeight;
 extern uint16_t totalWidth, totalHeight;
+extern bool multiMatrixEnabled;
 #endif
 // ------------------------------------------------------------------------------
 #if USE_BUTTON
@@ -169,72 +174,82 @@ extern String configButton;
 #endif
 // ------------------------------------------------------------------------------
 #if USE_MP3_PLAYER
-extern volatile bool mp3_pending_time_force;
-extern volatile bool mp3_pending_play;
-extern volatile bool mp3_pending_time_advert;
-extern volatile bool mp3_pending_weather_advert;
-extern volatile bool mp3_pending_weather_force;
+extern QueueHandle_t mp3CmdQueue;
+extern volatile bool announceSessionActive;
 extern uint8_t mp3_init_step;
-extern String configMP3;
-extern String soundList;
-extern bool isAnnouncing;
-extern uint8_t mp3_folder;
-extern uint8_t mp3_folder_last;
-extern uint8_t CurrentFolder;
-extern uint8_t CurrentFolder_last;
-extern uint8_t mp3_player_connect;
-extern uint8_t eff_volume;
-extern uint8_t eff_sound_on;
+extern bool mp3Initialized;
+extern volatile uint8_t mp3_player_connect;
+extern volatile uint8_t eff_volume;
+extern volatile uint8_t eff_sound_on;
+extern volatile uint8_t mp3_folder;
+extern volatile uint8_t mp3_folder_last;
+extern volatile uint8_t CurrentFolder;
+extern volatile uint8_t CurrentFolder_last;
 extern uint8_t alarm_volume;
 extern uint8_t sunset_volume;
 extern uint8_t day_advert_volume;
 extern uint8_t night_advert_volume;
+extern uint8_t weather_day_volume;
+extern uint8_t weather_night_volume;
 extern uint8_t AlarmFolder;
 extern uint8_t SunsetFolder;
+extern uint8_t previous_folder;
+extern volatile bool alarm_sound_on;
+extern volatile bool sunset_sound_on;
+extern volatile bool dawnflag_sound;
+extern volatile bool sunsetflag_sound;
+extern volatile bool alarm_sound_flag;
+extern volatile bool sunset_sound_flag;
+extern volatile bool isAnnouncing;
+extern volatile bool advert_hour;
+extern volatile bool advert_flag;
+extern volatile bool weather_advert_flag;
+extern volatile bool set_mp3_play_now;
+extern volatile bool mp3_stop;
+extern volatile bool pause_on;
+extern volatile bool wasPlayingBeforeAnnounce;
+extern volatile bool day_advert_sound_on;
+extern volatile bool night_advert_sound_on;
+extern volatile bool alarm_advert_sound_on;
+extern bool mp3_card_ok;
+extern bool dfPlayerIsOriginal;
+extern uint32_t alarm_timer;
+extern uint32_t sunset_timer;
+extern uint32_t weather_advert_timer;
+extern uint32_t mp3_timer;
+extern uint32_t mp3_check_timer;
+extern uint16_t mp3_delay;
 extern uint8_t Equalizer;
 extern uint32_t ADVERT_TIMER_1;
 extern uint32_t ADVERT_TIMER_2;
 extern uint16_t ADVERT_TIMER_H;
 extern uint16_t ADVERT_TIMER_M;
-extern uint16_t mp3_delay;
-extern bool alarm_sound_on;
-extern bool sunset_sound_on;
-extern bool day_advert_sound_on;
-extern bool night_advert_sound_on;
-extern bool alarm_advert_sound_on;
-extern bool dawnflag_sound;
-extern bool sunsetflag_sound;
-extern bool alarm_sound_flag;
-extern bool sunset_sound_flag;
-extern bool set_mp3_play_now;
-extern bool mp3_stop;
-extern bool pause_on;
-extern uint32_t mp3_timer;
-extern uint32_t alarm_timer;
-extern uint32_t sunset_timer;
-extern uint8_t mp3_receive_buf[10];
-extern HardwareSerial mp3;
+extern uint8_t weather_advert_state;
+extern uint8_t weather_advert_count;
+extern uint8_t weather_advert_index;
+extern uint16_t weather_advert_tracks[8];
 extern bool timeAnnounceEnabled;
-extern uint8_t previous_folder;
-extern bool mp3_card_ok;
-extern bool dfPlayerIsOriginal;
-extern uint16_t NIGHT_HOURS_START;
-extern uint16_t NIGHT_HOURS_STOP;
-extern bool send_sound;
-extern bool send_eff_volume;
-extern uint8_t weather_day_volume;
-extern uint8_t weather_night_volume;
-extern bool advert_flag;
-extern bool advert_hour;
+extern bool time_always;
+extern bool weather_always;
+extern bool manual_time_request;
+extern bool manual_weather_request;
 extern bool show_weather_desc;
-extern uint32_t mp3_check_timer;
 extern int day_weather_temp_on;
 extern int day_weather_desc_on;
 extern int night_weather_temp_on;
 extern int night_weather_desc_on;
-extern bool time_always;
-extern bool weather_always;
-#endif // USE_MP3_PLAYER
+extern bool send_sound;
+extern bool send_eff_volume;
+extern String configMP3;
+extern String soundList;
+extern uint8_t mp3_receive_buf[10];
+extern uint16_t saved_mp3_track;
+extern uint8_t saved_mp3_folder;
+extern volatile bool mp3_pending_time_advert;
+extern volatile bool mp3_pending_weather_advert;
+extern volatile bool mp3_pending_weather_force;
+extern volatile bool mp3_pending_time_force;
+#endif
 // ------------------------------------------------------------------------------
 #if USE_SD
 extern fs::File outFile;

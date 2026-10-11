@@ -195,6 +195,13 @@ struct WeatherData {
   uint8_t windDir;
   uint8_t condition;
 };
+
+struct Mp3CmdMsg {
+  uint8_t cmd;  // команда (0x06 = громкость, 0x0E = пауза, 0x17 = папка, 0xFF = play_sound_async)
+  uint8_t feedback; // 0 = не ждать ответа, 1 = ждать
+  uint8_t dat1;
+  uint8_t dat2;
+};
 #endif
 
 // -------------------------------

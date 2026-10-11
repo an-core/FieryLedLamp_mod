@@ -49,17 +49,18 @@ static uint16_t XY_single(uint8_t x, uint8_t y) {
 }
 
 uint16_t XY(uint8_t x, uint8_t y) {
-  #if MULTI_MATRIX
-  // переворот панели
+#if MULTI_MATRIX
+  if (!multiMatrixEnabled) {
+    if (x >= segWidth || y >= segHeight) return 0;
+    return XY_single(x, y);
+  }
+
   if (panelFlip) {
     x = matrixWidth - 1 - x;
     y = matrixHeight - 1 - y;
   }
-
   if (x >= matrixWidth || y >= matrixHeight) return 0;
-  if (segWidth == 0 || segHeight == 0) {
-    return 0;
-  }
+  if (segWidth == 0 || segHeight == 0) return 0;
   uint8_t tileX = x / segWidth;
   uint8_t tileY = y / segHeight;
   uint8_t localX = x % segWidth;
@@ -71,7 +72,6 @@ uint16_t XY(uint8_t x, uint8_t y) {
   if (globalPixel >= usedLeds / SEGMENTS) return 0;
   return globalPixel;
 #else
-  // когда одна матрица
   if (x >= segWidth || y >= segHeight) return 0;
   return XY_single(x, y);
 #endif

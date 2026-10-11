@@ -38,8 +38,8 @@ void IR_Receive_Handle() {
       uint8_t newFolder = effects_folders[currentMode];
       if (mp3_folder != newFolder) {
         mp3_folder = newFolder;
-        mp3_folder_last = mp3_folder;
-        mp3_pending_play = true;
+        mp3_folder_last = newFolder;
+      mp3SendPlayFolder(newFolder);
       }
     }
 #endif

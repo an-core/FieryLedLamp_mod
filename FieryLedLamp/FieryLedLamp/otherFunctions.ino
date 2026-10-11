@@ -355,11 +355,9 @@ void performUpdateCheck() {
     // выбор архива по варианту платформы
     String fileName;
 #if FIRMWARE_VARIANT == 1
-    fileName = "bin_ESP32-S3.zip"; // 1 = ESP32-S3
+    fileName = "bin_ESP32-S3.zip";
 #elif FIRMWARE_VARIANT == 2
-    fileName = "bin_ESP32.zip"; // 2 = ESP32
-#else
-#error "FIRMWARE_VARIANT не определён или неизвестен"
+    fileName = "bin_ESP32.zip";
 #endif
 
     String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
@@ -410,7 +408,7 @@ void performUpdateCheck() {
     }
   }
 
-  // ---------------------------------------------------------------------
+  // ----------------------------------------------------------------------
   serializeJson(doc, resp);
   updateCache.response = resp;
   updateCache.timestamp = millis();
@@ -945,7 +943,7 @@ void handleDawnMp3() {
     dawnflag_sound = 1;
 
     if (mp3Enabled && alarm_sound_on) {
-      delay(mp3_delay);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
       mp3_folder = AlarmFolder;
       alarm_timer = millis();
       send_command(0x06, FEEDBACK, 0, 0);
@@ -958,12 +956,12 @@ void handleDawnMp3() {
   else if (dawnflag_sound) {
     if (mp3Enabled) {
       send_command(0x06, FEEDBACK, 0, eff_volume);
-      delay(mp3_delay);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
       alarm_sound_flag = false;
       dawnflag_sound = 0;
       send_command(0x0E, FEEDBACK, 0, 0);
       mp3_stop = true;
-      delay(mp3_delay);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
     } else {
       alarm_sound_flag = false;
       dawnflag_sound = 0;
@@ -999,7 +997,7 @@ void handleSunsetMp3() {
     sunsetflag_sound = 1;
 
     if (mp3Enabled && sunset_sound_on) {
-      delay(mp3_delay);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
       mp3_folder = SunsetFolder;
       sunset_timer = millis();
       send_command(0x06, FEEDBACK, 0, 0);
@@ -1012,12 +1010,12 @@ void handleSunsetMp3() {
   else if (sunsetflag_sound) {
     if (mp3Enabled) {
       send_command(0x06, FEEDBACK, 0, eff_volume);
-      delay(mp3_delay);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
       sunset_sound_flag = false;
       sunsetflag_sound = 0;
       send_command(0x0E, FEEDBACK, 0, 0);
       mp3_stop = true;
-      delay(mp3_delay);
+      vTaskDelay(pdMS_TO_TICKS(mp3_delay));
     } else {
       sunset_sound_flag = false;
       sunsetflag_sound = 0;

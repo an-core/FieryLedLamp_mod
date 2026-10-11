@@ -2,15 +2,25 @@
 #include "Time.h"
 #include <sys/time.h>
 #include <esp_sntp.h>
-// -------------------------
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
+// ----------------------------
 
 static constexpr const char* NTP_SERVER_PRIMARY = "pool.ntp.org";
 static constexpr const char* NTP_SERVER_SECONDARY = "time.nist.gov";
 static constexpr const char* NTP_SERVER_GOOGLE = "time.google.com";
+static SemaphoreHandle_t timeMutex = nullptr;
+
+static void ensureTimeMutex() {
+  if (timeMutex == nullptr) {
+    timeMutex = xSemaphoreCreateMutex();
+  }
+}
 
 // ----------------------------------------------------------------------
 
 Time::Time() : initialized(false) {
+  ensureTimeMutex();
   sntp_set_time_sync_notification_cb([](struct timeval * tv) {
     Time::onSNTPTimeSync(tv);
   });
@@ -91,25 +101,35 @@ void Time::forcesync() {
 // ----------------------------------------------------------------------
 
 void Time::enable() {
-  if (initialized) return;
+  if (!timeMutex) return;
+  if (xSemaphoreTake(timeMutex, portMAX_DELAY) == pdTRUE) {
+    if (!initialized) {
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-  esp_sntp_init();
+      esp_sntp_init();
 #else
-  sntp_init();
+      sntp_init();
 #endif
-  initialized = true;
+      initialized = true;
+    }
+    xSemaphoreGive(timeMutex);
+  }
 }
 
 // ----------------------------------------------------------------------
 
 void Time::disable() {
-  if (!initialized) return;
+  if (!timeMutex) return;
+  if (xSemaphoreTake(timeMutex, portMAX_DELAY) == pdTRUE) {
+    if (initialized) {
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-  esp_sntp_stop();
+      esp_sntp_stop();
 #else
-  sntp_stop();
+      sntp_stop();
 #endif
-  initialized = false;
+      initialized = false;
+    }
+    xSemaphoreGive(timeMutex);
+  }
 }
 
 // ----------------------------------------------------------------------

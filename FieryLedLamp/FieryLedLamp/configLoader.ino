@@ -742,6 +742,7 @@ void loadMatrixAndInitLEDs() {
   ensureKey("panel_flip", "0");
   ensureKey("segMatrix_w", String(SEG_MATRIX_W));
   ensureKey("segMatrix_h", String(SEG_MATRIX_H));
+  ensureKey("multi_matrix", "1");
 #endif
 
   uint16_t newSegWidth = jsonReadtoInt(configLED, "width",  WIDTH);
@@ -762,6 +763,12 @@ void loadMatrixAndInitLEDs() {
   if (newSegW < 1) newSegW = 1;
   if (newSegH < 1) newSegH = 1;
   bool newPanelFlip = (jsonReadtoInt(configLED, "panel_flip", 0) == 1);
+
+  if (!multiMatrixEnabled) {
+    newSegW = 1;
+    newSegH = 1;
+    newPanelFlip = false;
+  }
 #else
   const uint8_t newSegW = 1, newSegH = 1;
   const bool newPanelFlip = false;
@@ -783,7 +790,7 @@ void loadMatrixAndInitLEDs() {
   if (newUsedLeds32 > MAX_LEDS) newUsedLeds32 = MAX_LEDS;
   uint16_t newUsedLeds = (uint16_t)newUsedLeds32;
 
-  // сохранение «старых» размеров для reconfigure
+  // сохранение "старых" размеров для reconfigure
   uint16_t oldWidth = matrixWidth;
   uint16_t oldHeight = matrixHeight;
   bool buffersExist = (leds != nullptr);
@@ -795,11 +802,13 @@ void loadMatrixAndInitLEDs() {
     MatrixType = newMatrixType;
     MatrixOrientation = newMatrixOrientation;
     current_limit = newCurrentLimit;
+    
 #if MULTI_MATRIX
     panelFlip = newPanelFlip;
     segMatrix_w = newSegW;
     segMatrix_h = newSegH;
 #endif
+
     matrixWidth = newMatrixWidth;
     matrixHeight = newMatrixHeight;
     usedLeds = newUsedLeds;
@@ -944,6 +953,17 @@ void loadMatrixAndInitLEDs() {
   }
 
   printFreeHeap("После выделения матрицы");
+}
+
+// ================================================================ НАСТРОЙКА МУЛЬТИМАТРИЦЫ ===========================================================
+
+void loadMultiMatrixSettings() {
+#if MULTI_MATRIX
+  multiMatrixEnabled = (jsonReadtoInt(configLED, "multi_matrix", 1) == 1);
+#if MATRIX_LOG
+  SYSLOG.add("multiMatrixEnabled: %d", multiMatrixEnabled);
+#endif
+#endif
 }
 
 // ============================================================ НАСТРОЙКИ ОТОБРАЖЕНИЯ ЧАСОВ НА МАТРИЦЕ ================================================
@@ -1566,6 +1586,7 @@ void loadModuleSettings() {
 // =================================================================== ЗАГРУЗКА ВСЕХ НАСТРОЕК =========================================================
 
 void loadAllSettings() {
+  loadMultiMatrixSettings();
   loadBasicSettings();            // Базовые настройки (LAMP_NAME, AP_NAME, AP_PASS, time_always, ночные/дневные режимы и т.д.)
   loadLocalAuthSettings();        // local_auth (установка пароля для редактора)
   loadBrightness();               // Яркость

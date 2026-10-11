@@ -18,22 +18,26 @@
 // *******************************************
 //
 // ****************************************************************** FIERYLEDLAMP (modifications) ******************************************************
-// ======================================================================================
-// Рекомендуемая плата: ESP32-S3 N16R8
-// Настройки:
-//  Ядро ESP32: 2.0.14 (версия 2.0.17 вызывает bootloop с дисплеем ST7789)
-//  FastLED: 3.5.0
-//  Плата: ESP32S3 Dev Module
-//  USB CDC On Boot: Enabled
-//  Flash Size: 16MB (128MB)
-//  PSRAM: OPI PSRAM
-//  Partition Scheme: 16MB with spiffs (6.25MB_backup APP with OTA / 3.43MB SPIFFS)
-// --------------------------------------------------------------------------------------
-// ESP32-WROOM тоже можно использовать, но только с ограничениями:
-//  - Partition Scheme: No OTA (2MB APP / 2MB SPIFFS)
-//  - #define USE_OTA 0
-//  - скорее всего придётся отключить и некоторые другие опции в Constants.h
-// ======================================================================================
+//
+// |===================================================================================|
+// | Ядро ESP32: 2.0.14 (версия 2.0.17 вызывает bootloop с дисплеем ST7789)            |
+// | FastLED: 3.5.0                                                                    |
+// |-----------------------------------------------------------------------------------|
+// | ESP32-S3 N16R8 (плата ESP32S3 Dev Module):                                        |
+// | - USB CDC On Boot: Enabled                                                        |
+// | - Flash Size: 16MB (128MB)                                                        |
+// | - PSRAM: OPI PSRAM                                                                |
+// | - Partition Scheme: 16MB with spiffs (6.25MB_backup APP with OTA / 3.43MB SPIFFS) |
+// |-----------------------------------------------------------------------------------|
+// | ESP32 Dev Module (использование с ограничениями - см. ModuleConfig.h):            |
+// | - Partition Scheme: No OTA (2MB APP / 2MB SPIFFS)                                 |
+// | - #define USE_OTA 0 (в Constants.h)                                               |
+// |===================================================================================|
+//
+// -----------------------------------------------------------------------------------------------------------------------------------------------------
+// ОБНОВЛЕНИЕ от 11.10.2026. Что нового:
+//  - многозадачность: устранены гонки между ядрами (очередь MP3, volatile, мьютекс Time, pendingRestart, стеки задач)
+//  - работа с памятью: исправлены setNoise/getNoise, safeGet/SafeSetNoise, readBinFile, drawScaledImage, fillNoiseLED, freeAllBuffers
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 // ОБНОВЛЕНИЕ от 09.10.2026. Что нового:
 //  - добавлен бэйдж "NEW UDPATE": если рядом с пунктом "Информация о ПО" появился бэйдж, значит, вышло обновление прошивки
@@ -339,6 +343,7 @@ bool sdEnabled = false;
 uint8_t sdType = 0;
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 // WI-FI
+volatile bool pendingRestart = false;
 volatile bool g_flagForceSync = false;
 volatile bool g_flagAutoTz = false;
 String configWiFi;                               // Конфиг настроек WiFi (config_wifi.json)
@@ -379,6 +384,7 @@ uint8_t segMatrix_h = SEG_MATRIX_H;              // Количество мат�
 uint16_t matrixWidth = segWidth * segMatrix_w;   // Общая ширина
 uint16_t matrixHeight = segHeight * segMatrix_h; // Общая высота
 bool panelFlip = false;                          // Переворот панели/матрицы на 180 градусов
+bool multiMatrixEnabled = true;                  // рантайм-флаг: включена ли поддержки нескольких матриц
 #else
 uint16_t matrixWidth = segWidth;                 // Общая ширина
 uint16_t matrixHeight = segHeight;               // Общая высота
@@ -572,38 +578,50 @@ RCSwitch rfReceiver = RCSwitch();                // Объект RF-приёмн
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 // мп3 плеер
 #if USE_MP3_PLAYER
+QueueHandle_t mp3CmdQueue = nullptr;             // Очередь команд MP3 (между ядрами)
 volatile bool announceSessionActive = false;
 uint8_t mp3_init_step = 0;                       // Текущий шаг инициализации DFPlayer
 bool mp3Initialized = false;                     // Плеер успешно инициализирован
-uint8_t mp3_player_connect = 0;                  // Статус подключения: 0=нет, 4=OK, 5=без карты
-uint8_t eff_volume = 9;                          // Громкость
+
+volatile uint8_t mp3_player_connect = 0;         // Статус подключения: 0=нет, 4=OK, 5=без карты
+volatile uint8_t eff_volume = 9;                 // Громкость
+volatile uint8_t eff_sound_on = 0;               // Включено ли звуковое сопровождение эффектов
+volatile uint8_t mp3_folder = 1;                 // Текущая папка воспроизведения
+volatile uint8_t mp3_folder_last = 255;          // Последняя использованная папка
+volatile uint8_t CurrentFolder = 1;              // Текущая выбранная папка в интерфейсе
+volatile uint8_t CurrentFolder_last = 0;         // Предыдущее значение CurrentFolder
+
 uint8_t alarm_volume = 15;                       // Громкость рассвета/будильника
 uint8_t sunset_volume = 10;                      // Громкость заката
 uint8_t day_advert_volume = 12;                  // Громкость озвучки времени днём
 uint8_t night_advert_volume = 5;                 // Громкость озвучки времени ночью
 uint8_t weather_day_volume = 12;                 // Громкость озвучки погоды днём
 uint8_t weather_night_volume = 5;                // Громкость озвучки погоды ночью
-uint8_t mp3_folder = 1;                          // Текущая папка воспроизведения
-uint8_t mp3_folder_last = 255;                   // Последняя использованная папка
-uint8_t CurrentFolder = 1;                       // Текущая выбранная папка в интерфейсе
-uint8_t CurrentFolder_last = 0;                  // Предыдущее значение CurrentFolder
+
 uint8_t AlarmFolder = 99;                        // Папка мелодии рассвета
 uint8_t SunsetFolder = 99;                       // Папка мелодии заката
 uint8_t previous_folder = 0;                     // Предыдущая папка (для возврата)
-uint8_t eff_sound_on = 0;                        // Включено ли звуковое сопровождение эффектов
-bool alarm_sound_on = true;                      // Играть звук при рассвете
-bool sunset_sound_on = false;                    // Играть звук при закате
-bool dawnflag_sound = false;                     // Флаг активного звукового режима рассвета
-bool sunsetflag_sound = false;                   // Флаг активного звукового режима заката
-bool alarm_sound_flag = false;                   // Флаг, что сейчас играет мелодия рассвета
-bool sunset_sound_flag = false;                  // Флаг, что сейчас играет мелодия заката
-bool isAnnouncing = false;                       // Идёт ли сейчас озвучка (время/погода)
-bool advert_hour = false;                        // Включена ли функция озвучки каждый час
-bool advert_flag = false;                        // флаг озвучки
-bool weather_advert_flag = false;                // флаг воспроизведения погоды
-bool set_mp3_play_now = false;                   // Нужно ли сейчас играть мелодию
-bool mp3_stop = true;                            // Плеер остановлен
-bool pause_on = true;                            // Режим паузы
+
+volatile bool alarm_sound_on = true;             // Играть звук при рассвете
+volatile bool sunset_sound_on = false;           // Играть звук при закате
+volatile bool dawnflag_sound = false;            // Флаг активного звукового режима рассвета
+volatile bool sunsetflag_sound = false;          // Флаг активного звукового режима заката
+volatile bool alarm_sound_flag = false;          // Флаг, что сейчас играет мелодия рассвета
+volatile bool sunset_sound_flag = false;         // Флаг, что сейчас играет мелодия заката
+
+volatile bool isAnnouncing = false;
+volatile bool advert_hour = false;
+volatile bool advert_flag = false;
+volatile bool weather_advert_flag = false;
+volatile bool set_mp3_play_now = false;
+volatile bool mp3_stop = true;
+volatile bool pause_on = true;
+volatile bool wasPlayingBeforeAnnounce = false;
+
+volatile bool day_advert_sound_on = true;
+volatile bool night_advert_sound_on = true;
+volatile bool alarm_advert_sound_on = true;
+
 bool mp3_card_ok = false;                        // SD-карта обнаружена
 bool dfPlayerIsOriginal = false;                 // Оригинальный DFPlayer или клон
 uint32_t alarm_timer = 0;                        // Таймер для мелодии Рассвета
@@ -617,9 +635,7 @@ uint32_t ADVERT_TIMER_1 = 800UL;
 uint32_t ADVERT_TIMER_2 = 1400UL;
 uint16_t ADVERT_TIMER_H = 1600;
 uint16_t ADVERT_TIMER_M = 1800;
-bool day_advert_sound_on = true;
-bool night_advert_sound_on = true;
-bool alarm_advert_sound_on = true;
+
 uint8_t weather_advert_state = 0;                // Текущее состояние машины состояний озвучки погоды
 uint8_t weather_advert_count = 0;                // Количество треков в очереди погоды
 uint8_t weather_advert_index = 0;                // Текущий индекс трека погоды
@@ -639,15 +655,14 @@ bool send_eff_volume = true;
 String configMP3;                                // Конфиг настроек плеера (config_mp3.json)
 String soundList;                                // Конфиг списка папок мелодий для эффектов (sound_list.json)
 uint8_t mp3_receive_buf[10];                     // Буфер для приёма ответов от плеера
-bool wasPlayingBeforeAnnounce = false;           // Было ли воспроизведение перед озвучкой
 uint16_t saved_mp3_track = 0;                    // Сохранённый трек перед озвучкой
 uint8_t saved_mp3_folder = 0;                    // Сохранённая папка перед озвучкой
+
 static Mp3PlayState mp3PlayState = MP3_PLAY_IDLE;
 static uint32_t mp3PlayTimer = 0;
 static uint8_t mp3PlayPendingFolder = 0;
 static bool mp3PlayNeedPause = false;
-// флаги для межъядерной связи
-volatile bool mp3_pending_play = false;
+
 volatile bool mp3_pending_time_advert = false;
 volatile bool mp3_pending_weather_advert = false;
 volatile bool mp3_pending_weather_force = false;
@@ -925,7 +940,7 @@ void setup() {
   if (saved_tz.length() == 0 || saved_tz == "auto") saved_tz = "MSK-3";
   myTime.tzsetup(saved_tz.c_str());
   Wifi::instance().begin(); // Инициализация WiFi
-  xTaskCreatePinnedToCore(updateCheckTask, "updchk", 8192, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(updateCheckTask, "updchk", 12288, NULL, 1, NULL, 0);
   initDeferredTasks();
 // -------------------------------------------------------------------
 #if USE_WEATHER
@@ -951,7 +966,8 @@ void setup() {
 #if USE_MP3_PLAYER
   if (mp3Enabled) {
     initMP3Hardware(); // Инициализация MP3 плеера
-    xTaskCreatePinnedToCore(mp3Task, "mp3Task", 8192, NULL, 1, NULL, 0);
+    mp3CmdQueue = xQueueCreate(32, sizeof(Mp3CmdMsg)); // очередь команд
+    xTaskCreatePinnedToCore(mp3Task, "mp3Task", 12288, NULL, 1, NULL, 0);
   }
 #endif
 // -------------------------------------------------------------------
@@ -980,6 +996,11 @@ void setup() {
 // ************************************************************************** VOID LOOP() **************************************************************
 
 void loop() {
+  if (pendingRestart) {
+    delay(500);
+    ESP.restart();
+  }
+// -------------------------------------------------------------------  
   parseUDP();
   HTTP.handleClient();
 // -------------------------------------------------------------------
