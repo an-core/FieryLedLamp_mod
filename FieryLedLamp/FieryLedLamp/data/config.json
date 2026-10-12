@@ -18,6 +18,7 @@
 	"night_time_minute": "00",
 	"day_bright": 150,
 	"night_bright": 5,
+	"tm1637_brightness": "255",
 	"effect_always": 0,
 	"eff_sel": 1,
 	"anim_sel": 0,
