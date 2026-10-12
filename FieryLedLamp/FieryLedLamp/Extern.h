@@ -279,6 +279,12 @@ extern bool tft_auto_brightness;
 extern uint8_t TFT_DAY_BRIGHTNESS;
 extern uint8_t TFT_NIGHT_BRIGHTNESS;
 #endif
+
+#if USE_TM1637
+extern uint8_t userTm1637Brightness;
+extern bool userTm1637AutoBrightness;
+#endif
+
 extern bool dateSwitchEnabled;
 extern bool weatherSwitchEnabled;
 // ------------------------------------------------------------------------------

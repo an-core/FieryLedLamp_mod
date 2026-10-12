@@ -292,6 +292,24 @@ void loadDisplaySwitchSettings() {
 #endif
 }
 
+// ================================================================== ЯРКОСТЬ ДИСПЛЕЯ TM1637 ===========================================================
+
+#if USE_TM1637
+void loadTM1637Settings() {
+  if (jsonRead(configSetup, "tm1637_brightness") == "") {
+    jsonWrite(configSetup, "tm1637_brightness", "255");
+    configChanged = true;
+  }
+  if (jsonRead(configSetup, "tm1637_auto_brightness") == "") {
+    jsonWrite(configSetup, "tm1637_auto_brightness", "1");
+    configChanged = true;
+  }
+
+  userTm1637Brightness = constrain(jsonReadtoInt(configSetup, "tm1637_brightness", 255), 0, 255);
+  userTm1637AutoBrightness = (jsonReadtoInt(configSetup, "tm1637_auto_brightness", 1) != 0);
+}
+#endif
+
 // =========================================================================== КНОПКА =================================================================
 
 void loadButtonSettings() {
@@ -1608,6 +1626,9 @@ void loadAllSettings() {
 #endif
   loadDisplaySwitchSettings();    // Общее переключение "Часы / Погода / Дата" на дисплеях TM1637 / ST7789
   loadClockAndWeatherIntervals(); // Интервал вывода бегущей строкой часов и погоды
+#if USE_TM1637
+  loadTM1637Settings();
+#endif
 #if USE_MP3_PLAYER
   loadMP3Settings();              // MP3 плеер
 #endif

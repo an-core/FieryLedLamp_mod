@@ -215,7 +215,7 @@ void User_settings() {
 #endif
   });
 
-  // --------------------------------------------------------------------- ДИСПЛЕЙ ST7789 ---------------------------------------------------------------
+  // --------------------------------------------------------------------- ДИСПЛЕЙ ST7789 ----------------------------------------------------------------
 
 #if USE_ST7789
   HTTP.on("/tft_clock_color", handle_tft_clock_color);
@@ -228,6 +228,13 @@ void User_settings() {
   HTTP.on("/tft_brightness", handle_tft_brightness);
   HTTP.on("/tft_auto_brightness", handle_tft_auto_brightness);
   HTTP.on("/tft_date_color", HTTP_GET, handle_tft_date_color);
+#endif
+
+  // --------------------------------------------------------------------- ДИСПЛЕЙ TM1637 ----------------------------------------------------------------
+
+#if USE_TM1637
+  HTTP.on("/tm1637_brightness", handle_tm1637_brightness);
+  HTTP.on("/tm1637_auto_brightness", handle_tm1637_auto_brightness);
 #endif
 
   // -------------------------------------------------------------------------- ВРЕМЯ -------------------------------------------------------------------
@@ -734,7 +741,7 @@ void User_settings() {
     HTTP.send(200, "text/plain", rainbowClock ? "1" : "0");
   });
 
-  // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) -------------------------------------------------------
+  // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) --------------------------------------------------------
 
 #if USE_WEATHER
   HTTP.on("/print_weather", handle_print_weather); // Интервал вывода погоды
@@ -4931,6 +4938,48 @@ void handle_save_brightness() {
 
   HTTP.send(200, F("text/plain"), F("OK"));
 }
+
+// ----------------------------------------------------------------------- НАСТРОЙКИ TM1637 ------------------------------------------------------------
+
+#if USE_TM1637
+void handle_tm1637_brightness() {
+  if (!HTTP.hasArg("value")) {
+    HTTP.send(400, "text/plain", "Missing value");
+    return;
+  }
+  uint8_t brightness = constrain(HTTP.arg("value").toInt(), 0, 255);
+  if (brightness != userTm1637Brightness) {
+    userTm1637Brightness = brightness;
+    jsonWrite(configSetup, "tm1637_brightness", String(brightness));
+    if (userTm1637AutoBrightness) {
+      userTm1637AutoBrightness = false;
+      jsonWrite(configSetup, "tm1637_auto_brightness", "0");
+    }
+    saveConfig();
+    if (tm1637Enabled) {
+      clockTicker_blink();
+    }
+  }
+  HTTP.send(200, "text/plain", String(brightness));
+}
+
+void handle_tm1637_auto_brightness() {
+  if (!HTTP.hasArg("value")) {
+    HTTP.send(400, "text/plain", "Missing value");
+    return;
+  }
+  bool enable = (HTTP.arg("value") == "1");
+  if (enable != userTm1637AutoBrightness) {
+    userTm1637AutoBrightness = enable;
+    jsonWrite(configSetup, "tm1637_auto_brightness", enable ? "1" : "0");
+    saveConfig();
+    if (tm1637Enabled) {
+      clockTicker_blink();
+    }
+  }
+  HTTP.send(200, "text/plain", enable ? "1" : "0");
+}
+#endif
 
 // ---------------------------------------------------------------------- НАСТРОЙКИ МАТРИЦЫ ------------------------------------------------------------
 

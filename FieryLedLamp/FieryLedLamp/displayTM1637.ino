@@ -86,15 +86,26 @@ static void displayWeather() {
   display.setSegments(buf, 4, 0);
 }
 
+static uint8_t tm1637BrightnessLevel(uint8_t bright) {
+  if (bright < 8)   return 0; // минимальная яркость (но дисплей ещё включён)
+  if (bright < 24)  return 1;
+  if (bright < 56)  return 2;
+  if (bright < 96)  return 3;
+  if (bright < 144) return 4;
+  if (bright < 192) return 5;
+  if (bright < 232) return 6;
+  return 7;
+}
+
 static DisplayMode activeModes[3];
 static uint8_t activeModeCount = 0;
 static uint8_t activeModeIndex = 0;
 
 static void rebuildActiveModes() {
   activeModeCount = 0;
-  activeModes[activeModeCount++] = DISP_MODE_CLOCK;  // часы всегда
+  activeModes[activeModeCount++] = DISP_MODE_CLOCK; // часы всегда
   if (weatherSwitchEnabled) activeModes[activeModeCount++] = DISP_MODE_WEATHER;
-  if (dateSwitchEnabled)    activeModes[activeModeCount++] = DISP_MODE_DATE;
+  if (dateSwitchEnabled) activeModes[activeModeCount++] = DISP_MODE_DATE;
 
   if (activeModeIndex >= activeModeCount) activeModeIndex = 0;
 }
@@ -233,7 +244,7 @@ void clockTicker_blink() {
   display.displayClock(h, m);
   if (millis() - tmr_blink > 100) {
     tmr_blink = millis();
-    display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
+    display.setBrightness(tm1637BrightnessLevel(DispBrightness), DispBrightness > 0);
     if (DispBrightness >= 204) aDirection = false;
     if (DispBrightness < 51U) {
       if (!DispBrightness) DispBrightness = 1;
@@ -250,25 +261,27 @@ void clockTicker_blink() {
 #endif
 
     tm1637_brightness();
-    display.setBrightness((DispBrightness / 51U) > 4 ? 7 : DispBrightness / 51U, DispBrightness);
+        display.setBrightness(tm1637BrightnessLevel(DispBrightness), DispBrightness > 0);
     display.displayClock(h, m);
   }
 }
 
 void tm1637_brightness() {
-  if (NIGHT_HOURS_START >= NIGHT_HOURS_STOP) { // переход через полночь
+  if (!userTm1637AutoBrightness) {
+    DispBrightness = userTm1637Brightness;
+    return;
+  }
+
+  if (NIGHT_HOURS_START >= NIGHT_HOURS_STOP) {
     if (thisTime >= NIGHT_HOURS_START || thisTime <= NIGHT_HOURS_STOP) {
       DispBrightness = NIGHT_HOURS_BRIGHTNESS ? NIGHT_HOURS_BRIGHTNESS : 0;
-    }
-    else {
+    } else {
       DispBrightness = DAY_HOURS_BRIGHTNESS ? DAY_HOURS_BRIGHTNESS : 0;
     }
-  }
-  else {
+  } else {
     if (thisTime >= NIGHT_HOURS_START && thisTime <= NIGHT_HOURS_STOP) {
       DispBrightness = NIGHT_HOURS_BRIGHTNESS ? NIGHT_HOURS_BRIGHTNESS : 0;
-    }
-    else {
+    } else {
       DispBrightness = DAY_HOURS_BRIGHTNESS ? DAY_HOURS_BRIGHTNESS : 0;
     }
   }
