@@ -16,6 +16,10 @@ class Weather {
       static Weather instance;
       return instance;
     }
+    
+    String customLat;
+    String customLon;
+    String customCoordName;
 
     void requestReload();
     void loadSettings();

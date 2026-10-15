@@ -8,6 +8,14 @@
 void Weather::loadSettings() {
 #if USE_WEATHER
   weatherApiKey = jsonRead(configWeather, "openweather_key");
+  customLat = jsonRead(configWeather, "custom_lat");
+  customLon = jsonRead(configWeather, "custom_lon");
+  customCoordName = jsonRead(configWeather, "custom_coord_name");
+  customLat.trim();
+  customLon.trim();
+  customLat.replace(",", ".");
+  customLon.replace(",", ".");
+  customCoordName.trim();
 
   String yandexGeoFromConfig = jsonRead(configWeather, "yandex_geo");
   String customYandexGeoFromConfig = jsonRead(configWeather, "custom_yandex_geo");
@@ -39,10 +47,10 @@ void Weather::loadSettings() {
   ::inClockWeatherMode = (show == 1);
 
   if (show == 0) {
-  jsonWrite(configWeather, "show_weather", 1);
-  configChanged = true;
-  ::inClockWeatherMode = true;
-}
+    jsonWrite(configWeather, "show_weather", 1);
+    configChanged = true;
+    ::inClockWeatherMode = true;
+  }
 
   preferYandex = (jsonReadtoInt(configWeather, "weather_source") == 0);
 
@@ -67,7 +75,9 @@ void Weather::update() {
     if (success) actualYandex = true;
   }
 
-  if (!success && weatherApiKey.length() > 10 && weatherCity.length() > 0) {
+  bool hasCoords = (customLat.length() > 0 && customLon.length() > 0);
+
+  if (!success && weatherApiKey.length() > 10 && (weatherCity.length() > 0 || hasCoords)) {
     success = fetchFromOpenWeather();
     if (success) actualYandex = false;
   }
@@ -111,20 +121,20 @@ bool Weather::fetchFromYandex() {
   String url = "https://yandex.com/time/sync.json?geo=" + yandexGeoId + "&lang=ru";
   yandexClient.setInsecure();
   yandexClient.setTimeout(5000);
-  
+
   if (yandexHttp.begin(yandexClient, url)) {
     yandexHttp.setTimeout(5000);
     yandexHttp.addHeader("User-Agent", "FieryLedLamp");
     int httpCode = yandexHttp.GET();
-    
+
     if (httpCode == HTTP_CODE_OK) {
       String payload = yandexHttp.getString();
       DynamicJsonDocument doc(8192);
       DeserializationError error = deserializeJson(doc, payload);
-      
+
       if (!error) {
         JsonObject clock = doc["clocks"][yandexGeoId];
-        
+
         if (!clock.isNull() && clock.containsKey("weather")) {
           JsonObject weatherObj = clock["weather"];
           currentTemp = weatherObj["temp"].as<float>();
@@ -140,33 +150,44 @@ bool Weather::fetchFromYandex() {
           SYSLOG.add("Яндекс.Погода: температура %.1f", currentTemp);
 #endif
           return true;
-          
+
         } //if (!clock.isNull() && clock.containsKey("weather"))
       } // if (!error)
     } // if (httpCode == HTTP_CODE_OK)
-    
+
     yandexHttp.end();
-    
+
   } // if (yandexHttp.begin(yandexClient, url))
-  
+
   return false;
-  
+
 } // bool Weather::fetchFromYandex()
 
 // --------------------------------------------------------------------------------
+
 // Openweather
 bool Weather::fetchFromOpenWeather() {
-  if (weatherCity.length() == 0 || weatherApiKey.length() < 15) {
-#if WEATHER_LOG
-    SYSLOG.add("OpenWeather: Ошибка: не указан город или ключ");
-#endif
+  if (weatherApiKey.length() < 15) {
     return false;
-  } // if (weatherCity.length() == 0 || weatherApiKey.length() < 15)
-  
-  String url = "https://api.openweathermap.org/data/2.5/weather?q=" + weatherCity + "&appid=" + weatherApiKey + "&units=metric&lang=ru";
+  }
+
+  String url;
+
+  if (customLat.length() > 0 && customLon.length() > 0) {
+    url = "https://api.openweathermap.org/data/2.5/weather?lat=" + customLat + "&lon=" + customLon + "&appid=" + weatherApiKey + "&units=metric&lang=ru";
 #if WEATHER_LOG
-  SYSLOG.add("OpenWeather: Запрос: %s", url.c_str());
+    SYSLOG.add("OpenWeather: Запрос по координатам: %s", url.c_str());
 #endif
+  } else if (weatherCity.length() > 0) {
+    String encodedCity = weatherCity;
+    encodedCity.replace(" ", "%20");
+    url = "https://api.openweathermap.org/data/2.5/weather?q=" + encodedCity + "&appid=" + weatherApiKey + "&units=metric&lang=ru";
+#if WEATHER_LOG
+    SYSLOG.add("OpenWeather: Запрос по городу: %s", url.c_str());
+#endif
+  } else {
+    return false;
+  }
 
   WiFiClientSecure client;
 
@@ -198,10 +219,10 @@ bool Weather::fetchFromOpenWeather() {
 #if WEATHER_LOG
       SYSLOG.add("OpenWeather: Ответ пустой (соединение не установлено)");
 #endif
-    } // else {
+    }
     http.end();
     return false;
-  } // if (httpCode != HTTP_CODE_OK)
+  }
 
   String payload = http.getString();
   http.end();
@@ -237,6 +258,7 @@ bool Weather::fetchFromOpenWeather() {
 } // bool Weather::fetchFromOpenWeather()
 
 // --------------------------------------------------------------------------------
+
 // описание
 String Weather::buildWeatherDescription(String baseDesc, float windSpeed, int weatherId, const String& provider, float pressureMm) {
   String desc = baseDesc;
@@ -263,6 +285,7 @@ String Weather::buildWeatherDescription(String baseDesc, float windSpeed, int we
 } // String Weather::buildWeatherDescription
 
 // --------------------------------------------------------------------------------
+
 String Weather::getYandexRussianDescription(const String& engCond, float windSpeed, int precType, float precStrength, float temp, float humidity, float pressure) {
   String desc = "";
 
@@ -455,15 +478,17 @@ String getRussianCityNameForOpenWeather(String city) {
 void Weather::startTask() {
   if (taskHandle != nullptr) return;
   xTaskCreatePinnedToCore(
-    [](void* arg){ static_cast<Weather*>(arg)->taskLoop(); },
-    "weather", 12288, this, 1, &taskHandle, 0);
+  [](void* arg) {
+    static_cast<Weather*>(arg)->taskLoop();
+  },
+  "weather", 12288, this, 1, &taskHandle, 0);
 }
 
 void Weather::taskLoop() {
   while (!Wifi::instance().isConnected()) {
     vTaskDelay(pdMS_TO_TICKS(1000));
   }
-  
+
   update();
   lastUpdateTime = millis();
 

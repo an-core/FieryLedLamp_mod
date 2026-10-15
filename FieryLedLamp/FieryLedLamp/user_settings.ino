@@ -775,7 +775,17 @@ void User_settings() {
       } else { // OpenWeather
         String city = jsonRead(configWeather, "city");
         String customCity = jsonRead(configWeather, "custom_city");
-        if (customCity.length() > 0) {
+        String coordName = jsonRead(configWeather, "custom_coord_name");
+        String lat = jsonRead(configWeather, "custom_lat");
+        String lon = jsonRead(configWeather, "custom_lon");
+
+        if (lat.length() > 0 && lon.length() > 0) {
+          if (coordName.length() > 0) {
+            cityName = coordName;
+          } else {
+            cityName = "(" + lat + ", " + lon + ")";
+          }
+        } else if (customCity.length() > 0) {
           cityName = getRussianCityNameForOpenWeather(customCity);
         } else if (city.length() > 0) {
           cityName = getRussianCityNameForOpenWeather(city);
@@ -889,6 +899,38 @@ void User_settings() {
       }
     }
 
+    if (HTTP.hasArg("custom_lat")) {
+      String value = HTTP.arg("custom_lat");
+      value.replace(",", ".");
+      value.trim();
+      String oldValue = jsonRead(configWeather, "custom_lat");
+      if (oldValue != value) {
+        jsonWrite(configWeather, "custom_lat", value);
+        configChanged = true;
+      }
+    }
+
+    if (HTTP.hasArg("custom_lon")) {
+      String value = HTTP.arg("custom_lon");
+      value.replace(",", ".");
+      value.trim();
+      String oldValue = jsonRead(configWeather, "custom_lon");
+      if (oldValue != value) {
+        jsonWrite(configWeather, "custom_lon", value);
+        configChanged = true;
+      }
+    }
+
+    if (HTTP.hasArg("custom_coord_name")) {
+      String value = HTTP.arg("custom_coord_name");
+      value.trim();
+      String oldValue = jsonRead(configWeather, "custom_coord_name");
+      if (oldValue != value) {
+        jsonWrite(configWeather, "custom_coord_name", value);
+        configChanged = true;
+      }
+    }
+
     if (configChanged) {
       saveConfig();
       Weather::instance().requestReload();
@@ -910,12 +952,18 @@ void User_settings() {
     String custom_yandex_geo = jsonRead(configWeather, "custom_yandex_geo");
     String city = jsonRead(configWeather, "city");
     String custom_city = jsonRead(configWeather, "custom_city");
+    String custom_lat = jsonRead(configWeather, "custom_lat");
+    String custom_lon = jsonRead(configWeather, "custom_lon");
+    String custom_coord_name = jsonRead(configWeather, "custom_coord_name");
 
     doc["weather_source"] = weather_source.length() > 0 ? weather_source : "0";
     doc["yandex_geo"] = yandex_geo.length() > 0 ? yandex_geo : "";
     doc["custom_yandex_geo"] = custom_yandex_geo.length() > 0 ? custom_yandex_geo : "";
     doc["city"] = city.length() > 0 ? city : "";
     doc["custom_city"] = custom_city.length() > 0 ? custom_city : "";
+    doc["custom_lat"] = custom_lat.length() > 0 ? custom_lat : "";
+    doc["custom_lon"] = custom_lon.length() > 0 ? custom_lon : "";
+    doc["custom_coord_name"] = custom_coord_name.length() > 0 ? custom_coord_name : "";
 
     String out;
     serializeJson(doc, out);
@@ -2930,7 +2978,7 @@ void handle_tim_h() {
   jsonWrite(configMP3, "tim_h", tmp);
   writeFile(F("config_mp3.json"), configMP3);
   HTTP.send(200, "text/plain", String(tmp));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -5625,7 +5673,7 @@ void handle_spt() {
   if (newSpeed == SpeedRunningText) {
     HTTP.send(200, "text/plain", String(newSpeed));
     return;
-}
+  }
   SpeedRunningText = newSpeed;
   jsonWrite(configLedPanel, "spt", SpeedRunningText);
   saveConfig();
@@ -6235,7 +6283,7 @@ void handle_weather_x_offset() {
   }
 
   HTTP.send(200, "text/plain", String(value));
-  
+
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
