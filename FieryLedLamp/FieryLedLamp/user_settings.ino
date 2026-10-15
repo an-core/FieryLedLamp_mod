@@ -762,15 +762,30 @@ void User_settings() {
       int weatherSource = jsonReadtoInt(configWeather, "weather_source");
 
       if (weatherSource == 0) { // Яндекс
-        String yandexGeo = jsonRead(configWeather, "yandex_geo");
-        String customYandexGeo = jsonRead(configWeather, "custom_yandex_geo");
-        if (customYandexGeo.length() > 0) {
-          cityName = getCityNameByGeo(customYandexGeo);
-          if (cityName.length() == 0) cityName = "Город " + customYandexGeo;
-        } else if (yandexGeo.length() > 0) {
-          cityName = getCityNameByGeo(yandexGeo);
+        String yandexApiKey = jsonRead(configWeather, "yandex_api_key");
+        String lat = jsonRead(configWeather, "custom_lat");
+        String lon = jsonRead(configWeather, "custom_lon");
+        String coordName = jsonRead(configWeather, "custom_coord_name");
+
+        // новый API (GraphQL): координаты + ключ
+        if (lat.length() > 0 && lon.length() > 0 && yandexApiKey.length() > 10) {
+          if (coordName.length() > 0) {
+            cityName = coordName;
+          } else {
+            cityName = "(" + lat + ", " + lon + ")";
+          }
         } else {
-          cityName = "Москва";
+          // Старый API (sync.json): Geo-id
+          String yandexGeo = jsonRead(configWeather, "yandex_geo");
+          String customYandexGeo = jsonRead(configWeather, "custom_yandex_geo");
+          if (customYandexGeo.length() > 0) {
+            cityName = getCityNameByGeo(customYandexGeo);
+            if (cityName.length() == 0) cityName = "Город " + customYandexGeo;
+          } else if (yandexGeo.length() > 0) {
+            cityName = getCityNameByGeo(yandexGeo);
+          } else {
+            cityName = "Москва";
+          }
         }
       } else { // OpenWeather
         String city = jsonRead(configWeather, "city");
@@ -931,6 +946,16 @@ void User_settings() {
       }
     }
 
+    if (HTTP.hasArg("yandex_api_key")) {
+      String value = HTTP.arg("yandex_api_key");
+      value.trim();
+      String oldValue = jsonRead(configWeather, "yandex_api_key");
+      if (oldValue != value) {
+        jsonWrite(configWeather, "yandex_api_key", value);
+        configChanged = true;
+      }
+    }
+
     if (configChanged) {
       saveConfig();
       Weather::instance().requestReload();
@@ -955,7 +980,9 @@ void User_settings() {
     String custom_lat = jsonRead(configWeather, "custom_lat");
     String custom_lon = jsonRead(configWeather, "custom_lon");
     String custom_coord_name = jsonRead(configWeather, "custom_coord_name");
+    String yandex_api_key = jsonRead(configWeather, "yandex_api_key");
 
+    doc["yandex_api_key"] = yandex_api_key.length() > 0 ? yandex_api_key : "";
     doc["weather_source"] = weather_source.length() > 0 ? weather_source : "0";
     doc["yandex_geo"] = yandex_geo.length() > 0 ? yandex_geo : "";
     doc["custom_yandex_geo"] = custom_yandex_geo.length() > 0 ? custom_yandex_geo : "";

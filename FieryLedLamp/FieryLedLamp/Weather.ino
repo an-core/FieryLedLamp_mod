@@ -8,6 +8,8 @@
 void Weather::loadSettings() {
 #if USE_WEATHER
   weatherApiKey = jsonRead(configWeather, "openweather_key");
+  yandexApiKey = jsonRead(configWeather, "yandex_api_key");
+  yandexApiKey.trim();
   customLat = jsonRead(configWeather, "custom_lat");
   customLon = jsonRead(configWeather, "custom_lon");
   customCoordName = jsonRead(configWeather, "custom_coord_name");
@@ -70,12 +72,17 @@ void Weather::update() {
   bool success = false;
   actualYandex = false;
 
-  if (preferYandex && yandexGeoId.length() > 0 && yandexGeoId != "0") {
-    success = fetchFromYandex();
+  bool hasCoords = (customLat.length() > 0 && customLon.length() > 0);
+
+  if (preferYandex && hasCoords && yandexApiKey.length() > 10) {
+    success = fetchFromYandexGraphQL();
     if (success) actualYandex = true;
   }
 
-  bool hasCoords = (customLat.length() > 0 && customLon.length() > 0);
+  if (!success && preferYandex && yandexGeoId.length() > 0 && yandexGeoId != "0") {
+    success = fetchFromYandex();
+    if (success) actualYandex = true;
+  }
 
   if (!success && weatherApiKey.length() > 10 && (weatherCity.length() > 0 || hasCoords)) {
     success = fetchFromOpenWeather();
@@ -162,6 +169,99 @@ bool Weather::fetchFromYandex() {
   return false;
 
 } // bool Weather::fetchFromYandex()
+
+// --------------------------------------------------------------------------------
+
+// Яндекс.Погода - новый API v3 (GraphQL), по координатам
+bool Weather::fetchFromYandexGraphQL() {
+  if (!Wifi::instance().isConnected()) return false;
+  if (yandexApiKey.length() < 10) return false;
+  if (customLat.length() == 0 || customLon.length() == 0) return false;
+
+  String url = "https://api.weather.yandex.ru/graphql/query";
+
+  // Тело GraphQL-запроса
+  String body = "{\"query\":\"{ weatherByPoint(request: { lat: " + customLat +
+                ", lon: " + customLon +
+                " }) { now { temperature condition } } }\"}";
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(10000);
+
+  HTTPClient http;
+  http.setTimeout(10000);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+  if (!http.begin(client, url)) {
+#if WEATHER_LOG
+    SYSLOG.add("Яндекс GraphQL: Не удалось инициализировать HTTP");
+#endif
+    return false;
+  }
+
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("X-Yandex-Weather-Key", yandexApiKey);
+
+  int httpCode = http.POST(body);
+
+  if (httpCode != HTTP_CODE_OK) {
+#if WEATHER_LOG
+    SYSLOG.add("Яндекс GraphQL: HTTP ошибка: %d", httpCode);
+#endif
+    String payload = http.getString();
+    if (payload.length() > 0) {
+#if WEATHER_LOG
+      SYSLOG.add("Яндекс GraphQL: Ответ: %s", payload.c_str());
+#endif
+    }
+    http.end();
+    return false;
+  }
+
+  String payload = http.getString();
+  http.end();
+
+#if WEATHER_LOG
+  SYSLOG.add("Яндекс GraphQL: Получен ответ длиной %d байт", payload.length());
+#endif
+
+  DynamicJsonDocument doc(4096);
+  DeserializationError error = deserializeJson(doc, payload);
+
+  if (error) {
+#if WEATHER_LOG
+    SYSLOG.add("Яндекс GraphQL: ошибка JSON: %s", error.c_str());
+#endif
+    return false;
+  }
+
+  if (doc.containsKey("errors")) {
+#if WEATHER_LOG
+    SYSLOG.add("Яндекс GraphQL: API вернул errors");
+#endif
+    return false;
+  }
+
+  JsonObject now = doc["data"]["weatherByPoint"]["now"];
+  if (now.isNull()) {
+#if WEATHER_LOG
+    SYSLOG.add("Яндекс GraphQL: нет данных weatherByPoint.now");
+#endif
+    return false;
+  }
+
+  currentTemp = now["temperature"].as<float>();
+  String condition = now["condition"] | "";
+
+  currentCondition = getYandexRussianDescription(condition, 0.0f, 0, 0.0f, currentTemp, 0.0f, 0.0f);
+
+#if WEATHER_LOG
+  SYSLOG.add("Яндекс GraphQL: %.1f°C, %s", currentTemp, currentCondition.c_str());
+#endif
+
+  return true;
+}
 
 // --------------------------------------------------------------------------------
 

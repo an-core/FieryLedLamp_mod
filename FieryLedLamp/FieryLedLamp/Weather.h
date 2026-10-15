@@ -67,12 +67,14 @@ class Weather {
     volatile bool needReloadSettings = false;
 
     bool fetchFromYandex();
+    bool fetchFromYandexGraphQL();
     bool fetchFromOpenWeather();
 
     String buildWeatherDescription(String baseDesc, float windSpeed, int weatherId, const String& provider, float pressureMm);
     String getYandexRussianDescription(const String& engCond, float windSpeed, int precType, float precStrength, float temp, float humidity, float pressure);
 
     String weatherApiKey;
+    String yandexApiKey;
     String yandexGeoId;
     String customYandexGeoId;
     String weatherCity;
