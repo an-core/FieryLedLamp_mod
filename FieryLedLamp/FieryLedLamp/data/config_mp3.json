@@ -15,6 +15,7 @@
 	"time_speak": 1,
 	"tim_h": 18,
 	"tim_m": 18,
+	"delay": 15,
 	"weather_temp_delay": 20,
 	"weather_desc_delay": 25,
 	"show_weather_desc": 1,
