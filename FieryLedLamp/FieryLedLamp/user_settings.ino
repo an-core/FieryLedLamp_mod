@@ -2836,7 +2836,7 @@ void handle_volume() {
   if (mp3Enabled && !dawnflag_sound && !sunsetflag_sound && !isAnnouncing)
     mp3SendCmd(0x06, FEEDBACK, 0, eff_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(eff_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2855,7 +2855,7 @@ void handle_alarm_volume() {
   jsonWrite(configMP3, "alm_vol", alarm_volume);
   if (mp3Enabled && dawnflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, alarm_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(alarm_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2874,7 +2874,7 @@ void handle_sunset_volume() {
   jsonWrite(configMP3, "sun_vol", sunset_volume);
   if (mp3Enabled && sunsetflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, sunset_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(sunset_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2892,7 +2892,7 @@ void handle_day_advert_volume() {
   day_advert_volume = constrain(HTTP.arg("day_vol").toInt(), 0, 30);
   jsonWrite(configMP3, "day_vol", day_advert_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(day_advert_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2910,7 +2910,7 @@ void handle_night_advert_volume() {
   night_advert_volume = constrain(HTTP.arg("night_vol").toInt(), 0, 30);
   jsonWrite(configMP3, "night_vol", night_advert_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(night_advert_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2929,8 +2929,8 @@ void handle_tim_h() {
   ADVERT_TIMER_H = 100UL * tmp;
   jsonWrite(configMP3, "tim_h", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-
+  HTTP.send(200, "text/plain", String(tmp));
+  
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -2948,7 +2948,7 @@ void handle_tim_m() {
   ADVERT_TIMER_M = 100UL * tmp;
   jsonWrite(configMP3, "tim_m", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2967,7 +2967,7 @@ void handle_delay() {
   mp3_delay = 10UL * tmp;
   jsonWrite(configMP3, "delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2985,7 +2985,7 @@ void handle_weather_day_volume() {
   weather_day_volume = constrain(HTTP.arg("val").toInt(), 0, 30);
   jsonWrite(configMP3, "weather_day_vol", weather_day_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(weather_day_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3003,7 +3003,7 @@ void handle_weather_night_volume() {
   weather_night_volume = constrain(HTTP.arg("val").toInt(), 0, 30);
   jsonWrite(configMP3, "weather_night_vol", weather_night_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(weather_night_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3016,13 +3016,13 @@ void handle_weather_night_volume() {
 #endif
 }
 
-// Задержка после температуры (перед описанием)
+// Пауза после температуры (перед описанием)
 void handle_weather_temp_delay() {
   uint8_t tmp = constrain(HTTP.arg("weather_temp_delay").toInt(), 5, 60);
   ADVERT_TIMER_1 = 100UL * tmp; // 500 - 6000 мс
   jsonWrite(configMP3, "weather_temp_delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3035,13 +3035,13 @@ void handle_weather_temp_delay() {
 #endif
 }
 
-// Задержка после описания (перед завершением озвучки)
+// Пауза после описания (перед завершением озвучки)
 void handle_weather_desc_delay() {
   uint8_t tmp = constrain(HTTP.arg("weather_desc_delay").toInt(), 10, 80);
   ADVERT_TIMER_2 = 100UL * tmp; // 1000 - 8000 мс
   jsonWrite(configMP3, "weather_desc_delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3209,7 +3209,7 @@ void handle_all_br() {
   Eeprom::instance().EepromPut(modes);
   loadingFlag = true;
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(ALLbri));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3230,7 +3230,7 @@ void handle_br() {
   saveConfig();
   Eeprom::instance().EepromPut(modes);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(newBri));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3258,7 +3258,7 @@ void handle_sp() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(newSpeed));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3286,7 +3286,7 @@ void handle_sc() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(newScale));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3659,64 +3659,6 @@ void handle_night_time() {
 
   HTTP.send(200, F("text/plain"), F("OK"));
 }
-
-// ----------------------------------------------------------------------------------------------------------------------------------------------------
-/*
-  void handle_save_time() {
-  String day_hour_str = HTTP.arg("day_time_hour");
-  String day_min_str = HTTP.arg("day_time_minute");
-  String night_hour_str = HTTP.arg("night_time_hour");
-  String night_min_str = HTTP.arg("night_time_minute");
-
-  int day_hour = day_hour_str.toInt();
-  int day_min = day_min_str.toInt();
-  int night_hour = night_hour_str.toInt();
-  int night_min = night_min_str.toInt();
-
-  day_hour = constrain(day_hour, 0, 23);
-  day_min = constrain(day_min, 0, 59);
-  night_hour = constrain(night_hour, 0, 23);
-  night_min = constrain(night_min, 0, 59);
-
-  char buf[3];
-  snprintf(buf, sizeof(buf), "%02d", day_hour);
-  day_hour_str = buf;
-  snprintf(buf, sizeof(buf), "%02d", day_min);
-  day_min_str = buf;
-  snprintf(buf, sizeof(buf), "%02d", night_hour);
-  night_hour_str = buf;
-  snprintf(buf, sizeof(buf), "%02d", night_min);
-  night_min_str = buf;
-
-  jsonWrite(configSetup, "day_time_hour", day_hour_str);
-  jsonWrite(configSetup, "day_time_minute", day_min_str);
-  jsonWrite(configSetup, "night_time_hour", night_hour_str);
-  jsonWrite(configSetup, "night_time_minute", night_min_str);
-
-  uint16_t day_time_minutes = day_hour * 60 + day_min;
-  uint16_t night_time_minutes = night_hour * 60 + night_min;
-
-  jsonWrite(configSetup, "day_time", day_time_minutes);
-  jsonWrite(configSetup, "night_time", night_time_minutes);
-  saveConfig();
-
-  NIGHT_HOURS_START = night_time_minutes;
-  NIGHT_HOURS_STOP = day_time_minutes;
-
-  getBrightnessForPrintTime();
-
-  #if USE_DAWN
-  if (ONflag && !dawnFlag)
-  #else
-  if (ONflag)
-  #endif
-    SetBrightness(modes[currentMode].Brightness);
-
-  timeout_save_file_changes = millis();
-  bitSet(save_file_changes, 0);
-
-  HTTP.send(200, F("text/plain"), F("OK"));
-  } */
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -5660,7 +5602,7 @@ void handle_text_y_offset() {
     Fill_String = false;
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5681,9 +5623,9 @@ void handle_spt() {
   }
   int newSpeed = constrain(HTTP.arg("spt").toInt(), 20, 220);
   if (newSpeed == SpeedRunningText) {
-    HTTP.send(200, "application/json", "{\"should_refresh\": true}");
+    HTTP.send(200, "text/plain", String(newSpeed));
     return;
-  }
+}
   SpeedRunningText = newSpeed;
   jsonWrite(configLedPanel, "spt", SpeedRunningText);
   saveConfig();
@@ -5701,7 +5643,7 @@ void handle_spt() {
       runningTextTimer.reset();
     }
   }
-  HTTP.send(200, "application/json", "{\"should_refresh\": true}");
+  HTTP.send(200, "text/plain", String(newSpeed));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5750,7 +5692,7 @@ void handle_sct() {
   loadingFlag = true;
   scrollTimer = millis() - 1000;
 
-  HTTP.send(200, "application/json", "{\"should_refresh\": true}");
+  HTTP.send(200, "text/plain", String(sctForDisplay));
 }
 
 // Шрифт бегущей строки
@@ -6061,7 +6003,7 @@ void handle_clock_x_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6093,7 +6035,7 @@ void handle_clock_y_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6132,7 +6074,7 @@ void handle_clock_hue() {
   saveConfig();
   loadingFlag = true;
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(clockHue));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6256,7 +6198,7 @@ void handle_weather_hue() {
   loadingFlag = true;
   weatherNeedRedraw = true;
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(weatherHue));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6292,8 +6234,8 @@ void handle_weather_x_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
-
+  HTTP.send(200, "text/plain", String(value));
+  
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
@@ -6325,7 +6267,7 @@ void handle_weather_y_offset() {
     weatherNeedRedraw = true;
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(value));
 }
 
 // Чекбокс "Мигание °"
@@ -6424,7 +6366,7 @@ void handle_date_hue() {
   loadingFlag = true;
   dateNeedRedraw = true;
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(dateHue));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6459,7 +6401,7 @@ void handle_date_x_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6494,7 +6436,7 @@ void handle_date_y_offset() {
 #endif
   }
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  HTTP.send(200, "text/plain", String(value));
 }
 
 // Чекбокс "Показывать 4 цифры года"

@@ -694,8 +694,8 @@ void printTime(bool onDemand) {
   bool needPrint = false;
   bool needAnnounce = false;
 
-  uint8_t currentMinute = 0;   // <-- объявляем заранее
-  uint8_t currentHour = 0;     // <-- объявляем заранее
+  uint8_t currentMinute = 0;
+  uint8_t currentHour = 0;
 
   if (onDemand) {
     needPrint = true;
