@@ -261,7 +261,6 @@ void performUpdateCheck() {
   doc["current_version"] = String(VERSION);
   doc["build_datetime"] = buildDateTime;
   doc["folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/FieryLedLamp_mod";
-  doc["update_folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/update";
 
   // Changelog
   {
@@ -352,13 +351,14 @@ void performUpdateCheck() {
 
   // Проверка обновления
   {
-    // выбор архива по варианту платформы
     String fileName;
 #if FIRMWARE_VARIANT == 1
     fileName = "bin_ESP32-S3.zip";
 #elif FIRMWARE_VARIANT == 2
     fileName = "bin_ESP32.zip";
 #endif
+
+    doc["update_folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/raw/main/update/" + fileName;
 
     String commitUrl = "https://api.github.com/repos/an-core/FieryLedLamp_mod/commits?path=update/" + fileName + "&per_page=1";
 
@@ -404,7 +404,12 @@ void performUpdateCheck() {
     if (hasUpdate) {
       doc["update_version"] = updateVersion;
       doc["update_datetime"] = fullDateTimeForDisplay;
-      doc["update_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/update";
+
+      JsonArray updates = doc.createNestedArray("updates");
+      JsonObject item = updates.createNestedObject();
+      item["file"] = fileName;
+      item["datetime"] = fullDateTimeForDisplay;
+      item["download_url"] = "https://github.com/an-core/FieryLedLamp_mod/raw/main/update/" + fileName;
     }
   }
 

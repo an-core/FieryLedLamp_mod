@@ -10,6 +10,7 @@
 
 class Wifi {
   public:
+
     static Wifi& instance() {
       static Wifi instance;
       return instance;
@@ -24,6 +25,7 @@ class Wifi {
     int32_t getRSSI() const;
 
     void setAPAlways(bool enable);
+
     bool isAPAlways() const {
       return apAlways;
     }
