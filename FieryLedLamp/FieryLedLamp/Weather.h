@@ -16,10 +16,6 @@ class Weather {
       static Weather instance;
       return instance;
     }
-    
-    String customLat;
-    String customLon;
-    String customCoordName;
 
     void requestReload();
     void loadSettings();
@@ -50,11 +46,18 @@ class Weather {
     bool isClockWeatherMode() const {
       return inClockWeatherMode;
     }
+    bool isUsingYandexGraphQL() const {
+      return actualYandex && useYandexGraphQL;
+    }
 
-    String getYandexGeoId() const { return yandexGeoId; }
-    String getWeatherCity() const { return weatherCity; }
+    String getYandexGeoId() const {
+      return yandexGeoId;
+    }
+    String getWeatherCity() const {
+      return weatherCity;
+    }
     void startTask();
-    
+
   private:
     TaskHandle_t taskHandle = nullptr;
     void taskLoop();
@@ -67,8 +70,8 @@ class Weather {
     volatile bool needReloadSettings = false;
 
     bool fetchFromYandex();
-    bool fetchFromYandexGraphQL();
     bool fetchFromOpenWeather();
+    bool fetchFromYandexGraphQL();
 
     String buildWeatherDescription(String baseDesc, float windSpeed, int weatherId, const String& provider, float pressureMm);
     String getYandexRussianDescription(const String& engCond, float windSpeed, int precType, float precStrength, float temp, float humidity, float pressure);
@@ -79,10 +82,15 @@ class Weather {
     String customYandexGeoId;
     String weatherCity;
     String customWeatherCity;
+    String customLat;
+    String customLon;
+    String customCoordName;
 
     bool inClockWeatherMode = false;
     bool preferYandex = true;
     bool actualYandex = true;
+    bool useYandexGraphQL = false;
+    volatile uint32_t lastGraphQLUpdateTime = 0;
 
     float currentTemp = -999.0f;
     String currentCondition;

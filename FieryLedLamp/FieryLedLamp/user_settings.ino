@@ -762,13 +762,22 @@ void User_settings() {
       int weatherSource = jsonReadtoInt(configWeather, "weather_source");
 
       if (weatherSource == 0) { // Яндекс
+        String yandexGeo = jsonRead(configWeather, "yandex_geo");
+        String customYandexGeo = jsonRead(configWeather, "custom_yandex_geo");
         String yandexApiKey = jsonRead(configWeather, "yandex_api_key");
         String lat = jsonRead(configWeather, "custom_lat");
         String lon = jsonRead(configWeather, "custom_lon");
         String coordName = jsonRead(configWeather, "custom_coord_name");
 
-        // новый API (GraphQL): координаты + ключ
-        if (lat.length() > 0 && lon.length() > 0 && yandexApiKey.length() > 10) {
+        // Те же условия, что в Weather::loadSettings
+        bool useYandexGraphQL = (yandexGeo.length() == 0) &&
+                                (customYandexGeo.length() == 0) &&
+                                (lat.length() > 0) &&
+                                (lon.length() > 0) &&
+                                (yandexApiKey.length() > 10);
+
+        if (useYandexGraphQL) {
+          // новый API (GraphQL): координаты + ключ
           if (coordName.length() > 0) {
             cityName = coordName;
           } else {
@@ -776,8 +785,6 @@ void User_settings() {
           }
         } else {
           // Старый API (sync.json): Geo-id
-          String yandexGeo = jsonRead(configWeather, "yandex_geo");
-          String customYandexGeo = jsonRead(configWeather, "custom_yandex_geo");
           if (customYandexGeo.length() > 0) {
             cityName = getCityNameByGeo(customYandexGeo);
             if (cityName.length() == 0) cityName = "Город " + customYandexGeo;
@@ -811,6 +818,8 @@ void User_settings() {
 
       doc["text"] = text;
       doc["temp"] = round(weather.getTemperature());
+      doc["condition"] = weather.getCondition();
+      doc["show_condition"] = jsonReadtoInt(configWeather, "show_weather_condition", 1) == 1;
       doc["city"] = cityName;
     } else {
       doc["text"] = "—";
@@ -818,6 +827,7 @@ void User_settings() {
     }
     doc["init"] = inClockWeatherMode;
     doc["provider"] = weather.isUsingYandex() ? "yandex" : "openweather";
+    doc["method"] = weather.isUsingYandex() ? (weather.isUsingYandexGraphQL() ? "graphql" : "sync") : "openweather";
 
     String out;
     serializeJson(doc, out);
@@ -991,6 +1001,7 @@ void User_settings() {
     doc["custom_lat"] = custom_lat.length() > 0 ? custom_lat : "";
     doc["custom_lon"] = custom_lon.length() > 0 ? custom_lon : "";
     doc["custom_coord_name"] = custom_coord_name.length() > 0 ? custom_coord_name : "";
+    doc["show_condition"] = jsonReadtoInt(configWeather, "show_weather_condition", 1) == 1;
 
     String out;
     serializeJson(doc, out);

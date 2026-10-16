@@ -31,6 +31,7 @@ void Weather::loadSettings() {
   }
 
   customYandexGeoId = customYandexGeoFromConfig;
+  useYandexGraphQL = (yandexGeoFromConfig.length() == 0) && (customYandexGeoFromConfig.length() == 0) && (customLat.length() > 0) && (customLon.length() > 0) && (yandexApiKey.length() > 10);
 
   String cityFromConfig = jsonRead(configWeather, "city");
   String customCityFromConfig = jsonRead(configWeather, "custom_city");
@@ -55,6 +56,7 @@ void Weather::loadSettings() {
   }
 
   preferYandex = (jsonReadtoInt(configWeather, "weather_source") == 0);
+  lastGraphQLUpdateTime = 0;
 
 #endif // USE_WEATHER
 } // void Weather::loadSettings()
@@ -74,17 +76,37 @@ void Weather::update() {
 
   bool hasCoords = (customLat.length() > 0 && customLon.length() > 0);
 
-  if (preferYandex && hasCoords && yandexApiKey.length() > 10) {
-    success = fetchFromYandexGraphQL();
-    if (success) actualYandex = true;
+  // яндекс
+  if (preferYandex) {
+
+    if (useYandexGraphQL) {
+      bool graphqlReady = (lastGraphQLUpdateTime == 0 || (millis() - lastGraphQLUpdateTime >= WEATHER_UPDATE_INTERVAL_YANDEX_GRAPHQL));
+
+      if (graphqlReady) {
+        success = fetchFromYandexGraphQL();
+        if (success) {
+          actualYandex = true;
+          lastGraphQLUpdateTime = millis();
+        }
+      } else {
+        return;
+      }
+    }
+    // sync.json (старый метод)
+    else if (yandexGeoId.length() > 0 && yandexGeoId != "0") {
+      success = fetchFromYandex();
+      if (success) actualYandex = true;
+    }
+
+    if (!success) {
+      currentTemp = -999.0f;
+      currentCondition = "";
+    }
+    return;
   }
 
-  if (!success && preferYandex && yandexGeoId.length() > 0 && yandexGeoId != "0") {
-    success = fetchFromYandex();
-    if (success) actualYandex = true;
-  }
-
-  if (!success && weatherApiKey.length() > 10 && (weatherCity.length() > 0 || hasCoords)) {
+  // openweather
+  if (weatherApiKey.length() > 10 && (weatherCity.length() > 0 || hasCoords)) {
     success = fetchFromOpenWeather();
     if (success) actualYandex = false;
   }
@@ -92,10 +114,6 @@ void Weather::update() {
   if (!success) {
     currentTemp = -999.0f;
     currentCondition = "";
-  } else if (currentTemp > -999.0f) {
-#if WEATHER_LOG
-    SYSLOG.add("На улице: %+.1f°C, %s", currentTemp, currentCondition.c_str());
-#endif
   }
 } // void Weather::update()
 
@@ -172,7 +190,7 @@ bool Weather::fetchFromYandex() {
 
 // --------------------------------------------------------------------------------
 
-// Яндекс.Погода - новый API v3 (GraphQL), по координатам
+// Яндекс.Погода по координатам
 bool Weather::fetchFromYandexGraphQL() {
   if (!Wifi::instance().isConnected()) return false;
   if (yandexApiKey.length() < 10) return false;
@@ -180,10 +198,7 @@ bool Weather::fetchFromYandexGraphQL() {
 
   String url = "https://api.weather.yandex.ru/graphql/query";
 
-  // Тело GraphQL-запроса
-  String body = "{\"query\":\"{ weatherByPoint(request: { lat: " + customLat +
-                ", lon: " + customLon +
-                " }) { now { temperature condition } } }\"}";
+  String body = "{\"query\":\"{ weatherByPoint(request: { lat: " + customLat + ", lon: " + customLon + " }) { now { temperature condition } } }\"}";
 
   WiFiClientSecure client;
   client.setInsecure();
@@ -253,7 +268,7 @@ bool Weather::fetchFromYandexGraphQL() {
 
   currentTemp = now["temperature"].as<float>();
   String condition = now["condition"] | "";
-
+  condition.toLowerCase();
   currentCondition = getYandexRussianDescription(condition, 0.0f, 0, 0.0f, currentTemp, 0.0f, 0.0f);
 
 #if WEATHER_LOG
