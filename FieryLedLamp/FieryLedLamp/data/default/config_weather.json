@@ -9,5 +9,6 @@
     "custom_lon": "",
     "custom_coord_name": "",
     "show_weather": 1,
-    "weather_source": 0
+    "weather_source": 0,
+	"show_weather_condition": "1"
 }
