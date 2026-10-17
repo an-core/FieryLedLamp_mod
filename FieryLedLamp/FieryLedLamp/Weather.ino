@@ -88,7 +88,9 @@ void Weather::update() {
           actualYandex = true;
           lastGraphQLUpdateTime = millis();
         }
-      } else {
+      }
+
+      if (!graphqlReady) {
         return;
       }
     }
@@ -121,6 +123,7 @@ void Weather::update() {
 
 void Weather::forceUpdate() {
   lastUpdateTime = 0;
+  lastGraphQLUpdateTime = 0;
 }
 
 // --------------------------------------------------

@@ -247,6 +247,7 @@ void User_settings() {
   HTTP.on("/auto_move_clock", handle_auto_move_clock);
   HTTP.on("/night_clock_enabled", handle_night_clock_enabled);
   HTTP.on("/night_clock_brightness", handle_night_clock_brightness);
+
   HTTP.on("/get_time", HTTP_GET, []() {
     DynamicJsonDocument doc(256);
 
@@ -286,176 +287,184 @@ void User_settings() {
     String cityName = "";
     String tz = jsonRead(configSetup, "tz");
 
-    // POSIX-форматы
-    if (tz == "MSK-3") cityName = "Москва";
-    else if (tz == "MSK-3_SPB") cityName = "Санкт-Петербург";
-    else if (tz == "MSK-3_RND") cityName = "Ростов-на-Дону";
-    else if (tz == "MSK-3_NN") cityName = "Нижний Новгород";
-    else if (tz == "MSK-3_Kazan") cityName = "Казань";
-    else if (tz == "MSK-3_Voronezh") cityName = "Воронеж";
-    else if (tz == "MSK-3_Krasnodar") cityName = "Краснодар";
-    else if (tz == "MSK-3_Sochi") cityName = "Сочи";
-    else if (tz == "MSK-3_Kirov") cityName = "Киров";
-    else if (tz == "MSK-3_Tula") cityName = "Тула";
-    else if (tz == "MSK-3_Tver") cityName = "Тверь";
-    else if (tz == "MSK-3_Ryazan") cityName = "Рязань";
-    else if (tz == "MSK-3_Yaroslavl") cityName = "Ярославль";
-    else if (tz == "MSK-3_Vladimir") cityName = "Владимир";
-    else if (tz == "MSK-3_Bryansk") cityName = "Брянск";
-    else if (tz == "MSK-3_Belgorod") cityName = "Белгород";
-    else if (tz == "MSK-3_Kursk") cityName = "Курск";
-    else if (tz == "MSK-3_Lipetsk") cityName = "Липецк";
-    else if (tz == "MSK-3_Orel") cityName = "Орёл";
-    else if (tz == "MSK-3_Smolensk") cityName = "Смоленск";
-    else if (tz == "MSK-3_Tambov") cityName = "Тамбов";
-    else if (tz == "MSK-3_Ivanovo") cityName = "Иваново";
-    else if (tz == "MSK-3_Kostroma") cityName = "Кострома";
-    else if (tz == "MSK-3_Arkhangelsk") cityName = "Архангельск";
-    else if (tz == "MSK-3_Vologda") cityName = "Вологда";
-    else if (tz == "MSK-3_Murmansk") cityName = "Мурманск";
-    else if (tz == "MSK-3_VelikyNovgorod") cityName = "Великий Новгород";
-    else if (tz == "MSK-3_Pskov") cityName = "Псков";
-    else if (tz == "MSK-3_Makhachkala") cityName = "Махачкала";
-    else if (tz == "MSK-3_Nalchik") cityName = "Нальчик";
-    else if (tz == "MSK-3_Vladikavkaz") cityName = "Владикавказ";
-    else if (tz == "MSK-3_Stavropol") cityName = "Ставрополь";
-    else if (tz == "MSK-3_Volgograd") cityName = "Волгоград";
-    else if (tz == "MSK-3_YoshkarOla") cityName = "Йошкар-Ола";
-    else if (tz == "MSK-3_Saransk") cityName = "Саранск";
-    else if (tz == "MSK-3_Cheboksary") cityName = "Чебоксары";
-    else if (tz == "MSK-3_Orenburg") cityName = "Оренбург";
-    else if (tz == "MSK-3_Penza") cityName = "Пенза";
-    else if (tz == "MSK-3_Ulyanovsk") cityName = "Ульяновск";
-    else if (tz == "MSK-3_Simferopol") cityName = "Симферополь";
-    else if (tz == "MSK-3_Minsk") cityName = "Минск";
+    if (jsonReadtoInt(configSetup, "geo_tz_enabled") == 1) {
+      String geoName = jsonRead(configSetup, "geo_tz_name");
+      if (geoName.length() > 0) {
+        cityName = geoName;
+      }
+    }
 
-    else if (tz == "MSK-3_Zelenodolsk") cityName = "Зеленодольск";
-    else if (tz == "MSK-3_Podolsk") cityName = "Подольск";
-    else if (tz == "MSK-3_Lubertsy") cityName = "Люберцы";
-    else if (tz == "MSK-3_Mytishchi") cityName = "Мытищи";
-    else if (tz == "MSK-3_Balashikha") cityName = "Балашиха";
-    else if (tz == "MSK-3_Khimki") cityName = "Химки";
-    else if (tz == "MSK-3_Korolev") cityName = "Королёв";
-    else if (tz == "MSK-3_Elektrostal") cityName = "Электросталь";
-    else if (tz == "MSK-3_Kolomna") cityName = "Коломна";
-    else if (tz == "MSK-3_Odintsovo") cityName = "Одинцово";
-    else if (tz == "MSK-3_Domodedovo") cityName = "Домодедово";
-    else if (tz == "MSK-3_SergievPosad") cityName = "Сергиев Посад";
-    else if (tz == "MSK-3_Pushkino") cityName = "Пушкино";
-    else if (tz == "MSK-3_Zhukovsky") cityName = "Жуковский";
-    else if (tz == "MSK-3_Reutov") cityName = "Реутов";
-    else if (tz == "MSK-3_Dolgoprudny") cityName = "Долгопрудный";
-    else if (tz == "MSK-3_Shchelkovo") cityName = "Щёлково";
-    else if (tz == "MSK-3_OrekhovoZuevo") cityName = "Орехово-Зуево";
-    else if (tz == "MSK-3_Serpukhov") cityName = "Серпухов";
-    else if (tz == "MSK-3_Voskresensk") cityName = "Воскресенск";
-    else if (tz == "MSK-3_Lobnya") cityName = "Лобня";
-    else if (tz == "MSK-3_Ivanteevka") cityName = "Ивантеевка";
-    else if (tz == "MSK-3_Dubna") cityName = "Дубна";
-    else if (tz == "MSK-3_Egoryevsk") cityName = "Егорьевск";
-    else if (tz == "MSK-3_Chekhov") cityName = "Чехов";
-    else if (tz == "MSK-3_Stupino") cityName = "Ступино";
-    else if (tz == "MSK-3_PavlovskyPosad") cityName = "Павловский Посад";
-    else if (tz == "MSK-3_NaroFominsk") cityName = "Наро-Фоминск";
-    else if (tz == "MSK-3_Klin") cityName = "Клин";
-    else if (tz == "MSK-3_Krasnogorsk") cityName = "Красногорск";
+    if (cityName.length() == 0) {
+      if (tz == "MSK-3") cityName = "Москва";
+      else if (tz == "MSK-3_SPB") cityName = "Санкт-Петербург";
+      else if (tz == "MSK-3_RND") cityName = "Ростов-на-Дону";
+      else if (tz == "MSK-3_NN") cityName = "Нижний Новгород";
+      else if (tz == "MSK-3_Kazan") cityName = "Казань";
+      else if (tz == "MSK-3_Voronezh") cityName = "Воронеж";
+      else if (tz == "MSK-3_Krasnodar") cityName = "Краснодар";
+      else if (tz == "MSK-3_Sochi") cityName = "Сочи";
+      else if (tz == "MSK-3_Kirov") cityName = "Киров";
+      else if (tz == "MSK-3_Tula") cityName = "Тула";
+      else if (tz == "MSK-3_Tver") cityName = "Тверь";
+      else if (tz == "MSK-3_Ryazan") cityName = "Рязань";
+      else if (tz == "MSK-3_Yaroslavl") cityName = "Ярославль";
+      else if (tz == "MSK-3_Vladimir") cityName = "Владимир";
+      else if (tz == "MSK-3_Bryansk") cityName = "Брянск";
+      else if (tz == "MSK-3_Belgorod") cityName = "Белгород";
+      else if (tz == "MSK-3_Kursk") cityName = "Курск";
+      else if (tz == "MSK-3_Lipetsk") cityName = "Липецк";
+      else if (tz == "MSK-3_Orel") cityName = "Орёл";
+      else if (tz == "MSK-3_Smolensk") cityName = "Смоленск";
+      else if (tz == "MSK-3_Tambov") cityName = "Тамбов";
+      else if (tz == "MSK-3_Ivanovo") cityName = "Иваново";
+      else if (tz == "MSK-3_Kostroma") cityName = "Кострома";
+      else if (tz == "MSK-3_Arkhangelsk") cityName = "Архангельск";
+      else if (tz == "MSK-3_Vologda") cityName = "Вологда";
+      else if (tz == "MSK-3_Murmansk") cityName = "Мурманск";
+      else if (tz == "MSK-3_VelikyNovgorod") cityName = "Великий Новгород";
+      else if (tz == "MSK-3_Pskov") cityName = "Псков";
+      else if (tz == "MSK-3_Makhachkala") cityName = "Махачкала";
+      else if (tz == "MSK-3_Nalchik") cityName = "Нальчик";
+      else if (tz == "MSK-3_Vladikavkaz") cityName = "Владикавказ";
+      else if (tz == "MSK-3_Stavropol") cityName = "Ставрополь";
+      else if (tz == "MSK-3_Volgograd") cityName = "Волгоград";
+      else if (tz == "MSK-3_YoshkarOla") cityName = "Йошкар-Ола";
+      else if (tz == "MSK-3_Saransk") cityName = "Саранск";
+      else if (tz == "MSK-3_Cheboksary") cityName = "Чебоксары";
+      else if (tz == "MSK-3_Orenburg") cityName = "Оренбург";
+      else if (tz == "MSK-3_Penza") cityName = "Пенза";
+      else if (tz == "MSK-3_Ulyanovsk") cityName = "Ульяновск";
+      else if (tz == "MSK-3_Simferopol") cityName = "Симферополь";
+      else if (tz == "MSK-3_Minsk") cityName = "Минск";
 
-    else if (tz == "EET-2") cityName = "Калининград";
+      else if (tz == "MSK-3_Zelenodolsk") cityName = "Зеленодольск";
+      else if (tz == "MSK-3_Podolsk") cityName = "Подольск";
+      else if (tz == "MSK-3_Lubertsy") cityName = "Люберцы";
+      else if (tz == "MSK-3_Mytishchi") cityName = "Мытищи";
+      else if (tz == "MSK-3_Balashikha") cityName = "Балашиха";
+      else if (tz == "MSK-3_Khimki") cityName = "Химки";
+      else if (tz == "MSK-3_Korolev") cityName = "Королёв";
+      else if (tz == "MSK-3_Elektrostal") cityName = "Электросталь";
+      else if (tz == "MSK-3_Kolomna") cityName = "Коломна";
+      else if (tz == "MSK-3_Odintsovo") cityName = "Одинцово";
+      else if (tz == "MSK-3_Domodedovo") cityName = "Домодедово";
+      else if (tz == "MSK-3_SergievPosad") cityName = "Сергиев Посад";
+      else if (tz == "MSK-3_Pushkino") cityName = "Пушкино";
+      else if (tz == "MSK-3_Zhukovsky") cityName = "Жуковский";
+      else if (tz == "MSK-3_Reutov") cityName = "Реутов";
+      else if (tz == "MSK-3_Dolgoprudny") cityName = "Долгопрудный";
+      else if (tz == "MSK-3_Shchelkovo") cityName = "Щёлково";
+      else if (tz == "MSK-3_OrekhovoZuevo") cityName = "Орехово-Зуево";
+      else if (tz == "MSK-3_Serpukhov") cityName = "Серпухов";
+      else if (tz == "MSK-3_Voskresensk") cityName = "Воскресенск";
+      else if (tz == "MSK-3_Lobnya") cityName = "Лобня";
+      else if (tz == "MSK-3_Ivanteevka") cityName = "Ивантеевка";
+      else if (tz == "MSK-3_Dubna") cityName = "Дубна";
+      else if (tz == "MSK-3_Egoryevsk") cityName = "Егорьевск";
+      else if (tz == "MSK-3_Chekhov") cityName = "Чехов";
+      else if (tz == "MSK-3_Stupino") cityName = "Ступино";
+      else if (tz == "MSK-3_PavlovskyPosad") cityName = "Павловский Посад";
+      else if (tz == "MSK-3_NaroFominsk") cityName = "Наро-Фоминск";
+      else if (tz == "MSK-3_Klin") cityName = "Клин";
+      else if (tz == "MSK-3_Krasnogorsk") cityName = "Красногорск";
 
-    else if (tz == "SAMT-4") cityName = "Самара";
-    else if (tz == "SAMT-4_Astrakhan") cityName = "Астрахань";
-    else if (tz == "SAMT-4_Saratov") cityName = "Саратов";
-    else if (tz == "SAMT-4_Tolyatti") cityName = "Тольятти";
+      else if (tz == "EET-2") cityName = "Калининград";
 
-    else if (tz == "YEKT-5") cityName = "Екатеринбург";
-    else if (tz == "YEKT-5_Chelyabinsk") cityName = "Челябинск";
-    else if (tz == "YEKT-5_Perm") cityName = "Пермь";
-    else if (tz == "YEKT-5_Ufa") cityName = "Уфа";
-    else if (tz == "YEKT-5_Orenburg") cityName = "Оренбург";
-    else if (tz == "YEKT-5_Kurgan") cityName = "Курган";
-    else if (tz == "YEKT-5_Tyumen") cityName = "Тюмень";
+      else if (tz == "SAMT-4") cityName = "Самара";
+      else if (tz == "SAMT-4_Astrakhan") cityName = "Астрахань";
+      else if (tz == "SAMT-4_Saratov") cityName = "Саратов";
+      else if (tz == "SAMT-4_Tolyatti") cityName = "Тольятти";
 
-    else if (tz == "OMST-6") cityName = "Омск";
+      else if (tz == "YEKT-5") cityName = "Екатеринбург";
+      else if (tz == "YEKT-5_Chelyabinsk") cityName = "Челябинск";
+      else if (tz == "YEKT-5_Perm") cityName = "Пермь";
+      else if (tz == "YEKT-5_Ufa") cityName = "Уфа";
+      else if (tz == "YEKT-5_Orenburg") cityName = "Оренбург";
+      else if (tz == "YEKT-5_Kurgan") cityName = "Курган";
+      else if (tz == "YEKT-5_Tyumen") cityName = "Тюмень";
 
-    else if (tz == "KRAT-7") cityName = "Красноярск";
-    else if (tz == "KRAT-7_Novosibirsk") cityName = "Новосибирск";
-    else if (tz == "KRAT-7_Tomsk") cityName = "Томск";
-    else if (tz == "KRAT-7_Barnaul") cityName = "Барнаул";
-    else if (tz == "KRAT-7_Kemerovo") cityName = "Кемерово";
-    else if (tz == "KRAT-7_Novokuznetsk") cityName = "Новокузнецк";
-    else if (tz == "KRAT-7_Sayanogorsk") cityName = "Саяногорск";
+      else if (tz == "OMST-6") cityName = "Омск";
 
-    else if (tz == "IRKT-8") cityName = "Иркутск";
-    else if (tz == "IRKT-8_UlanUde") cityName = "Улан-Удэ";
+      else if (tz == "KRAT-7") cityName = "Красноярск";
+      else if (tz == "KRAT-7_Novosibirsk") cityName = "Новосибирск";
+      else if (tz == "KRAT-7_Tomsk") cityName = "Томск";
+      else if (tz == "KRAT-7_Barnaul") cityName = "Барнаул";
+      else if (tz == "KRAT-7_Kemerovo") cityName = "Кемерово";
+      else if (tz == "KRAT-7_Novokuznetsk") cityName = "Новокузнецк";
+      else if (tz == "KRAT-7_Sayanogorsk") cityName = "Саяногорск";
 
-    else if (tz == "YAKT-9") cityName = "Якутск";
-    else if (tz == "YAKT-9_Chita") cityName = "Чита";
-    else if (tz == "YAKT-9_Blagoveshchensk") cityName = "Благовещенск";
-    else if (tz == "YAKT-9_Khandyga") cityName = "Хандыга";
+      else if (tz == "IRKT-8") cityName = "Иркутск";
+      else if (tz == "IRKT-8_UlanUde") cityName = "Улан-Удэ";
 
-    else if (tz == "VLAT-10") cityName = "Владивосток";
-    else if (tz == "VLAT-10_Khabarovsk") cityName = "Хабаровск";
-    else if (tz == "VLAT-10_Ussuriysk") cityName = "Уссурийск";
-    else if (tz == "VLAT-10_Komsomolsk") cityName = "Комсомольск-на-Амуре";
-    else if (tz == "VLAT-10_UstNera") cityName = "Усть-Нера";
+      else if (tz == "YAKT-9") cityName = "Якутск";
+      else if (tz == "YAKT-9_Chita") cityName = "Чита";
+      else if (tz == "YAKT-9_Blagoveshchensk") cityName = "Благовещенск";
+      else if (tz == "YAKT-9_Khandyga") cityName = "Хандыга";
 
-    else if (tz == "MAGT-11") cityName = "Магадан";
-    else if (tz == "MAGT-11_Sakhalin") cityName = "Сахалин";
-    else if (tz == "MAGT-11_YuzhnoSakhalinsk") cityName = "Южно-Сахалинск";
-    else if (tz == "MAGT-11_Srednekolymsk") cityName = "Среднеколымск";
+      else if (tz == "VLAT-10") cityName = "Владивосток";
+      else if (tz == "VLAT-10_Khabarovsk") cityName = "Хабаровск";
+      else if (tz == "VLAT-10_Ussuriysk") cityName = "Уссурийск";
+      else if (tz == "VLAT-10_Komsomolsk") cityName = "Комсомольск-на-Амуре";
+      else if (tz == "VLAT-10_UstNera") cityName = "Усть-Нера";
 
-    else if (tz == "PETT-12") cityName = "Камчатка";
-    else if (tz == "PETT-12_Anadyr") cityName = "Анадырь";
-    else if (tz == "PETT-12_Petropavlovsk") cityName = "Петропавловск-Камчатский";
+      else if (tz == "MAGT-11") cityName = "Магадан";
+      else if (tz == "MAGT-11_Sakhalin") cityName = "Сахалин";
+      else if (tz == "MAGT-11_YuzhnoSakhalinsk") cityName = "Южно-Сахалинск";
+      else if (tz == "MAGT-11_Srednekolymsk") cityName = "Среднеколымск";
 
-    else if (tz == "ALMT-5") cityName = "Алматы";
-    else if (tz == "ALMT-5_Astana") cityName = "Астана";
-    else if (tz == "ALMT-5_Karaganda") cityName = "Караганда";
-    else if (tz == "ALMT-5_Shymkent") cityName = "Шымкент";
-    else if (tz == "ALMT-5_Pavlodar") cityName = "Павлодар";
-    else if (tz == "ALMT-5_Prz") cityName = "Приозёрск";
-    else if (tz == "ALMT-5_Kostanay") cityName = "Костанай";
-    else if (tz == "ALMT-5_Aktau") cityName = "Актау";
-    else if (tz == "ALMT-5_Aktobe") cityName = "Актобе";
+      else if (tz == "PETT-12") cityName = "Камчатка";
+      else if (tz == "PETT-12_Anadyr") cityName = "Анадырь";
+      else if (tz == "PETT-12_Petropavlovsk") cityName = "Петропавловск-Камчатский";
 
-    // IANA-форматы
-    else if (tz == "Europe/Moscow") cityName = "Москва";
-    else if (tz == "Europe/Volgograd") cityName = "Волгоград";
-    else if (tz == "Europe/Simferopol") cityName = "Симферополь";
-    else if (tz == "Europe/Minsk") cityName = "Минск";
-    else if (tz == "Europe/Kirov") cityName = "Киров";
-    else if (tz == "Europe/Kaliningrad") cityName = "Калининград";
-    else if (tz == "Europe/Samara") cityName = "Самара";
-    else if (tz == "Europe/Ulyanovsk") cityName = "Ульяновск";
-    else if (tz == "Europe/Astrakhan") cityName = "Астрахань";
-    else if (tz == "Europe/Saratov") cityName = "Саратов";
-    else if (tz == "Asia/Yekaterinburg") cityName = "Екатеринбург";
-    else if (tz == "Asia/Orenburg") cityName = "Оренбург";
-    else if (tz == "Asia/Omsk") cityName = "Омск";
-    else if (tz == "Asia/Novosibirsk") cityName = "Новосибирск";
-    else if (tz == "Asia/Barnaul") cityName = "Барнаул";
-    else if (tz == "Asia/Krasnoyarsk") cityName = "Красноярск";
-    else if (tz == "Asia/Tomsk") cityName = "Томск";
-    else if (tz == "Asia/Irkutsk") cityName = "Иркутск";
-    else if (tz == "Asia/Yakutsk") cityName = "Якутск";
-    else if (tz == "Asia/Khandyga") cityName = "Хандыга";
-    else if (tz == "Asia/Vladivostok") cityName = "Владивосток";
-    else if (tz == "Asia/Ust-Nera") cityName = "Усть-Нера";
-    else if (tz == "Asia/Magadan") cityName = "Магадан";
-    else if (tz == "Asia/Srednekolymsk") cityName = "Среднеколымск";
-    else if (tz == "Asia/Kamchatka") cityName = "Камчатка";
-    else if (tz == "Asia/Anadyr") cityName = "Анадырь";
-    else if (tz == "Asia/Almaty") cityName = "Алматы";
-    else if (tz == "Asia/Qostanay") cityName = "Костанай";
-    else if (tz == "Asia/Aqtau") cityName = "Актау";
-    else if (tz == "Asia/Aqtobe") cityName = "Актобе";
-    else if (tz == "Asia/Chita") cityName = "Чита";
-    else if (tz == "Asia/Sakhalin") cityName = "Сахалин";
-    else if (tz == "Asia/Blagoveshchensk") cityName = "Благовещенск";
-    else if (tz == "Asia/Kemerovo") cityName = "Кемерово";
-    else if (tz == "Asia/Kurgan") cityName = "Курган";
-    else if (tz == "Asia/Perm") cityName = "Пермь";
-    else if (tz == "Asia/Chelyabinsk") cityName = "Челябинск";
+      else if (tz == "ALMT-5") cityName = "Алматы";
+      else if (tz == "ALMT-5_Astana") cityName = "Астана";
+      else if (tz == "ALMT-5_Karaganda") cityName = "Караганда";
+      else if (tz == "ALMT-5_Shymkent") cityName = "Шымкент";
+      else if (tz == "ALMT-5_Pavlodar") cityName = "Павлодар";
+      else if (tz == "ALMT-5_Prz") cityName = "Приозёрск";
+      else if (tz == "ALMT-5_Kostanay") cityName = "Костанай";
+      else if (tz == "ALMT-5_Aktau") cityName = "Актау";
+      else if (tz == "ALMT-5_Aktobe") cityName = "Актобе";
+
+      // IANA-форматы
+      else if (tz == "Europe/Moscow") cityName = "Москва";
+      else if (tz == "Europe/Volgograd") cityName = "Волгоград";
+      else if (tz == "Europe/Simferopol") cityName = "Симферополь";
+      else if (tz == "Europe/Minsk") cityName = "Минск";
+      else if (tz == "Europe/Kirov") cityName = "Киров";
+      else if (tz == "Europe/Kaliningrad") cityName = "Калининград";
+      else if (tz == "Europe/Samara") cityName = "Самара";
+      else if (tz == "Europe/Ulyanovsk") cityName = "Ульяновск";
+      else if (tz == "Europe/Astrakhan") cityName = "Астрахань";
+      else if (tz == "Europe/Saratov") cityName = "Саратов";
+      else if (tz == "Asia/Yekaterinburg") cityName = "Екатеринбург";
+      else if (tz == "Asia/Orenburg") cityName = "Оренбург";
+      else if (tz == "Asia/Omsk") cityName = "Омск";
+      else if (tz == "Asia/Novosibirsk") cityName = "Новосибирск";
+      else if (tz == "Asia/Barnaul") cityName = "Барнаул";
+      else if (tz == "Asia/Krasnoyarsk") cityName = "Красноярск";
+      else if (tz == "Asia/Tomsk") cityName = "Томск";
+      else if (tz == "Asia/Irkutsk") cityName = "Иркутск";
+      else if (tz == "Asia/Yakutsk") cityName = "Якутск";
+      else if (tz == "Asia/Khandyga") cityName = "Хандыга";
+      else if (tz == "Asia/Vladivostok") cityName = "Владивосток";
+      else if (tz == "Asia/Ust-Nera") cityName = "Усть-Нера";
+      else if (tz == "Asia/Magadan") cityName = "Магадан";
+      else if (tz == "Asia/Srednekolymsk") cityName = "Среднеколымск";
+      else if (tz == "Asia/Kamchatka") cityName = "Камчатка";
+      else if (tz == "Asia/Anadyr") cityName = "Анадырь";
+      else if (tz == "Asia/Almaty") cityName = "Алматы";
+      else if (tz == "Asia/Qostanay") cityName = "Костанай";
+      else if (tz == "Asia/Aqtau") cityName = "Актау";
+      else if (tz == "Asia/Aqtobe") cityName = "Актобе";
+      else if (tz == "Asia/Chita") cityName = "Чита";
+      else if (tz == "Asia/Sakhalin") cityName = "Сахалин";
+      else if (tz == "Asia/Blagoveshchensk") cityName = "Благовещенск";
+      else if (tz == "Asia/Kemerovo") cityName = "Кемерово";
+      else if (tz == "Asia/Kurgan") cityName = "Курган";
+      else if (tz == "Asia/Perm") cityName = "Пермь";
+      else if (tz == "Asia/Chelyabinsk") cityName = "Челябинск";
+    }
 
     doc["time"] = String(buf);
     doc["city"] = cityName;
@@ -725,12 +734,108 @@ void User_settings() {
     HTTP.send(200, "text/plain", "OK_TZ_SET");
   });
 
+  // установка часового пояса по координатам
+  HTTP.on("/set_geo_tz", HTTP_GET, []() {
+    bool changed = false;
+
+    if (HTTP.hasArg("enabled")) {
+      String v = HTTP.arg("enabled");
+      if (jsonRead(configSetup, "geo_tz_enabled") != v) {
+        jsonWrite(configSetup, "geo_tz_enabled", v);
+        changed = true;
+      }
+    }
+    if (HTTP.hasArg("lat")) {
+      String v = HTTP.arg("lat"); v.replace(",", "."); v.trim();
+      if (jsonRead(configSetup, "geo_tz_lat") != v) {
+        jsonWrite(configSetup, "geo_tz_lat", v);
+        changed = true;
+      }
+    }
+    if (HTTP.hasArg("lon")) {
+      String v = HTTP.arg("lon"); v.replace(",", "."); v.trim();
+      if (jsonRead(configSetup, "geo_tz_lon") != v) {
+        jsonWrite(configSetup, "geo_tz_lon", v);
+        changed = true;
+      }
+    }
+
+    // применение TZ по координатам (всегда, если включено)
+    if (jsonReadtoInt(configSetup, "geo_tz_enabled") == 1) {
+      String latS = jsonRead(configSetup, "geo_tz_lat");
+      String lonS = jsonRead(configSetup, "geo_tz_lon");
+      latS.trim(); lonS.trim();
+      if (latS.length() > 0 && lonS.length() > 0) {
+        String posixTz = "";
+        if (Wifi::instance().isConnected()) {
+          posixTz = geoToTimezoneOnline(latS.toFloat(), lonS.toFloat());
+        }
+
+        if (posixTz.length() == 0) {
+          posixTz = geoToTimezone(latS.toFloat(), lonS.toFloat());
+        }
+
+        String savedTz = jsonRead(configSetup, "tz");
+        savedTz.trim();
+
+        if (posixTz == "MSK-3" && savedTz.length() > 0 && savedTz != "MSK-3" && savedTz != "auto") {
+          posixTz = savedTz;
+        } else {
+          jsonWrite(configSetup, "tz", posixTz);
+          saveConfig();
+        }
+
+        myTime.tzsetup(posixTz.c_str());
+        return;
+      }
+    }
+
+    if (changed) {
+      saveConfig();
+    }
+
+    DynamicJsonDocument doc(256);
+    doc["should_refresh"] = "true";
+    doc["title"] = jsonRead(configSetup, "geo_tz_name");
+    doc["tz"] = jsonRead(configSetup, "tz");
+    String out;
+    serializeJson(doc, out);
+    HTTP.send(200, "application/json", out);
+  });
+
+  // определение города по координатам
+  HTTP.on("/resolve_city", HTTP_GET, []() {
+    if (!HTTP.hasArg("lat") || !HTTP.hasArg("lon")) {
+      HTTP.send(400, "text/plain", "Missing lat or lon");
+      return;
+    }
+
+    float lat = HTTP.arg("lat").toFloat();
+    float lon = HTTP.arg("lon").toFloat();
+
+    String city = getCityNameFromCoords(lat, lon);
+    HTTP.send(200, "text/plain", city);
+  });
+
+  // получить текущие настройки geo TZ
+  HTTP.on("/get_geo_tz", HTTP_GET, []() {
+    DynamicJsonDocument doc(512);
+    doc["enabled"] = jsonReadtoInt(configSetup, "geo_tz_enabled") == 1;
+    doc["lat"] = jsonRead(configSetup, "geo_tz_lat");
+    doc["lon"] = jsonRead(configSetup, "geo_tz_lon");
+    doc["name"] = jsonRead(configSetup, "geo_tz_name");
+    doc["tz"] = jsonRead(configSetup, "tz");
+    String out;
+    serializeJson(doc, out);
+    HTTP.send(200, "application/json", out);
+  });
+
   HTTP.on("/get_tz_info", HTTP_GET, []() {
     String info = getTimezoneInfo();
     HTTP.send(200, "application/json", info);
   });
 
-  // разноцветные часы на матрице (которые в списке эффектов)
+  // разноцветные часы на матрице (которые EFF_CLOCK)
   HTTP.on("/rainbow_clock", HTTP_GET, []() {
     if (HTTP.hasArg("value")) {
       rainbowClock = (HTTP.arg("value") == "1" || HTTP.arg("value") == "true");
@@ -739,6 +844,33 @@ void User_settings() {
       loadingFlag = true;
     }
     HTTP.send(200, "text/plain", rainbowClock ? "1" : "0");
+  });
+
+  HTTP.on("/save_geo_tz_param", HTTP_GET, []() {
+    if (!HTTP.hasArg("key") || !HTTP.hasArg("value")) {
+      HTTP.send(400, "text/plain", "Missing key or value");
+      return;
+    }
+    String key = HTTP.arg("key");
+    String value = HTTP.arg("value");
+    if (jsonRead(configSetup, key) != value) {
+      jsonWrite(configSetup, key, value);
+      saveConfig();
+    }
+    HTTP.send(200, "text/plain", "OK");
+  });
+
+  HTTP.on("/resolve_city", HTTP_GET, []() {
+    if (!HTTP.hasArg("lat") || !HTTP.hasArg("lon")) {
+      HTTP.send(400, "text/plain", "Missing lat or lon");
+      return;
+    }
+
+    float lat = HTTP.arg("lat").toFloat();
+    float lon = HTTP.arg("lon").toFloat();
+
+    String city = getCityNameFromCoords(lat, lon);
+    HTTP.send(200, "text/plain", city);
   });
 
   // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) --------------------------------------------------------
@@ -769,22 +901,15 @@ void User_settings() {
         String lon = jsonRead(configWeather, "custom_lon");
         String coordName = jsonRead(configWeather, "custom_coord_name");
 
-        // Те же условия, что в Weather::loadSettings
-        bool useYandexGraphQL = (yandexGeo.length() == 0) &&
-                                (customYandexGeo.length() == 0) &&
-                                (lat.length() > 0) &&
-                                (lon.length() > 0) &&
-                                (yandexApiKey.length() > 10);
+        bool useYandexGraphQL = (yandexGeo.length() == 0) && (customYandexGeo.length() == 0) && (lat.length() > 0) && (lon.length() > 0) && (yandexApiKey.length() > 10);
 
         if (useYandexGraphQL) {
-          // новый API (GraphQL): координаты + ключ
           if (coordName.length() > 0) {
             cityName = coordName;
           } else {
             cityName = "(" + lat + ", " + lon + ")";
           }
         } else {
-          // Старый API (sync.json): Geo-id
           if (customYandexGeo.length() > 0) {
             cityName = getCityNameByGeo(customYandexGeo);
             if (cityName.length() == 0) cityName = "Город " + customYandexGeo;
@@ -870,106 +995,84 @@ void User_settings() {
   });
 
   // кнопка "Применить"
+  // кнопка "Применить"
   HTTP.on("/save_weather_params", HTTP_GET, []() {
     bool configChanged = false;
 
-    String weather_source = HTTP.arg("weather_source");
-    String yandex_geo = HTTP.arg("yandex_geo");
-    String custom_yandex_geo = HTTP.arg("custom_yandex_geo");
-    String city = HTTP.arg("city");
-    String custom_city = HTTP.arg("custom_city");
+    // --- Запомнить СТАРЫЕ координаты ДО сохранения ---
+    String oldLat = jsonRead(configWeather, "custom_lat");
+    String oldLon = jsonRead(configWeather, "custom_lon");
+    oldLat.trim(); oldLon.trim();
 
-    if (HTTP.hasArg("weather_source")) {
-      String value = HTTP.arg("weather_source");
-      String oldValue = jsonRead(configWeather, "weather_source");
+    auto saveIfChanged = [&](const char* key, String value, bool trimVal = false, bool dotComma = false) {
+      if (trimVal) value.trim();
+      if (dotComma) {
+        value.replace(",", ".");
+        value.trim();
+      }
+      String oldValue = jsonRead(configWeather, key);
       if (oldValue != value) {
-        jsonWrite(configWeather, "weather_source", value);
+        jsonWrite(configWeather, key, value);
         configChanged = true;
+      }
+    };
+
+    if (HTTP.hasArg("weather_source"))      saveIfChanged("weather_source",      HTTP.arg("weather_source"));
+    if (HTTP.hasArg("yandex_geo"))          saveIfChanged("yandex_geo",          HTTP.arg("yandex_geo"));
+    if (HTTP.hasArg("custom_yandex_geo"))   saveIfChanged("custom_yandex_geo",   HTTP.arg("custom_yandex_geo"), true);
+    if (HTTP.hasArg("city"))                saveIfChanged("city",                HTTP.arg("city"));
+    if (HTTP.hasArg("custom_city"))         saveIfChanged("custom_city",         HTTP.arg("custom_city"), true);
+    if (HTTP.hasArg("custom_lat"))          saveIfChanged("custom_lat",          HTTP.arg("custom_lat"),  true, true);
+    if (HTTP.hasArg("custom_lon"))          saveIfChanged("custom_lon",          HTTP.arg("custom_lon"),  true, true);
+    // custom_coord_name сохраняем в конце — после проверки смены координат
+    // if (HTTP.hasArg("custom_coord_name"))   saveIfChanged("custom_coord_name",   HTTP.arg("custom_coord_name"), true);
+    if (HTTP.hasArg("yandex_api_key"))      saveIfChanged("yandex_api_key",      HTTP.arg("yandex_api_key"), true);
+
+    // --- Новые координаты ---
+    String latNow  = jsonRead(configWeather, "custom_lat");
+    String lonNow  = jsonRead(configWeather, "custom_lon");
+    latNow.trim(); lonNow.trim();
+
+    // --- Координаты изменились? -> сбросить старое название ---
+    bool coordsChanged = (oldLat != latNow) || (oldLon != lonNow);
+
+    if (coordsChanged) {
+      jsonWrite(configWeather, "custom_coord_name", "");
+      configChanged = true;
+    } else {
+      // Координаты не менялись — сохраняем то, что пришло из формы
+      if (HTTP.hasArg("custom_coord_name")) {
+        String value = HTTP.arg("custom_coord_name");
+        value.trim();
+        if (jsonRead(configWeather, "custom_coord_name") != value) {
+          jsonWrite(configWeather, "custom_coord_name", value);
+          configChanged = true;
+        }
       }
     }
 
-    if (HTTP.hasArg("yandex_geo")) {
-      String value = HTTP.arg("yandex_geo");
-      String oldValue = jsonRead(configWeather, "yandex_geo");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "yandex_geo", value);
-        configChanged = true;
-      }
-    }
+    // --- Если название пустое (сброшено или не было) и координаты есть — resolve ---
+    String nameNow = jsonRead(configWeather, "custom_coord_name");
+    nameNow.trim();
 
-    if (HTTP.hasArg("custom_yandex_geo")) {
-      String value = HTTP.arg("custom_yandex_geo");
-      String oldValue = jsonRead(configWeather, "custom_yandex_geo");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "custom_yandex_geo", value);
-        configChanged = true;
-      }
-    }
-
-    if (HTTP.hasArg("city")) {
-      String value = HTTP.arg("city");
-      String oldValue = jsonRead(configWeather, "city");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "city", value);
-        configChanged = true;
-      }
-    }
-
-    if (HTTP.hasArg("custom_city")) {
-      String value = HTTP.arg("custom_city");
-      String oldValue = jsonRead(configWeather, "custom_city");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "custom_city", value);
-        configChanged = true;
-      }
-    }
-
-    if (HTTP.hasArg("custom_lat")) {
-      String value = HTTP.arg("custom_lat");
-      value.replace(",", ".");
-      value.trim();
-      String oldValue = jsonRead(configWeather, "custom_lat");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "custom_lat", value);
-        configChanged = true;
-      }
-    }
-
-    if (HTTP.hasArg("custom_lon")) {
-      String value = HTTP.arg("custom_lon");
-      value.replace(",", ".");
-      value.trim();
-      String oldValue = jsonRead(configWeather, "custom_lon");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "custom_lon", value);
-        configChanged = true;
-      }
-    }
-
-    if (HTTP.hasArg("custom_coord_name")) {
-      String value = HTTP.arg("custom_coord_name");
-      value.trim();
-      String oldValue = jsonRead(configWeather, "custom_coord_name");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "custom_coord_name", value);
-        configChanged = true;
-      }
-    }
-
-    if (HTTP.hasArg("yandex_api_key")) {
-      String value = HTTP.arg("yandex_api_key");
-      value.trim();
-      String oldValue = jsonRead(configWeather, "yandex_api_key");
-      if (oldValue != value) {
-        jsonWrite(configWeather, "yandex_api_key", value);
-        configChanged = true;
+    if (nameNow.length() == 0 && latNow.length() > 0 && lonNow.length() > 0
+        && Wifi::instance().isConnected()) {
+      float latF = latNow.toFloat();
+      float lonF = lonNow.toFloat();
+      if (latF >= -90.0f && latF <= 90.0f && lonF >= -180.0f && lonF <= 180.0f
+          && !(latF == 0.0f && lonF == 0.0f)) {
+        String cityResolved = getCityNameFromCoords(latF, lonF);
+        cityResolved.trim();
+        if (cityResolved.length() > 0) {
+          jsonWrite(configWeather, "custom_coord_name", cityResolved);
+          configChanged = true;
+        }
       }
     }
 
     if (configChanged) {
       saveConfig();
       Weather::instance().requestReload();
-
       if (Wifi::instance().isConnected()) {
         Weather::instance().forceUpdate();
       }

@@ -104,6 +104,15 @@ void loadSystemLogSettings();
 #define loadSystemLogSettings() ((void)0)
 #endif
 // ------------------------------------------------------
+String getCityNameFromCoords(float lat, float lon);
+String geoToTimezone(float lat, float lon);
+bool isValidPosixFormat(const String& tz);
+String ianaToPosix(const String& iana);
+String russianCityToPosix(String city);
+String getTimezoneInfo();
+bool setCustomTimezone(String customTz);
+void autoDetectTimezone();
+void initTimeAndTimezone();
 time_t getCurrentLocalTime();
 void performUpdateCheck();
 void updateCheckTask(void* arg);
