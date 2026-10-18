@@ -995,11 +995,9 @@ void User_settings() {
   });
 
   // кнопка "Применить"
-  // кнопка "Применить"
   HTTP.on("/save_weather_params", HTTP_GET, []() {
     bool configChanged = false;
 
-    // --- Запомнить СТАРЫЕ координаты ДО сохранения ---
     String oldLat = jsonRead(configWeather, "custom_lat");
     String oldLon = jsonRead(configWeather, "custom_lon");
     oldLat.trim(); oldLon.trim();
@@ -1017,30 +1015,25 @@ void User_settings() {
       }
     };
 
-    if (HTTP.hasArg("weather_source"))      saveIfChanged("weather_source",      HTTP.arg("weather_source"));
-    if (HTTP.hasArg("yandex_geo"))          saveIfChanged("yandex_geo",          HTTP.arg("yandex_geo"));
-    if (HTTP.hasArg("custom_yandex_geo"))   saveIfChanged("custom_yandex_geo",   HTTP.arg("custom_yandex_geo"), true);
-    if (HTTP.hasArg("city"))                saveIfChanged("city",                HTTP.arg("city"));
-    if (HTTP.hasArg("custom_city"))         saveIfChanged("custom_city",         HTTP.arg("custom_city"), true);
-    if (HTTP.hasArg("custom_lat"))          saveIfChanged("custom_lat",          HTTP.arg("custom_lat"),  true, true);
-    if (HTTP.hasArg("custom_lon"))          saveIfChanged("custom_lon",          HTTP.arg("custom_lon"),  true, true);
-    // custom_coord_name сохраняем в конце — после проверки смены координат
-    // if (HTTP.hasArg("custom_coord_name"))   saveIfChanged("custom_coord_name",   HTTP.arg("custom_coord_name"), true);
-    if (HTTP.hasArg("yandex_api_key"))      saveIfChanged("yandex_api_key",      HTTP.arg("yandex_api_key"), true);
+    if (HTTP.hasArg("weather_source")) saveIfChanged("weather_source", HTTP.arg("weather_source"));
+    if (HTTP.hasArg("yandex_geo")) saveIfChanged("yandex_geo", HTTP.arg("yandex_geo"));
+    if (HTTP.hasArg("custom_yandex_geo")) saveIfChanged("custom_yandex_geo", HTTP.arg("custom_yandex_geo"), true);
+    if (HTTP.hasArg("city")) saveIfChanged("city", HTTP.arg("city"));
+    if (HTTP.hasArg("custom_city")) saveIfChanged("custom_city", HTTP.arg("custom_city"), true);
+    if (HTTP.hasArg("custom_lat")) saveIfChanged("custom_lat", HTTP.arg("custom_lat"),  true, true);
+    if (HTTP.hasArg("custom_lon")) saveIfChanged("custom_lon", HTTP.arg("custom_lon"),  true, true);
+    if (HTTP.hasArg("yandex_api_key")) saveIfChanged("yandex_api_key", HTTP.arg("yandex_api_key"), true);
 
-    // --- Новые координаты ---
     String latNow  = jsonRead(configWeather, "custom_lat");
     String lonNow  = jsonRead(configWeather, "custom_lon");
     latNow.trim(); lonNow.trim();
 
-    // --- Координаты изменились? -> сбросить старое название ---
     bool coordsChanged = (oldLat != latNow) || (oldLon != lonNow);
 
     if (coordsChanged) {
       jsonWrite(configWeather, "custom_coord_name", "");
       configChanged = true;
     } else {
-      // Координаты не менялись — сохраняем то, что пришло из формы
       if (HTTP.hasArg("custom_coord_name")) {
         String value = HTTP.arg("custom_coord_name");
         value.trim();
@@ -1051,7 +1044,6 @@ void User_settings() {
       }
     }
 
-    // --- Если название пустое (сброшено или не было) и координаты есть — resolve ---
     String nameNow = jsonRead(configWeather, "custom_coord_name");
     nameNow.trim();
 
