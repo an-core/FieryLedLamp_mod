@@ -2,10 +2,10 @@
 
 <p align="center">Информация по бинарникам модифицированной прошивки</p>
 <p align="center">
-<img width="857" height="545" alt="esp32s3" src="https://github.com/user-attachments/assets/08a95eae-5140-4be7-bed8-c235728b3a14" />
+<img width="861" height="605" alt="esp32s3" src="https://github.com/user-attachments/assets/08dd16bb-8ec6-4b36-802a-6a32a3ea1cfc" />
 </p>
 <p align="center">
-<img width="753" height="493" alt="esp32" src="https://github.com/user-attachments/assets/263df925-c2f2-4e0e-9fd4-7f1f30d0cd6f" />
+<img width="755" height="448" alt="esp32" src="https://github.com/user-attachments/assets/2118adf7-d097-41e2-a6ec-5d07c8ac116a" />
 </p>
 <p align="center">
 <img width="1320" height="307" alt="jinx_out" src="https://github.com/user-attachments/assets/171ecb15-dc69-4aaf-a8c7-b9001cb20660" />
