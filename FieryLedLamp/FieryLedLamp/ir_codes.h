@@ -175,12 +175,12 @@
 #define IR2_CYCLE       0x40BF20DF //              Вкл./Выкл. избранное
 #define IR2_EQ          0x00000002 //              Эквалайзер
 #define IR2_TIME        0x00000003 //              Произнести время
-#define IR_WEATHER      0x00000004 //              Произнести погоду
+#define IR2_WEATHER      0x00000004 //              Произнести погоду
 #define IR2_VOL_DOWN    0x40BFA05F //              Уменьшить громкость
 #define IR2_VOL_UP      0x40BF609F //              Увеличить громкость
-#define IR2_IP          0x00000004 //              Показать IP адрес
-#define IR2_BR_UP       0x40BF50AF //              Уменьшить яркость
-#define IR2_BR_DOWN     0x40BF906F //              Увеличить яркость
+#define IR2_IP          0x0000000D //              Показать IP адрес
+#define IR2_BR_UP       0x40BF50AF //              Увеличить яркость
+#define IR2_BR_DOWN     0x40BF906F //              Уменьшить яркость
 #define IR2_SP_UP       0x00000005 //              Увеличить скорость
 #define IR2_SP_DOWN     0x00000006 //              Уменьшить скорость
 #define IR2_SC_UP       0x00000007 //              Увеличить масштаб

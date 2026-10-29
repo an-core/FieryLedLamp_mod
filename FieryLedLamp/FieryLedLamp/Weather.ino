@@ -71,6 +71,13 @@ void Weather::update() {
     return;
   }
 
+  if (ESP.getFreeHeap() < 70000) {
+#if WEATHER_LOG
+    SYSLOG.add("Weather: heap too low (%u), skip update", ESP.getFreeHeap());
+#endif
+    return;
+  }
+
   bool success = false;
   actualYandex = false;
 
@@ -157,7 +164,7 @@ bool Weather::fetchFromYandex() {
 
     if (httpCode == HTTP_CODE_OK) {
       String payload = yandexHttp.getString();
-      DynamicJsonDocument doc(8192);
+      DynamicJsonDocument doc(4096);
       DeserializationError error = deserializeJson(doc, payload);
 
       if (!error) {
@@ -349,7 +356,7 @@ bool Weather::fetchFromOpenWeather() {
   SYSLOG.add("OpenWeather: Получен ответ длиной %d байт", payload.length());
 #endif
 
-  DynamicJsonDocument doc(2048);
+  DynamicJsonDocument doc(3072);
   DeserializationError error = deserializeJson(doc, payload);
 
   if (error) {
@@ -599,7 +606,7 @@ void Weather::startTask() {
   [](void* arg) {
     static_cast<Weather*>(arg)->taskLoop();
   },
-  "weather", 12288, this, 1, &taskHandle, 0);
+  "weather", 8192, this, 1, &taskHandle, 0);
 }
 
 void Weather::taskLoop() {
@@ -617,8 +624,10 @@ void Weather::taskLoop() {
       lastUpdateTime = 0;
     }
 
-    if (Wifi::instance().isConnected() &&
-        (millis() - lastUpdateTime >= WEATHER_UPDATE_INTERVAL)) {
+    bool needRetry = (currentTemp == -999.0f && ESP.getFreeHeap() >= 70000);
+    uint32_t interval = needRetry ? 30000UL : WEATHER_UPDATE_INTERVAL;
+
+    if (Wifi::instance().isConnected() && (millis() - lastUpdateTime >= interval)) {
       update();
       lastUpdateTime = millis();
     }

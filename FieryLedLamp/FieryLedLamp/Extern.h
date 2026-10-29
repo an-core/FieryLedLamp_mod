@@ -114,7 +114,6 @@ extern bool ONflag;
 extern uint8_t userClockBrightness;
 extern uint8_t nightModeBrightness;
 extern const uint8_t clockFont3x5[10][3];
-extern const uint8_t weatherSym3x5[4][3];
 extern uint8_t staticFont;
 extern void clearLastDateZone();
 extern bool buttonEnabled;
@@ -251,6 +250,17 @@ extern volatile bool mp3_pending_weather_force;
 extern volatile bool mp3_pending_time_force;
 #endif
 // ------------------------------------------------------------------------------
+#if USE_RADIO
+extern String configRadio;
+extern uint8_t radioVolume;
+extern bool radioInited;
+extern bool radioPlaying;
+extern uint8_t currentStation;
+extern uint8_t effects_stations[MODE_AMOUNT]; // максимум 255 станций
+extern bool radioEnabled;
+extern volatile bool radioPendingStop;
+#endif
+// ------------------------------------------------------------------------------
 #if USE_SD
 extern fs::File outFile;
 extern uint32_t outLastFrameTime;
@@ -294,6 +304,7 @@ extern bool repeat_multiple_lamp_control;
 #endif
 // ------------------------------------------------------------------------------
 #if USE_WEATHER
+extern const uint8_t weatherSym3x5[4][3];
 extern bool weatherErrActive;
 extern uint32_t weatherErrTimer;
 extern bool weatherSpeakEnabled;

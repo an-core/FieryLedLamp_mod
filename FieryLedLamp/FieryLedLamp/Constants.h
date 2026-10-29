@@ -15,7 +15,7 @@
 #define LED_CHIP 0             // Тип чипа (настраивается в WEB): 0 - WS2812B (WS2811, SK6812), 1 - APA102 (SK9822)
 #define WIDTH  (16)            // Ширина одной матрицы (настраивается в WEB)
 #define HEIGHT (16)            // Высота одной матрицы (настраивается в WEB)
-#define MULTI_MATRIX 0         // Поддержка использования нескольких последовательно соединённых матриц: 0 - одна матрица, 1 - несколько матриц
+#define MULTI_MATRIX 1         // Поддержка использования нескольких последовательно соединённых матриц: 0 - одна матрица, 1 - несколько матриц
 #define SEG_MATRIX_W 1         // Количество матриц по горизонтали (настраивается в WEB)
 #define SEG_MATRIX_H 1         // Количество матриц по вертикали (настраивается в WEB)
 #define COLOR_ORDER 0          // Порядок цветов светодиодов (настраивается в WEB): 0 - GRB, 1 - RGB, 2 - BRG, 3 - RBG, 4 - GBR, 5 - BGR
@@ -35,9 +35,9 @@
 #define USE_DAWN 1             // Использовать Будильник "Рассвет": 0 - нет, 1 - да
 #define USE_SUNSET 1           // Использовать режим "Закат": 0 - нет, 1 - да
 #define USE_SCHEDULE 1         // Использовать Расписание лампы: 0 - нет, 1 - да
-#define USE_MULTILAMP 0        // Использовать режим "Мультилампа" (Синхронное управление несколькими лампами): 0 - нет, 1 - да
+#define USE_MULTILAMP 1        // Использовать режим "Мультилампа" (Синхронное управление несколькими лампами): 0 - нет, 1 - да
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
-#define USE_MQTT 0             // Использовать MQTT: 0 - нет, 1 - да (доп. настройки см. ниже)
+#define USE_MQTT 1             // Использовать MQTT: 0 - нет, 1 - да (доп. настройки см. ниже)
 // -----------------------------------------------------------------------------------------------------------------------------------------------------
 #define USE_OTA 1              // Использовать обновление прошивки по воздуху: 0 - нет, 1 - да (в случае ES32 указать 0)
 #define BACKUP_CFG_FILES 1     // Использовать резервное копирование настроек: 0 - нет, 1 - да
@@ -52,26 +52,27 @@
 // Система отладки (включите логи, которые нужно посмотреть на WEB странице или в мониторе порта)
 #if DEBUG_ENABLED
   #define SYSLOG SystemLog::instance()
-  #define WIFI_LOG 0        // WiFi подключение
-  #define MATRIX_LOG 0      // Матрица (буферы)
-  #define EFF_LOG 0         // Эффекты
-  #define MQTT_LOG 0        // MQTT
-  #define MP3_LOG 0         // MP3 плеер
-  #define BUTTON_LOG 0      // Кнопка
-  #define IR_LOG 0          // Пульт IR
-  #define RF_LOG 0          // Пульт RF
-  #define ST7789_LOG 0      // Дисплей ST7789
-  #define TM1637_LOG 0      // Дисплей TM1637
-  #define WEATHER_LOG 0     // Погода
-  #define SUNSET_LOG 0      // Закат
-  #define DAWN_LOG 0        // Рассвет
-  #define SCHEDULE_LOG 0    // Расписание
-  #define SD_LOG 0          // SD карта
-  #define MEMORY_LOG 0      // Память
-  #define TELNET_LOG 0      // Telnet
-  #define MULTILAMP_LOG 0   // Режим "Мультилампа" (синхронное управление несколькоми лампамм)
-  #define UPDATE_LOG 0      // Обновление прошивки
-  #define GENERAL_LOG 0     // Общие логи
+  #define WIFI_LOG 1           // WiFi
+  #define MATRIX_LOG 0         // Матрица (буферы)
+  #define EFF_LOG 0            // Эффекты
+  #define MQTT_LOG 0           // MQTT
+  #define MP3_LOG 0            // MP3 плеер
+  #define RADIO_LOG 1          // Радио
+  #define BUTTON_LOG 0         // Кнопка
+  #define IR_LOG 0             // Пульт IR
+  #define RF_LOG 0             // Пульт RF
+  #define ST7789_LOG 0         // Дисплей ST7789
+  #define TM1637_LOG 0         // Дисплей TM1637
+  #define WEATHER_LOG 0        // Погода
+  #define SUNSET_LOG 0         // Закат
+  #define DAWN_LOG 0           // Рассвет
+  #define SCHEDULE_LOG 0       // Расписание
+  #define SD_LOG 0             // SD карта
+  #define MEMORY_LOG 0         // Память
+  #define TELNET_LOG 0         // Telnet
+  #define MULTILAMP_LOG 0      // Режим "Мультилампа" (синхронное управление несколькоми лампамм)
+  #define UPDATE_LOG 0         // Обновление прошивки
+  #define GENERAL_LOG 1        // Общие логи
 #endif
 // ============================================================== ПОДКЛЮЧЕНИЕ К ESP32 / ESP32-S3 =======================================================
 #ifdef ESP32_USED
@@ -108,6 +109,12 @@
 #if USE_MP3_PLAYER
   #define MP3_TX_PIN (17U) // TX -> RX на плеере
   #define MP3_RX_PIN (16U) // RX -> TX на плеере
+#endif
+
+#if USE_RADIO
+#define I2S_BCLK (26)
+#define I2S_LRCK (25)
+#define I2S_DOUT (22)
 #endif
 
 #if USE_IR_RECEIVER
@@ -163,21 +170,21 @@
 #endif // ESP32_S3_USED
 #endif // ESP32_USED
 
-// ----------------------------------------------------------------- ДОПОЛНИТЕЛЬНЫЕ НАСТРОЙКИ ----------------------------------------------------------
+// ----------------------------------------------------------------- ДОПОЛНИТЕЛЬНЫЕ НАСТРОЙКИ CONSTANTS.H----------------------------------------------------------
 // Настройка кнопки
 #if USE_BUTTON
-  #define BUTTON_LOCK_ON_START 1 // Блокировка кнопки при старте
-  #define BUTTON_STEP_TIMEOUT (100U)  // Таймаут удержания кнопки (мс)
-  #define BUTTON_CLICK_TIMEOUT (500U) // Таймаут между нажатиями (мс)
-  #define BUTTON_SET_DEBOUNCE_SENSORY (10U) // Время антидребезга (мс) для сенсорной кнопки
+  #define BUTTON_LOCK_ON_START 1               // Блокировка кнопки при старте
+  #define BUTTON_STEP_TIMEOUT (100U)           // Таймаут удержания кнопки (мс)
+  #define BUTTON_CLICK_TIMEOUT (500U)          // Таймаут между нажатиями (мс)
+  #define BUTTON_SET_DEBOUNCE_SENSORY (10U)    // Время антидребезга (мс) для сенсорной кнопки
   #define BUTTON_SET_DEBOUNCE_MECHANICAL (60U) // Время антидребезга (мс) для механической кнопки
 #endif
 // --------------------------------------------------------------------------------------------------
 // Настройка ИК пульта
 #if USE_IR_RECEIVER
-  #define USE_2_PULTS 0 // Использовать второй пульт: 0 - нет, 1 - да
-  #define IR_REPEAT_TIMER 500 // Время ожидания повтора
-  #define IR_TICK_TIMER 100 // Время между автоповтором
+  #define USE_2_PULTS 0             // Использовать второй пульт: 0 - нет, 1 - да
+  #define IR_REPEAT_TIMER 500       // Время ожидания повтора
+  #define IR_TICK_TIMER 100         // Время между автоповтором
   #define IR_DIGIT_ENTER_TIMER 2000 // Время для ввода второй цифры номера эффекта
 #endif
 // --------------------------------------------------------------------------------------------------
@@ -202,9 +209,9 @@
 // --------------------------------------------------------------------------------------------------
 // Настройка дисплея ST7789
 #if USE_ST7789
-  #define TFT_BL_CH 7 // Канал подсветки
+  #define TFT_BL_CH 7      // Канал подсветки
   #define TFT_BL_FREQ 5000 // Частота подсветки
-  #define TFT_BL_BITS 8 // Разрядность
+  #define TFT_BL_BITS 8    // Разрядность
 #endif
 // --------------------------------------------------------------------------------------------------
 // Настройка дисплея TM1637
@@ -242,10 +249,10 @@
 #if USE_BLYNK
   #define CYCLE_LAST_EFFECT (MODE_AMOUNT - 1)
   #define BLYNK_AUTH_TOKEN "token" // Вставьте токен
-  #define CYCLE_DONT_OFF (1U) // Не отключать режим Цикл при выключении лампы = 1U, отключать = 0U
-  #define CYCLE_TIMER (60U) // Интервал смены эффектов
-  #define CYCLE_TIMER_PLUS (0U) // + случайное время от нуля до 0U секунд
-  #define CYCLE_1ST_EFFECT (0U) // С какого эффекта будет начинаться демонстрирация
+  #define CYCLE_DONT_OFF (1U)      // Не отключать режим Цикл при выключении лампы = 1U, отключать = 0U
+  #define CYCLE_TIMER (60U)        // Интервал смены эффектов
+  #define CYCLE_TIMER_PLUS (0U)    // + случайное время от нуля до 0U секунд
+  #define CYCLE_1ST_EFFECT (0U)    // С какого эффекта будет начинаться демонстрирация
 #endif
 // --------------------------------------------------------------------------------------------------
 // Переключение избранных эффектов
@@ -253,32 +260,48 @@
 #define DEFAULT_FAVORITES_DISPERSION (0U) // значение по умолчанию для разброса интервала переключения избранных эффектов в секундах
 // --------------------------------------------------------------------------------------------------
 // Настройки текста
-#define TEXT_DIRECTION (1U) // 1 - по горизонтали, 0 - по вертикали
-#define MIRR_V (0U) // отразить текст по вертикали
-#define MIRR_H (0U) // отразить текст по горизонтали
-#define SPACE (1U) // пробел между символами
-#define LETTER_COLOR (CRGB::Blue)
-#define FONT_SMALL 0 // Маленький шрифт (5x8)
-#define FONT_MEDIUM 1 // Средний шрифт (8x13)
-#define FONT_LARGE 2 // Крупный шрифт (10x16)
+#define TEXT_DIRECTION (1U)       // 1 - по горизонтали, 0 - по вертикали
+#define MIRR_V (0U)               // отразить текст по вертикали
+#define MIRR_H (0U)               // отразить текст по горизонтали
+#define SPACE (1U)                // пробел между символами
+#define LETTER_COLOR (0x0000FF)   // синий, без зависимости от CRGB
+#define FONT_SMALL 0              // Маленький шрифт (5x8)
+#define FONT_MEDIUM 1             // Средний шрифт (8x13)
+#define FONT_LARGE 2              // Крупный шрифт (10x16)
 // --------------------------------------------------------------------------------------------------
-#define ESP_HTTP_PORT (80U) // Для WiFi клиента
-#define ESP_UDP_PORT (8888U) // Для UDP сервера
+#define AUDIO_SOURCE_MP3    0
+#define AUDIO_SOURCE_RADIO  1
+#define AUDIO_SOURCE_NONE   2
+// --------------------------------------------------------------------------------------------------
+#define ESP_HTTP_PORT (80U)       // Для WiFi клиента
+#define ESP_UDP_PORT (8888U)      // Для UDP сервера
+// --------------------------------------------------------------------------------------------------
+// AsyncTCP — настройки под WLED-стиль
+/*#ifndef CONFIG_ASYNC_TCP_TX_BUFFER_SIZE
+  #define CONFIG_ASYNC_TCP_TX_BUFFER_SIZE 512     // было 8192 / 1024 → 512
+#endif
+#ifndef CONFIG_ASYNC_TCP_RX_BUFFER_SIZE
+  #define CONFIG_ASYNC_TCP_RX_BUFFER_SIZE 512     // было 2048 / 1024 → 512
+#endif
+#ifndef CONFIG_ASYNC_TCP_MAX_ACTIVE_CONNECTIONS
+  #define CONFIG_ASYNC_TCP_MAX_ACTIVE_CONNECTIONS 1   // 1, не 2
+#endif*/
+// --------------------------------------------------------------------------------------------------
 #if USE_OTA
-  #define ESP_OTA_PORT (8266U) // Для обновления по воздуху
-  #define ESP_CONF_TIMEOUT 420 // Таймаут OTA режима (7 минут)
+  #define ESP_OTA_PORT (8266U)       // Для обновления по воздуху
+  #define ESP_CONF_TIMEOUT 420       // Таймаут OTA режима (7 минут)
 #endif
 #define USE_DEFAULT_SETTINGS_RESET 1 // Сброс настроек эффектов: 0 - откл, 1 - вкл
-#define HEAP_SIZE_PRINT 0 // Вывод размера свободного ОЗУ: 0 - откл, 1 - вкл
-#define MAIN_CYCLES_PER_SECOND 0 // Вывод FPS: 0 - откл, 1 - вкл
-#define USE_LittleFS // Закомментируйте, если используете SPIFFS
+#define HEAP_SIZE_PRINT 0            // Вывод размера свободного ОЗУ: 0 - откл, 1 - вкл
+#define MAIN_CYCLES_PER_SECOND 0     // Вывод FPS: 0 - откл, 1 - вкл
+#define USE_LittleFS                 // Закомментируйте, если используете SPIFFS
 #define TIMER_DISABLED 999999999UL
 // --------------------------------------------------------------------------------------------------
-#define SAVE_CONFIG_BIT 0x01 // Отложенное сохранение config.json
-#define SAVE_ALARMS_BIT 0x02 // Отложенное сохранение config_alarm.json и config_sunset.json
-#define SAVE_CYCLE_BIT 0x04 // Отложенное сохранение cycle.json
+#define SAVE_CONFIG_BIT 0x01    // Отложенное сохранение config.json
+#define SAVE_ALARMS_BIT 0x02    // Отложенное сохранение config_alarm.json и config_sunset.json
+#define SAVE_CYCLE_BIT 0x04     // Отложенное сохранение cycle.json
 #define SAVE_MULTILAMP_BIT 0x08 // Отложенное сохранение config_multilamp.json
-#define SAVE_SCHEDULE_BIT 0x10 // Отложенное сохранение config_schedule.json
+#define SAVE_SCHEDULE_BIT 0x10  // Отложенное сохранение config_schedule.json
 // --------------------------------------------------------------------------------------------------
 #define countof(a) (sizeof(a) / sizeof(a[0]))
 #define USE_RANDOM_SETS_IN_APP // Совместимость с приложением FireLamp
@@ -333,7 +356,7 @@
 #define EEPROM_TOTAL_BYTES_USED (EEPROM_UPDATE_DATE_ADDR + EEPROM_UPDATE_DATE_SIZE)
 #define EEPROM_FIRST_RUN_MARK ((uint8_t)(MODE_AMOUNT - 255)) // метка первого запуска
 #define EEPROM_WRITE_DELAY (30000UL)               // задержка перед записью в EEPROM (30 секунд)
-#define SAVE_FILE_DELAY_TIMEOUT (5000UL)           // задержка перед сохранением в файл (15 секунд)
+#define SAVE_FILE_DELAY_TIMEOUT (5000UL)           // задержка перед сохранением в файл (5 секунд)
 // ------------------
 #if BACKUP_CFG_FILES
   #define EEPROM_WIFI_BACKUP_START_ADDRESS 512
@@ -347,6 +370,10 @@
 const uint32_t MEDIUM_TASK_INTERVAL = 250;
 const uint32_t SLOW_TASK_INTERVAL = 1000;
 const uint32_t WIFI_TASK_INTERVAL = 200;
+// --------------------------------------------------------------------------------------------------
+const uint32_t MQTT_PUBLISH_INTERVAL_MS = 900;
+const uint32_t HEAP_MONITOR_INTERVAL_MS = 10000;
+const uint32_t FAVORITES_CHECK_INTERVAL_MS = 100;
 // --------------------------------------------------------------------------------------------------
 static const uint16_t HTTPS_TIMEOUT_CHANGELOG_MS = 5000;
 static const uint16_t HTTPS_TIMEOUT_PLANNED_MS = 3000;

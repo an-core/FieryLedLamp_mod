@@ -5,8 +5,8 @@
 #if USE_IR_RECEIVER
 
 #include <ArduinoJson.h>
+#include "Ardu_Json.h"
 #include <LittleFS.h>
-#include <map>
 
 class IRManager {
   private:
@@ -49,44 +49,51 @@ class IRManager {
     IRCodeMap currentCodes;
     String currentRemoteId;
     String currentRemoteName;
-    std::map<String, uint32_t*> codeMap;
+    // Массив пар {имя, указатель на поле} вместо std::map
+    struct IRCodePair {
+      const char* name;
+      uint32_t* ptr;
+    };
+
+    static const uint8_t IR_CODE_COUNT = 33;
+    IRCodePair codeMap[IR_CODE_COUNT];
 
     void initCodeMap() {
-      codeMap["IR_ON_OFF"] = &currentCodes.IR_ON_OFF;
-      codeMap["IR_MUTE"] = &currentCodes.IR_MUTE;
-      codeMap["IR_PREV"] = &currentCodes.IR_PREV;
-      codeMap["IR_NEXT"] = &currentCodes.IR_NEXT;
-      codeMap["IR_WEATHER"] = &currentCodes.IR_WEATHER;
-      codeMap["IR_TIME"] = &currentCodes.IR_TIME;
-      codeMap["IR_VOL_DOWN"] = &currentCodes.IR_VOL_DOWN;
-      codeMap["IR_VOL_UP"] = &currentCodes.IR_VOL_UP;
-      codeMap["IR_BR_DOWN"] = &currentCodes.IR_BR_DOWN;
-      codeMap["IR_BR_UP"] = &currentCodes.IR_BR_UP;
-      codeMap["IR_IP"] = &currentCodes.IR_IP;
-      codeMap["IR_0"] = &currentCodes.IR_0;
-      codeMap["IR_1"] = &currentCodes.IR_1;
-      codeMap["IR_2"] = &currentCodes.IR_2;
-      codeMap["IR_3"] = &currentCodes.IR_3;
-      codeMap["IR_4"] = &currentCodes.IR_4;
-      codeMap["IR_5"] = &currentCodes.IR_5;
-      codeMap["IR_6"] = &currentCodes.IR_6;
-      codeMap["IR_7"] = &currentCodes.IR_7;
-      codeMap["IR_8"] = &currentCodes.IR_8;
-      codeMap["IR_9"] = &currentCodes.IR_9;
-      codeMap["IR_CYCLE"] = &currentCodes.IR_CYCLE;
-      codeMap["IR_EQ"] = &currentCodes.IR_EQ;
-      codeMap["IR_SP_UP"] = &currentCodes.IR_SP_UP;
-      codeMap["IR_SP_DOWN"] = &currentCodes.IR_SP_DOWN;
-      codeMap["IR_FAV_ADD"] = &currentCodes.IR_FAV_ADD;
-      codeMap["IR_FAV_DEL"] = &currentCodes.IR_FAV_DEL;
-      codeMap["IR_RND"] = &currentCodes.IR_RND;
-      codeMap["IR_DEF"] = &currentCodes.IR_DEF;
-      codeMap["IR_FOLD_PREV"] = &currentCodes.IR_FOLD_PREV;
-      codeMap["IR_FOLD_NEXT"] = &currentCodes.IR_FOLD_NEXT;
-      codeMap["IR_SC_DOWN"] = &currentCodes.IR_SC_DOWN;
-      codeMap["IR_SC_UP"] = &currentCodes.IR_SC_UP;
+      codeMap[0]  = {"IR_ON_OFF",    &currentCodes.IR_ON_OFF};
+      codeMap[1]  = {"IR_MUTE",      &currentCodes.IR_MUTE};
+      codeMap[2]  = {"IR_PREV",      &currentCodes.IR_PREV};
+      codeMap[3]  = {"IR_NEXT",      &currentCodes.IR_NEXT};
+      codeMap[4]  = {"IR_WEATHER",   &currentCodes.IR_WEATHER};
+      codeMap[5]  = {"IR_TIME",      &currentCodes.IR_TIME};
+      codeMap[6]  = {"IR_VOL_DOWN",  &currentCodes.IR_VOL_DOWN};
+      codeMap[7]  = {"IR_VOL_UP",    &currentCodes.IR_VOL_UP};
+      codeMap[8]  = {"IR_BR_DOWN",   &currentCodes.IR_BR_DOWN};
+      codeMap[9]  = {"IR_BR_UP",     &currentCodes.IR_BR_UP};
+      codeMap[10] = {"IR_IP",        &currentCodes.IR_IP};
+      codeMap[11] = {"IR_0",         &currentCodes.IR_0};
+      codeMap[12] = {"IR_1",         &currentCodes.IR_1};
+      codeMap[13] = {"IR_2",         &currentCodes.IR_2};
+      codeMap[14] = {"IR_3",         &currentCodes.IR_3};
+      codeMap[15] = {"IR_4",         &currentCodes.IR_4};
+      codeMap[16] = {"IR_5",         &currentCodes.IR_5};
+      codeMap[17] = {"IR_6",         &currentCodes.IR_6};
+      codeMap[18] = {"IR_7",         &currentCodes.IR_7};
+      codeMap[19] = {"IR_8",         &currentCodes.IR_8};
+      codeMap[20] = {"IR_9",         &currentCodes.IR_9};
+      codeMap[21] = {"IR_CYCLE",     &currentCodes.IR_CYCLE};
+      codeMap[22] = {"IR_EQ",        &currentCodes.IR_EQ};
+      codeMap[23] = {"IR_SP_UP",     &currentCodes.IR_SP_UP};
+      codeMap[24] = {"IR_SP_DOWN",   &currentCodes.IR_SP_DOWN};
+      codeMap[25] = {"IR_FAV_ADD",   &currentCodes.IR_FAV_ADD};
+      codeMap[26] = {"IR_FAV_DEL",   &currentCodes.IR_FAV_DEL};
+      codeMap[27] = {"IR_RND",       &currentCodes.IR_RND};
+      codeMap[28] = {"IR_DEF",       &currentCodes.IR_DEF};
+      codeMap[29] = {"IR_FOLD_PREV", &currentCodes.IR_FOLD_PREV};
+      codeMap[30] = {"IR_FOLD_NEXT", &currentCodes.IR_FOLD_NEXT};
+      codeMap[31] = {"IR_SC_DOWN",   &currentCodes.IR_SC_DOWN};
+      codeMap[32] = {"IR_SC_UP",     &currentCodes.IR_SC_UP};
     }
-
+    
     uint32_t parseHexOrDec(const String& str) {
       if (str.startsWith("0x") || str.startsWith("0X")) {
         return strtoul(str.c_str(), NULL, 16);
@@ -97,7 +104,7 @@ class IRManager {
   public:
     IRManager() {
       initCodeMap();
-      loadSavedRemote();
+      //loadSavedRemote();
     }
 
     bool loadRemote(const String& remoteId) {
@@ -123,9 +130,9 @@ class IRManager {
           currentRemoteName = remote["name"].as<String>();
           JsonObject codes = remote["codes"];
 
-          for (auto& kv : codeMap) {
-            String codeStr = codes[kv.first].as<String>();
-            *kv.second = parseHexOrDec(codeStr);
+          for (uint8_t i = 0; i < IR_CODE_COUNT; i++) {
+            String codeStr = codes[codeMap[i].name].as<String>();
+            *codeMap[i].ptr = parseHexOrDec(codeStr);
           }
 
           saveSelectedRemote(remoteId);
@@ -187,10 +194,11 @@ class IRManager {
       return result;
     }
 
-    uint32_t getCode(const String& key) {
-      auto it = codeMap.find(key);
-      if (it != codeMap.end()) {
-        return *it->second;
+        uint32_t getCode(const String& key) {
+      for (uint8_t i = 0; i < IR_CODE_COUNT; i++) {
+        if (key == codeMap[i].name) {
+          return *codeMap[i].ptr;
+        }
       }
       return 0;
     }

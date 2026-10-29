@@ -239,4 +239,19 @@ struct UpdateCache {
     bool valid;
 };
 
+
+// -------------------------------
+#if USE_IR_RECEIVER
+typedef void (*IRActionFn)();
+struct IRAction {
+  const char* name;   // имя кода в irManager (ключ в ir.json)
+  uint32_t fallback;  // статический код по умолчанию (IR_XXX)
+#if USE_2_PULTS
+  uint32_t fallback2; // второй пульт (IR2_XXX), 0 если нет
+#endif
+  IRActionFn action;  // что делать
+  bool allowRepeat;   // true - реагировать на удержание (IR_Data_Ready == 2)
+};
+#endif // USE_IR_RECEIVER
+
 // ******************************************************************************************************************************************************

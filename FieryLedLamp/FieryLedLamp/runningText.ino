@@ -185,7 +185,9 @@ void drawChar(int16_t x, int16_t y, uint8_t high, uint8_t low, CRGB color, uint8
       }
       return;
     }
-    // символы погоды (минус, плюс, градус, C)
+    
+   // символы погоды (минус, плюс, градус, C)
+#if USE_WEATHER
     uint8_t symIdx = 255;
     if (low == '-') symIdx = 0;
     else if (low == '+') symIdx = 1;
@@ -193,14 +195,15 @@ void drawChar(int16_t x, int16_t y, uint8_t high, uint8_t low, CRGB color, uint8
     else if (low == 'C' || low == 'c') symIdx = 3;
     if (symIdx < 4) {
       for (uint8_t col = 0; col < 3; col++) {
-        uint8_t byte = pgm_read_byte(&weatherSym3x5[symIdx][col]);
+        uint8_t b = pgm_read_byte(&weatherSym3x5[symIdx][col]);
         for (uint8_t row = 0; row < 5; row++) {
-          if (byte & (1 << row)) {
+          if (b & (1 << row)) {
             drawPixelXY(x + col, y + row, color);
           }
         }
       }
     }
+#endif
     return;
   }
 
@@ -272,9 +275,12 @@ void drawChar(int16_t x, int16_t y, uint8_t high, uint8_t low, CRGB color, uint8
 void drawDegreeSymbol(int16_t x, int16_t y, CRGB color, uint8_t fontId) {
   if (fontId == 0) {
     for (uint8_t col = 0; col < 3; col++) {
-      uint8_t byte = pgm_read_byte(&weatherSym3x5[2][col]);
+      uint8_t b = 0;
+      #if USE_WEATHER
+      b = pgm_read_byte(&weatherSym3x5[2][col]);
+      #endif
       for (uint8_t row = 0; row < 5; row++) {
-        if (byte & (1 << row)) {
+        if (b & (1 << row)) {
           drawPixelXY(x + col, y + row, color);
         }
       }

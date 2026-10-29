@@ -128,16 +128,16 @@ void buttonTick() {
     }
     loadingFlag = true;
 
-#if USE_MP3_PLAYER
-    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-      uint8_t newFolder = effects_folders[currentMode];
-      if (mp3_folder != newFolder) {
-        mp3_folder = newFolder;
-        mp3_folder_last = newFolder;
-        mp3SendPlayFolder(newFolder);
-      }
-    }
-#endif
+    /* #if USE_MP3_PLAYER
+        if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+          uint8_t newFolder = effects_folders[currentMode];
+          if (mp3_folder != newFolder) {
+            mp3_folder = newFolder;
+            mp3_folder_last = newFolder;
+            mp3SendPlayFolder(newFolder);
+          }
+        }
+      #endif */
 
 #if USE_MQTT
     if (Wifi::instance().isConnected()) {
@@ -174,15 +174,23 @@ void buttonTick() {
     jsonWrite(configSetup, "sp", modes[currentMode].Speed);
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
+#if USE_RADIO
+    if (radioEnabled && ONflag) {
+      uint8_t stId = radioGetStationForMode(currentMode);
+      if (stId > 0) radioPlayStation(stId);
+      else radioStop();
+    } else
+#endif
+
 #if USE_MP3_PLAYER
-    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-      uint8_t newFolder = effects_folders[currentMode];
-      if (mp3_folder != newFolder) {
-        mp3_folder = newFolder;
-        mp3_folder_last = newFolder;
-        mp3SendPlayFolder(newFolder);
+      if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+        uint8_t newFolder = effects_folders[currentMode];
+        if (mp3_folder != newFolder) {
+          mp3_folder = newFolder;
+          mp3_folder_last = newFolder;
+          mp3SendPlayFolder(newFolder);
+        }
       }
-    }
 #endif
 
     SetBrightness(modes[currentMode].Brightness);
@@ -227,15 +235,23 @@ void buttonTick() {
     jsonWrite(configSetup, "sp", modes[currentMode].Speed);
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
+#if USE_RADIO
+    if (radioEnabled && ONflag) {
+      uint8_t stId = radioGetStationForMode(currentMode);
+      if (stId > 0) radioPlayStation(stId);
+      else radioStop();
+    } else
+#endif
+
 #if USE_MP3_PLAYER
-    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-      uint8_t newFolder = effects_folders[currentMode];
-      if (mp3_folder != newFolder) {
-        mp3_folder = newFolder;
-        mp3_folder_last = newFolder;
-        mp3SendPlayFolder(newFolder);
+      if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+        uint8_t newFolder = effects_folders[currentMode];
+        if (mp3_folder != newFolder) {
+          mp3_folder = newFolder;
+          mp3_folder_last = newFolder;
+          mp3SendPlayFolder(newFolder);
+        }
       }
-    }
 #endif
 
     SetBrightness(modes[currentMode].Brightness);
@@ -302,7 +318,9 @@ void buttonTick() {
       textEnded = fillString(textToShow.c_str(), CRGB::White, false);
       FastLED.show();
       parseUDP();
-      HTTP.handleClient();
+#if USE_RADIO
+      radioLoop();
+#endif
       delay(1);
       yield();
     }

@@ -6,7 +6,7 @@
 #include "Prototypes.h"
 #include "Extern.h"
 #include "Types.h"
-// ----------------
+// --------------------------
 
 static const char* CFG_BACKUP_ZIP_PATH = "/config_backup.zip";      // для создания бэкапа
 static const char* CFG_RESTORE_ZIP_PATH = "/config_to_restore.zip"; // временный файл при восстановлении
@@ -17,11 +17,13 @@ static bool createConfigBackupZip();
 static bool restoreConfigFromZip(const char* zipPath);
 
 // --------------------------------------------------------------
+
 String getConfigBackupMessage() {
   return cfgBackupMessage;
 }
 
 // --------------------------------------------------------------
+
 static const BackupConfigFileInfo BACKUP_FILES_LIST[] = {
   { "/config.json", "config.json", false },
   { "/config_alarm.json", "config_alarm.json", false },
@@ -41,9 +43,11 @@ static const BackupConfigFileInfo BACKUP_FILES_LIST[] = {
 };
 
 // --------------------------------------------------------------
+
 static const size_t BACKUP_FILES_COUNT = sizeof(BACKUP_FILES_LIST) / sizeof(BACKUP_FILES_LIST[0]);
 
 // --------------------------------------------------------------
+
 static bool isMergeJsonConfigPath(const char* path) {
   if (!path) return false;
   String s(path);
@@ -51,6 +55,7 @@ static bool isMergeJsonConfigPath(const char* path) {
 }
 
 // --------------------------------------------------------------
+
 static bool mergeJsonVariant(JsonVariant dst, JsonVariantConst src) {
   if (dst.is<JsonObject>() && src.is<JsonObjectConst>()) {
     JsonObject dstObj = dst.as<JsonObject>();
@@ -92,6 +97,7 @@ static bool mergeJsonVariant(JsonVariant dst, JsonVariantConst src) {
 } // static bool mergeJsonVariant(JsonVariant dst, JsonVariantConst src)
 
 // --------------------------------------------------------------
+
 static bool mergeJsonFileWithTmp(const char* tmpPath, const char* dstPath) {
   if (!tmpPath || !dstPath || !LittleFS.exists(tmpPath)) return false;
   String curText = F("{}");
@@ -150,6 +156,7 @@ static bool mergeJsonFileWithTmp(const char* tmpPath, const char* dstPath) {
 } // static bool mergeJsonFileWithTmp(const char* tmpPath, const char* dstPath)
 
 // --------------------------------------------------------------
+
 static const char* CFG_BACKUP_PART_LABEL = "backup";
 static const char* CFG_BACKUP_NVS_NS = "cfgbackup";
 static const char* CFG_BACKUP_NVS_KEY = "pending";
@@ -157,6 +164,7 @@ static const uint32_t CFG_BACKUP_MAGIC = 0x424B505AUL;
 static const uint16_t CFG_BACKUP_VERSION = 1;
 
 // --------------------------------------------------------------
+
 static const esp_partition_t* findConfigBackupPartition() {
   const esp_partition_t* part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, CFG_BACKUP_PART_LABEL);
   if (part) return part;
@@ -175,6 +183,7 @@ static const esp_partition_t* findConfigBackupPartition() {
 }
 
 // --------------------------------------------------------------
+
 static bool setConfigBackupPendingFlag(bool value) {
   nvs_handle_t h;
   esp_err_t err = nvs_open(CFG_BACKUP_NVS_NS, NVS_READWRITE, &h);
@@ -196,6 +205,7 @@ static bool setConfigBackupPendingFlag(bool value) {
 }
 
 // --------------------------------------------------------------
+
 bool isConfigBackupPending() {
   nvs_handle_t h;
   esp_err_t err = nvs_open(CFG_BACKUP_NVS_NS, NVS_READONLY, &h);
@@ -207,11 +217,13 @@ bool isConfigBackupPending() {
 }
 
 // --------------------------------------------------------------
+
 void clearConfigBackupPending() {
   setConfigBackupPendingFlag(false);
 }
 
 // --------------------------------------------------------------
+
 static bool saveZipToBackupPartition(const char* zipPath, bool setPendingFlag, const __FlashStringHelper* successMessage) {
   if (!zipPath) {
     cfgBackupMessage = F("Не указан путь к ZIP");
@@ -306,9 +318,10 @@ static bool saveZipToBackupPartition(const char* zipPath, bool setPendingFlag, c
 
   cfgBackupMessage = String(successMessage);
   return true;
-} // static bool saveZipToBackupPartition(const char* zipPath, bool setPendingFlag, const __FlashStringHelper* successMessage)
+} // static bool saveZipToBackupPartition(const char* ...)
 
 // --------------------------------------------------------------
+
 bool saveConfigBackupToPartition(bool setPendingFlag) {
   if (!createConfigBackupZip()) {
     if (cfgBackupMessage.length() == 0)
@@ -322,6 +335,7 @@ bool saveConfigBackupToPartition(bool setPendingFlag) {
 } // bool saveConfigBackupToPartition(bool setPendingFlag)
 
 // --------------------------------------------------------------
+
 bool ConfigBackupFromPartition() {
   const esp_partition_t* part = findConfigBackupPartition();
 
@@ -397,6 +411,7 @@ bool ConfigBackupFromPartition() {
 } // bool ConfigBackupFromPartition()
 
 // --------------------------------------------------------------
+
 static int backupFindConfigIndexByZipName(const String &name) {
   for (size_t i = 0; i < BACKUP_FILES_COUNT; i++) {
     String target(BACKUP_FILES_LIST[i].zipName);
@@ -410,6 +425,7 @@ static int backupFindConfigIndexByZipName(const String &name) {
 }
 
 // --------------------------------------------------------------
+
 static String backupMakeTmpRestorePath(size_t index) {
   String s = F("/restore_tmp_");
   s += index;
@@ -418,6 +434,7 @@ static String backupMakeTmpRestorePath(size_t index) {
 }
 
 // --------------------------------------------------------------
+
 static bool validateJsonFile(const String& path) {
   File f = LittleFS.open(path, "r");
   if (!f) return false;
@@ -429,6 +446,7 @@ static bool validateJsonFile(const String& path) {
 }
 
 // --------------------------------------------------------------
+
 static bool validateBackupTempFile(const String& path, const char* dstPath) {
   if (!dstPath) return false;
 
@@ -443,12 +461,14 @@ static bool validateBackupTempFile(const String& path, const char* dstPath) {
 }
 
 // --------------------------------------------------------------
+
 static inline void zipWriteU16(File &f, uint16_t v) {
   uint8_t b[2] = { (uint8_t)(v & 0xFF), (uint8_t)((v >> 8) & 0xFF) };
   f.write(b, 2);
 }
 
 // --------------------------------------------------------------
+
 static inline void zipWriteU32(File &f, uint32_t v) {
   uint8_t b[4] = {
     (uint8_t)(v & 0xFF),
@@ -461,6 +481,7 @@ static inline void zipWriteU32(File &f, uint32_t v) {
 }
 
 // --------------------------------------------------------------
+
 static bool zipReadU16(File &f, uint16_t &v) {
   uint8_t b[2];
   if (f.read(b, 2) != 2) return false;
@@ -469,6 +490,7 @@ static bool zipReadU16(File &f, uint16_t &v) {
 }
 
 // --------------------------------------------------------------
+
 static bool zipReadU32(File &f, uint32_t &v) {
   uint8_t b[4];
   if (f.read(b, 4) != 4) return false;
@@ -477,6 +499,7 @@ static bool zipReadU32(File &f, uint32_t &v) {
 }
 
 // --------------------------------------------------------------
+
 static uint32_t zipCrc32Update(uint32_t crc, const uint8_t* data, size_t len) {
   crc = ~crc;
 
@@ -490,6 +513,7 @@ static uint32_t zipCrc32Update(uint32_t crc, const uint8_t* data, size_t len) {
 }
 
 // --------------------------------------------------------------
+
 static bool zipCalcFileInfo(const char* path, uint32_t &sizeOut, uint32_t &crcOut) {
   File f = LittleFS.open(path, "r");
   if (!f) return false;
@@ -508,6 +532,7 @@ static bool zipCalcFileInfo(const char* path, uint32_t &sizeOut, uint32_t &crcOu
 }
 
 // --------------------------------------------------------------
+
 static bool zipCopyFileToOut(const char* path, File &out) {
   File in = LittleFS.open(path, "r");
   if (!in) return false;
@@ -525,6 +550,7 @@ static bool zipCopyFileToOut(const char* path, File &out) {
 }
 
 // --------------------------------------------------------------
+
 static bool zipReplaceFileWithValidatedTemp(const char* tmpPath, const char* dstPath) {
   String bakPath = String(dstPath) + F(".bak");
   LittleFS.remove(bakPath);
@@ -550,6 +576,7 @@ static bool zipReplaceFileWithValidatedTemp(const char* tmpPath, const char* dst
 }
 
 // --------------------------------------------------------------
+
 static bool createConfigBackupZip() {
   struct ZipEntryInfo {
     const char* fsPath;
@@ -656,9 +683,10 @@ static bool createConfigBackupZip() {
   zipWriteU16(out, 0);
   out.close();
   return true;
-} //static bool createConfigBackupZip()
+} // static bool createConfigBackupZip()
 
 // --------------------------------------------------------------
+
 String getPlatformString() {
 #if defined(CONFIG_IDF_TARGET_ESP32S3)
   return "ESP32-S3";
@@ -681,7 +709,10 @@ String getPlatformString() {
 } // String getPlatformString()
 
 // --------------------------------------------------------------
-static void sendBackupPage(const String &msg = String(), bool ok = false) {
+
+static void sendBackupPage(AsyncWebServerRequest *request, const String &msg = String(), bool ok = false) {
+  if (!request) return;
+
   File htmlFile = LittleFS.open("/backup.htm", "r");
   bool isGzipped = false;
 
@@ -691,7 +722,7 @@ static void sendBackupPage(const String &msg = String(), bool ok = false) {
   }
 
   if (!htmlFile) {
-    HTTP.send(404, F("text/html"), F("<html><body><h1>404</h1><p>backup.htm не найден</p></body></html>"));
+    request->send(404, "text/html", "<html><body><h1>404</h1><p>backup.htm не найден</p></body></html>");
     return;
   }
 
@@ -699,13 +730,13 @@ static void sendBackupPage(const String &msg = String(), bool ok = false) {
   htmlFile.close();
 
   if (html.length() == 0) {
-    HTTP.send(500, F("text/plain"), F("Файл backup.htm"));
+    request->send(500, "text/plain", "Файл backup.htm");
     return;
   }
 
   html.replace("{LAMP_NAME}", LAMP_NAME);
-  String ipAddress = WiFi.localIP().toString();
 
+  String ipAddress = WiFi.localIP().toString();
   if (ipAddress == "0.0.0.0") {
     ipAddress = WiFi.softAPIP().toString();
   }
@@ -722,26 +753,28 @@ static void sendBackupPage(const String &msg = String(), bool ok = false) {
 
     if (html.indexOf("{MESSAGE}") >= 0) {
       html.replace("{MESSAGE}", msgHtml);
-    }  else {
+    } else {
       int pos = html.indexOf("</h1>");
       if (pos < 0) pos = html.indexOf("</h2>");
       if (pos >= 0) {
         html = html.substring(0, pos + 5) + msgHtml + html.substring(pos + 5);
       }
     }
-  } // if (msg.length())
-  else {
+  } else {
     html.replace("{MESSAGE}", "");
   }
 
+  AsyncWebServerResponse *response = request->beginResponse(200, "text/html", html);
+
   if (isGzipped) {
-    HTTP.sendHeader(F("Content-Encoding"), F("gzip"));
-    HTTP.sendHeader(F("Vary"), F("Accept-Encoding"));
+    response->addHeader("Content-Encoding", "gzip");
+    response->addHeader("Vary", "Accept-Encoding");
   }
-  HTTP.send(200, F("text/html"), html);
+  request->send(response);
 }
 
 // --------------------------------------------------------------
+
 static bool restoreConfigFromZip(const char* zipPath) {
   File in = LittleFS.open(zipPath, "r");
 
@@ -898,33 +931,30 @@ static bool restoreConfigFromZip(const char* zipPath) {
 } // static bool restoreConfigFromZip(const char* zipPath)
 
 // --------------------------------------------------------------
-static void handleBackupConfigDownload() {
+
+static void handleBackupConfigDownload(AsyncWebServerRequest *request) {
   if (!createConfigBackupZip()) {
-    HTTP.send(500, F("text/plain"), cfgBackupMessage.length() ? cfgBackupMessage : F("Ошибка архива"));
+    request->send(500, "text/plain", cfgBackupMessage.length() ? cfgBackupMessage : "Ошибка архива");
     return;
   }
 
-  File file = LittleFS.open(CFG_BACKUP_ZIP_PATH, "r");
+  if (!LittleFS.exists(CFG_BACKUP_ZIP_PATH)) {
+    request->send(500, "text/plain", "Ошибка открытия архива");
+    return;
+  }
 
-  if (!file) {
-    HTTP.send(500, F("text/plain"), F("Ошибка открытия архива"));
+  AsyncWebServerResponse *response = request->beginResponse( LittleFS, CFG_BACKUP_ZIP_PATH, "application/zip", true);
+  request->send(response);
+
+  request->onDisconnect([]() {
     LittleFS.remove(CFG_BACKUP_ZIP_PATH);
-    return;
-  }
-
-  HTTP.sendHeader(F("Content-Type"), F("application/zip"));
-  HTTP.sendHeader(F("Content-Disposition"), F("attachment; filename=lamp_settings.zip"));
-  HTTP.sendHeader(F("Connection"), F("close"));
-  HTTP.streamFile(file, F("application/zip"));
-  file.close();
-  LittleFS.remove(CFG_BACKUP_ZIP_PATH);
+  });
 }
 
 // --------------------------------------------------------------
-static void handleBackupUpload() {
-  HTTPUpload& upload = HTTP.upload();
 
-  if (upload.status == UPLOAD_FILE_START) {
+static void handleBackupUploadChunk(AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
+  if (index == 0) {
     cfgBackupSuccess = false;
     cfgBackupMessage = "";
     LittleFS.remove(CFG_RESTORE_ZIP_PATH);
@@ -933,16 +963,16 @@ static void handleBackupUpload() {
     if (!fsUploadFile) {
       cfgBackupMessage = F("Не удалось создать временный файл");
     }
-  } else if (upload.status == UPLOAD_FILE_WRITE) {
+  }
 
-    if (fsUploadFile) {
-      fsUploadFile.write(upload.buf, upload.currentSize);
-    }
-  } else if (upload.status == UPLOAD_FILE_END) {
+  if (len && fsUploadFile) {
+    fsUploadFile.write(data, len);
+  }
 
+  if (final) {
     if (fsUploadFile) {
       fsUploadFile.close();
-      cfgBackupSuccess = saveZipToBackupPartition(CFG_RESTORE_ZIP_PATH, true, F("После перезагрузки настройки будут восстановлены."));
+      cfgBackupSuccess = saveZipToBackupPartition( CFG_RESTORE_ZIP_PATH, true, F("После перезагрузки настройки будут восстановлены."));
     } else {
       cfgBackupSuccess = false;
       cfgBackupMessage = F("Не удалось сохранить загруженный файл");
@@ -950,36 +980,40 @@ static void handleBackupUpload() {
   }
 }
 
-// --------------------------------------------------------------
-static void handleBackupRestoreFinish() {
+static void handleBackupUpload(AsyncWebServerRequest *request) {
   if (cfgBackupSuccess) {
-    HTTP.send(200, "text/plain", "Успешно");
-    delay(100);
-    delay(1000);
-    ESP.restart();
+    request->send(200, "text/plain", "Успешно");
+    pendingRestart = true;
   } else {
     String errorMsg = cfgBackupMessage.length() ? cfgBackupMessage : F("Ошибка загрузки архива");
-    sendBackupPage(errorMsg, false);
+    sendBackupPage(request, errorMsg, false);
   }
 
-  LittleFS.remove(CFG_RESTORE_ZIP_PATH);
+  if (!cfgBackupSuccess) {
+    LittleFS.remove(CFG_RESTORE_ZIP_PATH);
+  }
 }
 
 // --------------------------------------------------------------
+
 void BackupInit() {
-
-  HTTP.on("/backup", HTTP_GET, []() {
-    sendBackupPage();
+  HTTP.on("/backup", HTTP_GET, [](AsyncWebServerRequest * request) {
+    sendBackupPage(request);
   });
-
-  HTTP.on("/backup_config", HTTP_GET, handleBackupConfigDownload);
-  HTTP.on("/restore_config", HTTP_POST, handleBackupRestoreFinish, handleBackupUpload);
+  HTTP.on("/backup_config", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handleBackupConfigDownload(request);
+  });
+  HTTP.on("/restore_config", HTTP_POST, [](AsyncWebServerRequest * request) {
+    handleBackupUpload(request);
+  }, handleBackupUploadChunk );
 }
 
 // --------------------------------------------------------------
+
 #endif // BACKUP_CFG_FILES
 
 // --------------------------------------------------------------
+
 void BackupsIfNeeded() {
 #if BACKUP_CFG_FILES
 
@@ -997,7 +1031,8 @@ void BackupsIfNeeded() {
   BackupInit();
 #endif // BACKUP_CFG_FILES
 
-  // --------------------------------------------------------------
+// --------------------------------------------------------------
+
 #if BACKUP_CFG_FILES && USE_OTA
   if (Eeprom::instance().IsWifiBackupAvailable()) {
     String tempConfig = configSetup;
@@ -1010,7 +1045,8 @@ void BackupsIfNeeded() {
     }
   }
 #endif // BACKUP_CFG_FILES && USE_OTA
-  // --------------------------------------------------------------
+// --------------------------------------------------------------
+
 } // void BackupsIfNeeded()
 
 // ******************************************************************************************************************************************************

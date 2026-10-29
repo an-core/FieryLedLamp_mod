@@ -1,48 +1,249 @@
 // ************************************************************************* system_Init.ino ************************************************************
 
 // ================================================================ ИНИЦИАЛИЗАЦИЯ ФАЙЛОВОЙ СИСТЕМЫ =====================================================
+
 bool FS_init(void) {
   if (!LittleFS.begin(false)) {
 #if GENERAL_LOG
-    SYSLOG.add("Ошибка монтирования LittleFS, выполняется форматирование...");
+    SYSLOG.add("LittleFS mount failed, retry...");
 #endif
-    LittleFS.format();
-    delay(200);
+    delay(100);
     if (!LittleFS.begin(false)) {
 #if GENERAL_LOG
-      SYSLOG.add("LittleFS не удалось смонтировать даже после форматирования");
+      SYSLOG.add("LittleFS mount failed twice - форматирование ОТКЛЮЧЕНО");
+      SYSLOG.add("Загрузите FS через /update_fs или веб-флешер");
 #endif
       return false;
     }
+  }
 #if GENERAL_LOG
-    SYSLOG.add("LittleFS отформатирована и смонтирована успешно");
+  SYSLOG.add("LittleFS OK: total=%u, used=%u, free=%u", (unsigned)LittleFS.totalBytes(), (unsigned)LittleFS.usedBytes(), (unsigned)(LittleFS.totalBytes() - LittleFS.usedBytes()));
+  if (LittleFS.usedBytes() == 0) {
+    SYSLOG.add("ВНИМАНИЕ: LittleFS пуста - загрузите образ FS");
+  }
+  {
+    File root = LittleFS.open("/");
+    if (root && root.isDirectory()) {
+      File f = root.openNextFile();
+      int n = 0;
+      while (f && n < 500) {
+        SYSLOG.add("FS: %s (%u bytes)", f.name(), (unsigned)f.size());
+        f = root.openNextFile();
+        n++;
+      }
+      SYSLOG.add("FS: total %d entries", n);
+    }
+  }
 #endif
-  } else {
-#if GENERAL_LOG
-    SYSLOG.add("LittleFS смонтирована успешно");
-#endif
+  return true;
+}
+
+// ===================================================================== ИНИЦИАЛИЗАЦИЯ SSDP ============================================================
+
+void SSDP_init(void) {
+  static bool routeRegistered = false;
+  if (!routeRegistered) {
+    HTTP.on("/description.xml", HTTP_GET, [](AsyncWebServerRequest * request) {
+      String xml;
+      xml.reserve(600);
+      xml += F("<?xml version=\"1.0\"?>\r\n");
+      xml += F("<root xmlns=\"urn:schemas-upnp-org:device-1-0\">\r\n");
+      xml += F("<specVersion><major>1</major><minor>0</minor></specVersion>\r\n");
+      xml += F("<device>\r\n");
+      xml += F("<deviceType>upnp:rootdevice</deviceType>\r\n");
+      xml += F("<friendlyName>");
+      xml += LAMP_NAME;
+      xml += F("</friendlyName>\r\n");
+      xml += F("<manufacturer>MishanyaTS</manufacturer>\r\n");
+      xml += F("<manufacturerURL>https://github.com/MishanyaTS/FieryLedLamp</manufacturerURL>\r\n");
+      xml += F("<modelName>FieryLedLamp</modelName>\r\n");
+      xml += F("<modelNumber>");
+      xml += LAMP_NAME + VERSION;
+      xml += F("</modelNumber>\r\n");
+      xml += F("<modelURL>https://github.com/MishanyaTS/FieryLedLamp</modelURL>\r\n");
+      xml += F("<serialNumber>");
+      xml += get_Chip_ID();
+      xml += F("</serialNumber>\r\n");
+      xml += F("<UDN>uuid:");
+      xml += get_Chip_ID();
+      xml += F("</UDN>\r\n");
+      xml += F("</device>\r\n");
+      xml += F("</root>\r\n");
+      request->send(200, "text/xml", xml);
+    });
+    routeRegistered = true;
   }
 
-  HTTP.on("/edit", HTTP_GET, []() {
-    if (!HTTP.authenticate(FILEMANAGER_USERNAME, FILEMANAGER_PASSWORD)) {
-      HTTP.requestAuthentication();
+  String lampName = jsonRead(configSetup, "ssdp");
+  LAMP_NAME = lampName;
+  SSDP.setName(lampName);
+  SSDP.setDeviceType(F("upnp:rootdevice"));
+  SSDP.setSchemaURL(F("description.xml"));
+  SSDP.setHTTPPort(80);
+  SSDP.setSerialNumber(get_Chip_ID());
+  SSDP.setURL("/");
+  SSDP.setModelName(F("FieryLedLamp"));
+  SSDP.setModelNumber(lampName + VERSION);
+  SSDP.setModelURL(F("https://github.com/MishanyaTS/FieryLedLamp"));
+  SSDP.setManufacturer(F("MishanyaTS"));
+  SSDP.setManufacturerURL(F("https://github.com/MishanyaTS/FieryLedLamp"));
+  SSDP.begin();
+}
+
+// =================================================================== ПЕРЕИНИЦИАЛИЗАЦИЯ SSDP ==========================================================
+
+void restartSSDP() {
+  SSDP_init();
+  ssdpInitialized = true;
+  auto& wifi = Wifi::instance();
+  if (wifi.isConnected()) {
+    previousIP = wifi.localIP();
+  } else {
+    previousIP = wifi.apIP();
+  }
+}
+
+// ====================================================================== ИНИЦИАЛИЗАЦИЯ WEB ============================================================
+
+void initWebServices() {
+#if GENERAL_LOG
+  SYSLOG.add("initWebServices: start, free heap=%u", ESP.getFreeHeap());
+#endif
+  SSDP_init();
+#if GENERAL_LOG
+  SYSLOG.add("initWebServices: SSDP_init OK, free heap=%u", ESP.getFreeHeap());
+#endif
+  Udp.begin(localPort);
+#if GENERAL_LOG
+  SYSLOG.add("initWebServices: Udp.begin OK, free heap=%u", ESP.getFreeHeap());
+#endif
+  User_settings();
+#if GENERAL_LOG
+  SYSLOG.add("initWebServices: User_settings OK, free heap=%u", ESP.getFreeHeap());
+#endif
+  HTTP_init();
+#if GENERAL_LOG
+  SYSLOG.add("initWebServices: HTTP_init OK, free heap=%u", ESP.getFreeHeap());
+#endif
+}
+
+// ----------------------------------------------------------------------------------------
+
+void HTTP_init(void) {
+  HTTP.on("/config.json", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", configSetup);
+  });
+
+  HTTP.on("/restart", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("device") && request->getParam("device")->value() == "ok") {
+      request->send(200, "text/plain", "Reset OK");
+      pendingRestart = true;
+    } else {
+      request->send(200, "text/plain", "No Reset");
+    }
+  });
+
+  HTTP.on("/ping", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "PONG");
+  });
+
+  HTTP.on("/check_file", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("path")) {
+      request->send(400, "text/plain", "Missing ?path=");
       return;
     }
-    handleFileRead("/edit.htm");
+    String p = request->getParam("path")->value();
+    if (!p.startsWith("/")) p = "/" + p;
+
+    String out = "path: " + p + "\n";
+    out += "exists(): ";
+    out += LittleFS.exists(p) ? "YES" : "NO";
+    out += "\n";
+
+    File f = LittleFS.open(p);
+    if (f) {
+      out += "open(): OK, size=";
+      out += (unsigned)f.size();
+      out += "\n";
+      out += "isDirectory(): ";
+      out += f.isDirectory() ? "YES" : "NO";
+      out += "\n";
+      f.close();
+    } else {
+      out += "open(): FAILED\n";
+    }
+    request->send(200, "text/plain", out);
   });
 
-  HTTP.on("/edit", HTTP_PUT, handleFileCreate);
-  HTTP.on("/edit", HTTP_DELETE, handleFileDelete);
-  HTTP.on("/edit", HTTP_POST, []() {}, handleFileUpload);
-  HTTP.on("/list", HTTP_GET, handleFileList);
+  HTTP.on("/fs_info", HTTP_GET, [](AsyncWebServerRequest * request) {
+    String out = "";
+    out += "totalBytes: "; out += (unsigned)LittleFS.totalBytes(); out += "\n";
+    out += "usedBytes: ";  out += (unsigned)LittleFS.usedBytes();  out += "\n";
+    out += "freeBytes: ";  out += (unsigned)(LittleFS.totalBytes() - LittleFS.usedBytes()); out += "\n";
+    request->send(200, "text/plain", out);
+  });
 
-  HTTP.onNotFound([]() {
-    if (!handleFileRead(HTTP.uri())) {
-      handleFileRead("/index.html");
+  FS_routes();
+#if GENERAL_LOG
+  SYSLOG.add("HTTP_init: heap=%u, FS used=%u", ESP.getFreeHeap(), (unsigned)LittleFS.usedBytes());
+#endif
+  HTTP.begin();
+}
+
+// ----------------------------------------------------------------------------------------
+
+void FS_routes() {
+  HTTP.on("/", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!handleFileRead(request, "/index.htm")) {
+      request->send(404, "text/plain", "index.htm not found in FS");
     }
   });
 
-  return true;
+  HTTP.on("/index.htm", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!handleFileRead(request, "/index.htm")) {
+      request->send(404, "text/plain", "index.htm not found in FS");
+    }
+  });
+
+  HTTP.on("/test", HTTP_GET, [](AsyncWebServerRequest * request) {
+#if GENERAL_LOG
+    SYSLOG.add(">>> /test: HIT from %s", request->client()->remoteIP().toString().c_str());
+#endif
+    request->send(200, "text/plain", "TEST OK");
+  });
+
+  HTTP.on("/edit", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!requireFileManagerAuth(request, true)) return;
+    handleFileRead(request, "/edit.htm");
+  });
+
+  HTTP.on("/edit", HTTP_PUT, [](AsyncWebServerRequest * request) { handleFileCreate(request); });
+
+  HTTP.on("/edit", HTTP_DELETE, [](AsyncWebServerRequest * request) { handleFileDelete(request); });
+
+  HTTP.on("/edit", HTTP_POST,
+  [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "OK");
+  }, handleFileUpload);
+
+  HTTP.on("/edit_json", HTTP_POST,
+  [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "OK");
+  }, handleJsonUpload);
+
+  HTTP.on("/list", HTTP_GET, [](AsyncWebServerRequest * request) { handleFileList(request); });
+
+  HTTP.onNotFound([](AsyncWebServerRequest * request) {
+#if GENERAL_LOG
+    SYSLOG.add(">>> onNotFound: url=%s method=%d", request->url().c_str(), (int)request->method());
+#endif
+    if (!handleFileRead(request, request->url())) {
+#if GENERAL_LOG
+      SYSLOG.add(">>> onNotFound: handleFileRead returned false, sending 404 for %s", request->url().c_str());
+#endif
+      request->send(404, "text/plain", "Not found");
+    }
+  });
 }
 
 // =================================================================== АППАРАТНАЯ ИНИЦИАЛИЗАЦИЯ ========================================================
@@ -310,74 +511,9 @@ void initMQTT() {
 // ==================================================================== ИНИЦИАЛИЗАЦИЯ TELNET ===========================================================
 
 void initTelnetDebug() {
-#if DEBUG_ENABLED && DEBUG_TELNET
+#if DEBUG_TELNET
   initTelnet();
 #endif
-}
-
-// ===================================================================== ИНИЦИАЛИЗАЦИЯ SSDP ============================================================
-
-void SSDP_init(void) {
-  HTTP.on(F("/description.xml"), HTTP_GET, []() {
-    SSDP.schema(HTTP.client());
-  });
-
-  String lampName = jsonRead(configSetup, "ssdp");
-  LAMP_NAME = lampName;
-  SSDP.setName(lampName);
-  SSDP.setDeviceType(F("upnp:rootdevice"));
-  SSDP.setSchemaURL(F("description.xml"));
-  SSDP.setHTTPPort(80);
-  SSDP.setSerialNumber(get_Chip_ID());
-  SSDP.setURL("/");
-  SSDP.setModelName(F("FieryLedLamp"));
-  SSDP.setModelNumber(lampName + VERSION);
-  SSDP.setModelURL(F("https://github.com/MishanyaTS/FieryLedLamp"));
-  SSDP.setManufacturer(F("MishanyaTS"));
-  SSDP.setManufacturerURL(F("https://github.com/MishanyaTS/FieryLedLamp"));
-  SSDP.begin();
-}
-
-// =================================================================== ПЕРЕИНИЦИАЛИЗАЦИЯ SSDP ==========================================================
-
-void restartSSDP() {
-  SSDP_init();
-  ssdpInitialized = true;
-  auto& wifi = Wifi::instance();
-  if (wifi.isConnected()) {
-    previousIP = wifi.localIP();
-  } else {
-    previousIP = wifi.apIP();
-  }
-}
-
-// ====================================================================== ИНИЦИАЛИЗАЦИЯ WEB ============================================================
-
-void initWebServices() {
-  SSDP_init();
-  Udp.begin(localPort);
-  User_settings();
-  HTTP_init();
-}
-
-void HTTP_init(void) {
-  HTTP.on("/config.json", HTTP_GET, []() {
-    HTTP.send(200, F("application/json"), configSetup);
-  });
-
-  HTTP.on("/restart", HTTP_GET, []() {
-    String restart = HTTP.arg("device");
-    if (restart == "ok") {
-      HTTP.send(200, F("text / plain"), F("Reset OK"));
-      delay(1000);
-      ESP.restart();
-    } else {
-      HTTP.send(200, F("text / plain"), F("No Reset"));
-    }
-  });
-
-  ElegantOTA.begin(&HTTP);
-  HTTP.begin();
 }
 
 // ******************************************************************************************************************************************************

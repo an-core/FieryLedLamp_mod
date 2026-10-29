@@ -287,7 +287,10 @@ void loadDisplaySwitchSettings() {
   if (jsonRead(configSetup, "weather_switch") == "null") {
     jsonWrite(configSetup, "weather_switch", weatherSwitchEnabled ? 1 : 0);
   }
-  saveConfig();
+  if (configChanged) {
+  saveConfig("setup");
+  configChanged = false;
+}
   rebuildActiveModes();
 #endif
 }
@@ -459,6 +462,48 @@ void loadMultilampSettings() {
   str.toCharArray(Host4, sizeof(Host4));
   str = jsonRead(configMultilamp, "host5");
   str.toCharArray(Host5, sizeof(Host5));
+}
+#endif
+
+// ============================================================================ РАДИО ================================================================
+
+#if USE_RADIO
+void loadRadioConfig() {
+  configRadio = readFile("config_radio.json", 8192);
+
+#if RADIO_LOG
+  SYSLOG.add("[RADIO] loadRadioConfig: raw len=%d head=%.60s", configRadio.length(), configRadio.c_str());
+#endif
+
+  if (configRadio == "Failed" || configRadio == "Large" || configRadio.isEmpty() || configRadio == "{}") {
+    configRadio = "{\"stations\":[],\"effects\":{},\"volume\":10}";
+#if RADIO_LOG
+    SYSLOG.add("[RADIO] loadRadioConfig: FAILED → default");
+#endif
+  } else {
+    DynamicJsonDocument testDoc(8192);
+    DeserializationError err = deserializeJson(testDoc, configRadio);
+    if (err) {
+#if RADIO_LOG
+      SYSLOG.add("[RADIO] loadRadioConfig: JSON error '%s' → default", err.c_str());
+#endif
+      configRadio = "{\"stations\":[],\"effects\":{},\"volume\":10}";
+    }
+  }
+
+  radioVolume = constrain(jsonReadtoInt(configRadio, "volume", 10), 0, 21);
+
+  // привязка станций к эффектам
+  DynamicJsonDocument doc(8192);
+  if (deserializeJson(doc, configRadio) == DeserializationError::Ok) {
+    JsonObject eff = doc["effects"].as<JsonObject>();
+    if (eff) {
+      for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+        String key = String(i);
+        effects_stations[i] = eff[key] | 0;
+      }
+    }
+  }
 }
 #endif
 
@@ -820,7 +865,7 @@ void loadMatrixAndInitLEDs() {
     MatrixType = newMatrixType;
     MatrixOrientation = newMatrixOrientation;
     current_limit = newCurrentLimit;
-    
+
 #if MULTI_MATRIX
     panelFlip = newPanelFlip;
     segMatrix_w = newSegW;
@@ -847,7 +892,8 @@ void loadMatrixAndInitLEDs() {
 #if MATRIX_LOG
       SYSLOG.add("Матрица изменена, перезагрузка...");
 #endif
-      if (configNeedsSave) saveConfig();
+    //  if (configNeedsSave) saveConfig();
+      if (configNeedsSave) saveConfig("ledmatr");
       ESP.restart();
     } else {
       if (!reconfigureMatrix(newMatrixWidth, newMatrixHeight, newUsedLeds, oldWidth, oldHeight)) {
@@ -967,7 +1013,8 @@ void loadMatrixAndInitLEDs() {
 #endif
 
   if (configNeedsSave) {
-    saveConfig();
+    //saveConfig();
+    saveConfig("ledmatr"); 
   }
 
   printFreeHeap("После выделения матрицы");
@@ -1599,7 +1646,24 @@ void loadModuleSettings() {
   mp3Enabled = true;
 #endif
 #endif
-}
+
+#if USE_RADIO
+#if defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV)
+  radioEnabled = jsonReadtoInt(configSetup, "radio_enabled", 0) == 1;
+#else
+  radioEnabled = false;
+#endif
+#endif
+
+#if USE_RADIO && USE_MP3_PLAYER
+  if (radioEnabled && mp3Enabled) {
+    mp3Enabled = false;
+    jsonWrite(configSetup, "mp3_enabled", "0");
+    configChanged = true;
+  }
+#endif
+
+} // void loadModuleSettings()
 
 // =================================================================== ЗАГРУЗКА ВСЕХ НАСТРОЕК =========================================================
 
@@ -1632,6 +1696,9 @@ void loadAllSettings() {
 #if USE_MP3_PLAYER
   loadMP3Settings();              // MP3 плеер
 #endif
+#if USE_RADIO
+  loadRadioConfig();              // Радио
+#endif
 #if USE_BUTTON
   loadButtonSettings();           // Кнопка
 #endif
@@ -1654,9 +1721,97 @@ void loadAllSettings() {
   loadEffectSettings();           // Загрузка настроек эффектов
 
   if (configChanged) {
-    saveConfig();
     configChanged = false;
   }
+}
+
+// ====================================================================== СОХРАНЕНИЕ КОНФИГОВ =========================================================
+
+bool saveConfig(const char* which) {
+  auto match = [&](const char* name) -> bool {
+    return (which == nullptr) || (strcmp(which, name) == 0);
+  };
+
+  bool allSuccess = true;
+
+  if (match("setup")) {
+    if (!writeFile(F("config.json"), configSetup)) allSuccess = false;
+  }
+  if (match("wifi")) {
+    if (!writeFile(F("config_wifi.json"), configWiFi)) allSuccess = false;
+  }
+  if (match("ledpanel")) {
+    if (!writeFile(F("config_led_panel.json"), configLedPanel)) allSuccess = false;
+  }
+  if (match("ledinter")) {
+    if (!writeFile(F("config_led_interval.json"), configLedInterval)) allSuccess = false;
+  }
+  if (match("ledmatr")) {
+    if (!writeFile(F("config_led_matrix.json"), configLED)) allSuccess = false;
+  }
+  if (match("cycle")) {
+    if (!writeFile(F("config_cycle.json"), configCycle)) allSuccess = false;
+  }
+
+#if USE_BUTTON
+  if (match("button")) {
+    if (!writeFile(F("config_button.json"), configButton)) allSuccess = false;
+  }
+#endif
+#if USE_MQTT
+  if (match("mqtt")) {
+    if (!writeFile(F("config_mqtt.json"), configMQTT)) allSuccess = false;
+  }
+#endif
+#if USE_WEATHER
+  if (match("weather")) {
+    if (!writeFile(F("config_weather.json"), configWeather)) allSuccess = false;
+  }
+#endif
+#if USE_MP3_PLAYER
+  if (match("mp3")) {
+    if (!writeFile(F("config_mp3.json"), configMP3)) allSuccess = false;
+  }
+#endif
+#if USE_RADIO
+  if (match("radio") && configRadio.length() > 0
+      && configRadio != "{\"stations\":[],\"effects\":{},\"volume\":10}") {
+    if (!writeFile(F("config_radio.json"), configRadio)) allSuccess = false;
+  }
+#endif
+#if USE_ST7789
+  if (match("st7789")) {
+    if (!writeFile(F("config_st7789.json"), configST7789)) allSuccess = false;
+  }
+#endif
+#if USE_MULTILAMP
+  if (match("multilamp")) {
+    if (!writeFile(F("config_multilamp.json"), configMultilamp)) allSuccess = false;
+  }
+#endif
+#if USE_DAWN
+  if (match("alarm")) {
+    if (!writeFile(F("config_alarm.json"), configAlarm)) allSuccess = false;
+  }
+#endif
+#if USE_SUNSET
+  if (match("sunset")) {
+    if (!writeFile(F("config_sunset.json"), configSunset)) allSuccess = false;
+  }
+#endif
+#if USE_SCHEDULE
+  if (match("schedule")) {
+    if (!writeFile(F("config_schedule.json"), configSchedule)) allSuccess = false;
+  }
+#endif
+
+  if (!allSuccess) {
+#if GENERAL_LOG
+    SYSLOG.add("saveConfig: не все файлы сохранены (which=%s)", which ? which : "all");
+#endif
+  }
+
+  return allSuccess;
 }
 
 // ******************************************************************************************************************************************************

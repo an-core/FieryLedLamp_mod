@@ -129,7 +129,7 @@ void IR_Power() {
 // Вкл / Выкл звука
 void Mute() {
 #if USE_MP3_PLAYER
-  if (mp3Enabled && mp3_player_connect >= 4) {   // ← >= 4 вместо == 4
+  if (mp3Enabled && mp3_player_connect >= 4) {
     if (eff_sound_on) {
       eff_sound_on = 0;
       advert_flag = false;
@@ -170,69 +170,79 @@ void Mute() {
 
 // Следующий эффект, предыдущий эффект
 void Prev_Next_eff(bool direction) {
-  if (ONflag) {
-    uint8_t temp = jsonReadtoInt(configSetup, "eff_sel");
-    if (direction) {
-      if (Favorit_only) {
-        uint8_t lastMode = currentMode;
-        do {
-          if (++temp >= MODE_AMOUNT) temp = 0;
-          currentMode = eff_num_correct[temp];
-        } while (Favorites::instance().FavoriteModes[currentMode] == 0 && currentMode != lastMode);
-        if (currentMode == lastMode) // если ни один режим не добавлен в избранное, всё равно куда-нибудь переключимся
-          if (++temp >= MODE_AMOUNT) temp = 0;
-        currentMode = eff_num_correct[temp];
-      } else if (++temp >= MODE_AMOUNT) temp = 0;
-    } else {
-      if (Favorit_only) {
-        uint8_t lastMode = currentMode;
-        do {
-          if (--temp >= MODE_AMOUNT) temp = MODE_AMOUNT - 1;
-          currentMode = eff_num_correct[temp];
-        } while (Favorites::instance().FavoriteModes[currentMode] == 0 && currentMode != lastMode);
-        if (currentMode == lastMode) // если ни один режим не добавлен в избранное, всё равно куда-нибудь переключимся
-          if (--temp >= MODE_AMOUNT) temp = MODE_AMOUNT - 1;
-        currentMode = eff_num_correct[temp];
-      } else if (--temp >= MODE_AMOUNT) temp = MODE_AMOUNT - 1;
+  if (!ONflag) return;
+
+  uint8_t temp = jsonReadtoInt(configSetup, "eff_sel");
+  if (temp >= MODE_AMOUNT) temp = 0;
+
+  auto step = [&](int dir) {
+    int t = temp;
+    uint8_t lastMode = currentMode;
+    do {
+      t += dir;
+      if (t < 0) t = MODE_AMOUNT - 1;
+      if (t >= MODE_AMOUNT) t = 0;
+      currentMode = eff_num_correct[t];
+    } while (Favorit_only
+             && Favorites::instance().FavoriteModes[currentMode] == 0
+             && currentMode != lastMode);
+    temp = (uint8_t)t;
+    // если в избранном никого нет — всё равно переключимся на следующий
+    if (Favorit_only && currentMode == lastMode) {
+      t += dir;
+      if (t < 0) t = MODE_AMOUNT - 1;
+      if (t >= MODE_AMOUNT) t = 0;
+      currentMode = eff_num_correct[t];
+      temp = (uint8_t)t;
     }
-    currentMode = eff_num_correct[temp];
-    jsonWrite(configSetup, "eff_sel", temp);
-    jsonWrite(configSetup, "br", modes[currentMode].Brightness);
-    jsonWrite(configSetup, "sp", modes[currentMode].Speed);
-    jsonWrite(configSetup, "sc", modes[currentMode].Scale);
-    SetBrightness(modes[currentMode].Brightness);
-    loadingFlag = true;
+  };
+
+  step(direction ? +1 : -1);
+
+  jsonWrite(configSetup, "eff_sel", temp);
+  jsonWrite(configSetup, "br", modes[currentMode].Brightness);
+  jsonWrite(configSetup, "sp", modes[currentMode].Speed);
+  jsonWrite(configSetup, "sc", modes[currentMode].Scale);
+  SetBrightness(modes[currentMode].Brightness);
+  loadingFlag = true;
+
+#if USE_RADIO
+  if (radioEnabled) {
+    uint8_t stId = radioGetStationForMode(currentMode);
+    if (stId > 0) radioPlayStation(stId);
+    else radioStop();
+  }
+#endif
 
 #if USE_TM1637
-    if (tm1637Enabled) {
-      DisplayFlag = 0;
-      Display_Timer();
-    }
+  if (tm1637Enabled) {
+    DisplayFlag = 0;
+    Display_Timer();
+  }
 #endif
 #if USE_ST7789
-    if (st7789Enabled) {
-      DisplayFlag = 0;
-      TFT_Display_Timer(0);
-    }
+  if (st7789Enabled) {
+    DisplayFlag = 0;
+    TFT_Display_Timer(0);
+  }
 #endif
 
-    effectsTick();
-    FastLED.show();
+  effectsTick();
+  FastLED.show();
 
-    if (random_on && Favorites::instance().FavoritesRunning)
-      selectedSettings = 1U;
+  if (random_on && Favorites::instance().FavoritesRunning)
+    selectedSettings = 1U;
 #if USE_MQTT
-    if (Wifi::instance().isConnected()) {
-      Mqtt::instance().needToPublish = true;
-    }
+  if (Wifi::instance().isConnected()) {
+    Mqtt::instance().needToPublish = true;
+  }
 #endif
 #if USE_BLYNK
-    updateRemoteBlynkParams();
+  updateRemoteBlynkParams();
 #endif
 #if USE_MULTILAMP
-    repeat_multiple_lamp_control = true;
+  repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
-  }
 }
 
 void Cycle_on_off() {
@@ -240,6 +250,7 @@ void Cycle_on_off() {
     uint8_t tmp;
     jsonReadtoInt(configSetup, "cycle_on") == 0 ? tmp = 1 : tmp = 0;
     jsonWrite(configSetup, "cycle_on", tmp);
+    saveConfig();
     Favorites::instance().FavoritesRunning = tmp;
     if (tmp) {
       showWarning(CRGB::Blue, 500, 250U); // мигание синим цветом 0.5 секунды
@@ -374,7 +385,6 @@ void Print_IP() {
 
   auto& wifi = Wifi::instance();
   String textToShow;
-  CRGB textColor = CRGB::White;
 
   if (wifi.isConnected()) {
     textToShow = wifi.localIP().toString();
@@ -388,7 +398,7 @@ void Print_IP() {
 
 #if USE_ST7789
   if (st7789Enabled) {
-    TFT_ShowIP(wifi.localIP().toString().c_str());
+    TFT_ShowIP(textToShow.c_str());
   }
 #endif
 
@@ -403,10 +413,12 @@ void Print_IP() {
 
   bool textEnded = false;
   while (!textEnded) {
-    textEnded = fillString(textToShow.c_str(), textColor, false);
+    textEnded = fillString(textToShow.c_str(), CRGB::White, false);
     FastLED.show();
     parseUDP();
-    HTTP.handleClient();
+#if USE_RADIO
+    radioLoop();
+#endif
     delay(1);
     yield();
   }
@@ -437,27 +449,25 @@ void Print_IP() {
 void Folder_Next_Prev(bool direction) {
 #if USE_MP3_PLAYER
   if (mp3Enabled) {
-    if (true) { // (!pause_on && !mp3_stop && eff_sound_on) {
-      CurrentFolder = constrain(direction ? CurrentFolder + 1 : CurrentFolder - 1, 0, 99);
-      jsonWrite(configSetup, "fold_sel", CurrentFolder);
-      if (!pause_on && !mp3_stop && eff_sound_on) {
-        mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder); // Включить непрерывное воспроизведение указанной папки
-      }
+    jsonWrite(configMP3, "fold_sel", CurrentFolder);
+    writeFile(F("config_mp3.json"), configMP3);
+    if (!pause_on && !mp3_stop && eff_sound_on) {
+      mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
     }
+  }
 
 #if USE_TM1637
-    if (tm1637Enabled) {
-      DisplayFlag = 0;
-      Display_Timer();
-    }
+  if (tm1637Enabled) {
+    DisplayFlag = 0;
+    Display_Timer();
+  }
 #endif
 #if USE_ST7789
-    if (st7789Enabled) {
-      DisplayFlag = 0;
-      TFT_Display_Timer(0);
-    }
-#endif
+  if (st7789Enabled) {
+    DisplayFlag = 0;
+    TFT_Display_Timer(0);
   }
+#endif
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
@@ -477,7 +487,8 @@ void Current_Eff_Rnd_Def(bool direction) {
 #if USE_MULTILAMP
     repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
-  } if (direction) showWarning(CRGB::Blue, 500, 250U); // мигание синим цветом 0.5 секунды
+  }
+  if (direction) showWarning(CRGB::Blue, 500, 250U); // мигание синим цветом 0.5 секунды
   else showWarning(CRGB::Red, 500, 250U); // мигание красным цветом 0.5 секунды
 }
 
@@ -486,7 +497,8 @@ void IR_Equalizer() {
   if (mp3Enabled) {
     Equalizer++;
     if (Equalizer > 5) Equalizer = 0;
-    jsonWrite(configSetup, "eq", Equalizer);
+    jsonWrite(configMP3, "eq", Equalizer);
+    writeFile(F("config_mp3.json"), configMP3);
     mp3SendCmd(0x07, FEEDBACK, 0, Equalizer);
     timeout_save_file_changes = millis();
     bitSet (save_file_changes, 0);
@@ -519,6 +531,7 @@ void Favorit_Add_Del(bool direction) {
 
 void Digit_Handle(uint8_t digit) {
   if (!Enter_Digit_1) {
+    // первая цифра
     Enter_Digit_1 = 1;
     IR_Dgit_Enter_Timer = millis();
     Enter_Number = digit;
@@ -535,45 +548,57 @@ void Digit_Handle(uint8_t digit) {
     }
 #endif
   } else {
+    // вторая цифра
     Enter_Digit_1 = 0;
     Enter_Number = Enter_Number * 10 + digit;
-    currentMode = eff_num_correct[Enter_Number];
-#if USE_TM1637
-    if (tm1637Enabled) {
-      DisplayFlag = 3;
-      Display_Timer(Enter_Number);
+
+    if (Enter_Number >= MODE_AMOUNT) {
+      Enter_Number = digit;
     }
+
+    if (Enter_Number < MODE_AMOUNT) {
+      currentMode = eff_num_correct[Enter_Number];
+
+#if USE_TM1637
+      if (tm1637Enabled) {
+        DisplayFlag = 3;
+        Display_Timer(Enter_Number);
+      }
 #endif
-    jsonWrite(configSetup, "eff_sel", Enter_Number);
-    jsonWrite(configSetup, "br", modes[currentMode].Brightness);
-    jsonWrite(configSetup, "sp", modes[currentMode].Speed);
-    jsonWrite(configSetup, "sc", modes[currentMode].Scale);
-    SetBrightness(modes[currentMode].Brightness);
-    loadingFlag = true;
-    if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
+      jsonWrite(configSetup, "eff_sel", Enter_Number);
+      jsonWrite(configSetup, "br", modes[currentMode].Brightness);
+      jsonWrite(configSetup, "sp", modes[currentMode].Speed);
+      jsonWrite(configSetup, "sc", modes[currentMode].Scale);
+      SetBrightness(modes[currentMode].Brightness);
+      loadingFlag = true;
+
+      if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
 
 #if USE_MP3_PLAYER
-    if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-      uint8_t newFolder = effects_folders[currentMode];
-      if (mp3_folder != newFolder) {
-        mp3_folder = newFolder;
-        mp3_folder_last = newFolder;
-        mp3SendPlayFolder(newFolder);
+      if (ONflag && mp3Enabled && mp3_player_connect >= 4 && eff_sound_on) {
+        uint8_t newFolder = effects_folders[currentMode];
+        if (mp3_folder != newFolder) {
+          mp3_folder = newFolder;
+          mp3_folder_last = newFolder;
+          mp3SendPlayFolder(newFolder);
+        }
       }
-    }
 #endif
 
 #if USE_MQTT
-    if (Wifi::instance().isConnected()) {
-      Mqtt::instance().needToPublish = true;
-    }
+      if (Wifi::instance().isConnected()) {
+        Mqtt::instance().needToPublish = true;
+      }
 #endif
 #if USE_BLYNK
-    updateRemoteBlynkParams();
+      updateRemoteBlynkParams();
 #endif
 #if USE_MULTILAMP
-    repeat_multiple_lamp_control = true;
+      repeat_multiple_lamp_control = true;
 #endif  // USE_MULTILAMP
+    } else {
+      showWarning(CRGB::Red, 500, 250U);
+    }
   }
 }
 #endif // USE_IR_RECEIVER || USE_RF_RECEIVER

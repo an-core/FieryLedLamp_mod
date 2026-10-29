@@ -37,7 +37,6 @@ void SetBrightness(uint8_t newBrightness) {
 #endif
   FastLED.setBrightness(finalBrightness);
 
-  // сохранение новой яркости только, если лампа включена
 #if USE_DAWN
   if (dawnFlag != 1) {
 #endif
@@ -433,7 +432,6 @@ void showIPOnMatrix() {
     textEnded = fillString(ipToShow.c_str(), CRGB(220, 220, 240), false);
     FastLED.show();
     parseUDP();
-    HTTP.handleClient();
     delay(1);
     yield();
   }

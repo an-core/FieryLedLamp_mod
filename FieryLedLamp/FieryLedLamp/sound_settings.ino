@@ -508,7 +508,6 @@ void mp3PlayTick() {
       CurrentFolder = mp3PlayPendingFolder;
       CurrentFolder_last = CurrentFolder;
       jsonWrite(configMP3, "fold_sel", CurrentFolder);
-      writeFile(F("config_mp3.json"), configMP3);
       mp3PlayTimer = millis();
       mp3PlayState = MP3_PLAY_WAIT_FOLDER;
       return;
@@ -707,12 +706,7 @@ void play_weather(bool force) {
   }
 
   // проверка описания
-  /*bool needDescription = show_weather_desc;
-  if (!force) {
-    if (isDay && !day_weather_desc_on) needDescription = false;
-    if (!isDay && !night_weather_desc_on) needDescription = false;
-  } */
-    bool needDescription = show_weather_desc;
+  bool needDescription = show_weather_desc;
   if (isDay && !day_weather_desc_on) needDescription = false;
   if (!isDay && !night_weather_desc_on) needDescription = false;
 
@@ -858,5 +852,76 @@ void mp3Task(void *pvParameters) {
 
 // ------------------------
 #endif // USE_MP3_PLAYER
+
+// -----------------------------------------------------------------------------------------
+// переключение источника звука: 0 = MP3, 1 = Radio
+void setAudioSource(uint8_t source) {
+  // остановка противоположного источника
+#if USE_MP3_PLAYER
+  if (source != AUDIO_SOURCE_MP3 && mp3Enabled) {
+    if (mp3CmdQueue && mp3Initialized) {
+      mp3SendCmd(0x0E, FEEDBACK, 0, 0);
+    }
+    mp3_stop = true;
+    pause_on = true;
+    mp3Enabled = false;
+    jsonWrite(configSetup, "mp3_enabled", "0");
+  }
+#endif
+
+#if USE_RADIO
+  if (source != AUDIO_SOURCE_RADIO && radioEnabled) {
+    radioStop();
+    radioEnabled = false;
+    jsonWrite(configSetup, "radio_enabled", "0");
+  }
+#endif
+
+  if (source == AUDIO_SOURCE_MP3) {
+#if USE_MP3_PLAYER
+    if (!mp3Enabled) {
+      mp3Enabled = true;
+      jsonWrite(configSetup, "mp3_enabled", "1");
+    }
+#endif
+  } else if (source == AUDIO_SOURCE_RADIO) {
+#if USE_RADIO
+    if (!radioEnabled) {
+      radioEnabled = true;
+      jsonWrite(configSetup, "radio_enabled", "1");
+      radioInit();
+      if (ONflag) {
+        uint8_t stId = radioGetStationForMode(currentMode);
+        if (stId > 0) radioPlayStation(stId);
+      }
+    }
+#endif
+  }
+  saveConfig("setup");
+}
+
+// -----------------------------------------------------------------------------------------
+// выключение одного источника без включения другого
+void disableAudioSource(uint8_t source) {
+#if USE_MP3_PLAYER
+  if (source == AUDIO_SOURCE_MP3 && mp3Enabled) {
+    if (mp3CmdQueue && mp3Initialized) {
+      mp3SendCmd(0x0E, FEEDBACK, 0, 0);
+    }
+    mp3_stop = true;
+    pause_on = true;
+    mp3Enabled = false;
+    jsonWrite(configSetup, "mp3_enabled", "0");
+  }
+#endif
+#if USE_RADIO
+  if (source == AUDIO_SOURCE_RADIO && radioEnabled) {
+    radioStop();
+    radioEnabled = false;
+    jsonWrite(configSetup, "radio_enabled", "0");
+  }
+#endif
+  saveConfig("setup");
+}
 
 // ******************************************************************************************************************************************************

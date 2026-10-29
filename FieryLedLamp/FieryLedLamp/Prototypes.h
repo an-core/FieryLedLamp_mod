@@ -6,15 +6,17 @@
 #include <FastLED.h>
 #include "Constants.h"
 #include "Extern.h"
+class AsyncWebServerRequest;
 // ---------------------
 
 #if USE_DAWN
 void handle_alarm();
+void handle_alarm_http(AsyncWebServerRequest *request);
 void save_alarms();
 #endif
-// ------------------------------------------------------
 #if USE_SUNSET
 void handle_sunset();
+void handle_sunset_http(AsyncWebServerRequest *request);
 void save_sunsets();
 #endif
 // ------------------------------------------------------
@@ -44,6 +46,23 @@ void mp3PlayTick();
 void mp3Task(void *pvParameters);
 #endif
 // ------------------------------------------------------
+void setAudioSource(uint8_t source);
+void disableAudioSource(uint8_t source);
+// ------------------------------------------------------
+#if USE_RADIO
+void radioInit();
+void radioLoop();
+void radioStop();
+void radioPlayStation(uint8_t idx);
+void handle_radio_volume();
+void radioSetVolume(uint8_t vol);
+void loadRadioConfig();
+String getStationUrl(uint8_t idx);
+String getStationName(uint8_t idx);
+uint8_t getStationCount();
+uint8_t radioGetStationForMode(uint8_t modeCode);
+#endif
+// ------------------------------------------------------
 #if defined(USE_RANDOM_SETS_IN_APP) || defined(RANDOM_SETTINGS_IN_CYCLE_MODE)
 void setModeSettings(uint8_t Scale = 0U, uint8_t Speed = 0U);
 #endif
@@ -59,6 +78,22 @@ void multiple_lamp_control();
 #if USE_IR_RECEIVER
 void IR_Receive_Handle();
 void IR_Receive_Button_Handle();
+void IR_Power();
+void Mute();
+void Prev_Next_eff(bool direction);
+void Cycle_on_off();
+void Bright_Up_Down(bool direction);
+void Speed_Up_Down(bool direction);
+void Scale_Up_Down(bool direction);
+void Volum_Up_Down(bool direction);
+void Print_IP();
+void Folder_Next_Prev(bool direction);
+void Current_Eff_Rnd_Def(bool direction);
+void IR_Equalizer();
+void Favorit_Add_Del(bool direction);
+void Digit_Handle(uint8_t digit);
+void IR_Time();
+void IR_Weather();
 #endif
 // ------------------------------------------------------
 #if USE_RF_RECEIVER
@@ -104,6 +139,8 @@ void loadSystemLogSettings();
 #define loadSystemLogSettings() ((void)0)
 #endif
 // ------------------------------------------------------
+bool saveConfig(const char* which = nullptr);
+void FS_routes();
 String getCityNameFromCoords(float lat, float lon);
 String geoToTimezone(float lat, float lon);
 bool isValidPosixFormat(const String& tz);

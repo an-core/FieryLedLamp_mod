@@ -358,6 +358,9 @@ void changePower() {
       pause_on = true;
     }
 #endif // USE_MP3_PLAYER
+#if USE_RADIO
+    radioStop();
+#endif
     FastLED.clear();
     FastLED.setBrightness(0);
     FastLED.show();
@@ -391,6 +394,15 @@ void changePower() {
     FastLED.setBrightness(targetBrightness);
     FastLED.clear();
 
+    systemShuttingDown = false;
+
+#if USE_RADIO
+    if (radioEnabled) {
+      uint8_t stId = radioGetStationForMode(currentMode);
+      if (stId > 0) radioPlayStation(stId);
+    }
+#endif
+
 #if USE_MP3_PLAYER
     if (mp3Enabled && eff_sound_on && mp3_player_connect == 4) {
       uint8_t newFolder = effects_folders[currentMode];
@@ -401,10 +413,6 @@ void changePower() {
       }
     }
 #endif
-
-    systemShuttingDown = false;
-   // effectsTick();
-   // FastLED.show();
 
   } // if (ONflag) { // включение
   else { // выключение
@@ -420,6 +428,10 @@ void changePower() {
     timeout_save_file_changes = 0;
     manualOverride = true;
     manualOverrideUntil = millis() + 300000UL;
+
+#if USE_RADIO
+    radioStop();
+#endif
 
 #if USE_MP3_PLAYER
     if (mp3Enabled && mp3_player_connect == 4) {
@@ -479,14 +491,28 @@ void Eff_Tick() {
   }
   uint32_t now = millis();
 
-#if USE_MP3_PLAYER
+#if USE_RADIO || USE_MP3_PLAYER
   static uint8_t lastMode = 255;
-  if (mp3Enabled && lastMode != currentMode && ONflag && eff_sound_on && mp3_player_connect == 4) {
-    uint8_t folder = effects_folders[currentMode];
-    if (folder != 0) {
-      mp3SendPlayFolder(folder);
-    }
-    lastMode = currentMode;
+  if (lastMode != currentMode && ONflag) {
+#if USE_RADIO
+    if (radioEnabled) {
+      if (effects_stations[currentMode] > 0) {
+        radioPlayStation(effects_stations[currentMode]);
+      } else {
+        radioStop();
+      }
+      lastMode = currentMode;
+    } else
+#endif
+#if USE_MP3_PLAYER
+      if (mp3Enabled && eff_sound_on && mp3_player_connect == 4) {
+        uint8_t folder = effects_folders[currentMode];
+        if (folder != 0) {
+          mp3SendPlayFolder(folder);
+        }
+        lastMode = currentMode;
+      }
+#endif
   }
 #endif
 
@@ -505,7 +531,9 @@ void Eff_Tick() {
 
     if (nightModeBrightness > 0) {
       globalPointBrightness = 255;
+#if USE_WEATHER
       globalDegBrightness = 255;
+#endif
     } else {
       uint32_t phaseLong = now % 2000UL;
       uint8_t brLong = (phaseLong < 1000) ? map(phaseLong, 0, 1000, 10, 255) : map(phaseLong - 1000, 0, 1000, 255, 10);

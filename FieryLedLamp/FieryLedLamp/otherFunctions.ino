@@ -227,6 +227,7 @@ String formatDateTimeForDisplay(String dateTime) {
 
 void updateCheckTask(void* arg) {
   esp_task_wdt_delete(NULL);
+   vTaskDelay(pdMS_TO_TICKS(120000));
   for (;;) {
     if (updateCheckPending && !updateCheckInProgress) {
       updateCheckInProgress = true;
@@ -254,7 +255,27 @@ void performUpdateCheck() {
     return;
   }
 
-  DynamicJsonDocument doc(24576);
+  uint32_t waited = 0;
+  while (ESP.getFreeHeap() < 45000 && waited < 120000) {
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    waited += 1000;
+  }
+  if (ESP.getFreeHeap() < 45000) {
+    #if GENERAL_LOG
+    SYSLOG.add("Update check: heap too low (%u), skipping", ESP.getFreeHeap());
+    #endif
+    DynamicJsonDocument doc(256);
+    doc["has_update"] = false;
+    doc["error"] = "Мало памяти для проверки";
+    String resp;
+    serializeJson(doc, resp);
+    updateCache.response = resp;
+    updateCache.timestamp = millis();
+    updateCache.valid = true;
+    return;
+  }
+
+  DynamicJsonDocument doc(16384);
   String resp;
   String buildDateTime = buildDateTimeString();
 
@@ -413,7 +434,8 @@ void performUpdateCheck() {
     }
   }
 
-  // ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
   serializeJson(doc, resp);
   updateCache.response = resp;
   updateCache.timestamp = millis();
@@ -678,6 +700,16 @@ void publishMqttState() {
 #endif
 }
 
+void handleMqttPublish() {
+#if USE_MQTT
+  static uint32_t lastMqttPublish = 0;
+  if (millis() - lastMqttPublish >= MQTT_PUBLISH_INTERVAL_MS) {
+    lastMqttPublish = millis();
+    publishMqttState();
+  }
+#endif
+}
+
 void handleMediumTasks() {
 #if defined(GENERAL_DEBUG) && GENERAL_DEBUG_TELNET
   handleTelnetClient();
@@ -715,22 +747,17 @@ void handleSlowTasks() {
       }
     }
   }
-}
 
-// -----------------------
-// для интервалов
-static const uint32_t MQTT_PUBLISH_INTERVAL_MS = 900;
-static const uint32_t HEAP_MONITOR_INTERVAL_MS = 10000;
-static const uint32_t FAVORITES_CHECK_INTERVAL_MS = 100;
-
-void handleMqttPublish() {
-#if USE_MQTT
-  static uint32_t lastMqttPublish = 0;
-  if (millis() - lastMqttPublish >= MQTT_PUBLISH_INTERVAL_MS) {
-    lastMqttPublish = millis();
-    publishMqttState();
-  }
+  if (Wifi::instance().isConnected()) {
+    IPAddress cur = Wifi::instance().localIP();
+    if (cur != IPAddress(0, 0, 0, 0) && cur != previousIP) {
+      previousIP = cur;
+      restartSSDP();
+#if GENERAL_LOG
+      SYSLOG.add("IP changed - %s, SSDP restarted", cur.toString().c_str());
 #endif
+    }
+  }
 }
 
 // -----------------------

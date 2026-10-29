@@ -44,6 +44,16 @@ void updateSets() {
 
 // --------------------------------------------------------------------
 
+// Вспомогательная функция: найти UI-индекс по коду эффекта
+static uint8_t findUiIndexByMode(uint8_t modeCode) {
+  for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+    if (eff_num_correct[i] == modeCode) return i;
+  }
+  return 255;
+}
+
+// --------------------------------------------------------------------
+
 void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutput) {
   char buff[MAX_UDP_BUFFER_SIZE], *endToken = NULL;
   String BUFF = String(inputBuffer);
@@ -62,100 +72,145 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       if (!strncmp_P(inputBuffer, PSTR("EFF_N"), 5)) tmp = 1;
       temp = jsonReadtoInt(configSetup, "eff_sel");
 
-      if (tmp) {
-        if (Favorit_only) {
-          uint8_t lastMode = currentMode;
-          do {
-            if (++temp >= MODE_AMOUNT) temp = 0;
-            currentMode = eff_num_correct[temp];
-#if USE_MP3_PLAYER
-            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-              uint8_t newFolder = effects_folders[currentMode];
-              if (mp3_folder != newFolder) {
-                mp3_folder = newFolder;
-                mp3_folder_last = newFolder;
-                mp3SendPlayFolder(newFolder);
-              }
-            }
-#endif
-          }
-          while (Favorites::instance().FavoriteModes[currentMode] == 0 && currentMode != lastMode);
-          if (currentMode == lastMode) {
-            if (++temp >= MODE_AMOUNT) temp = 0;
-            currentMode = eff_num_correct[temp];
-#if USE_MP3_PLAYER
-            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-              uint8_t newFolder = effects_folders[currentMode];
-              if (mp3_folder != newFolder) {
-                mp3_folder = newFolder;
-                mp3_folder_last = newFolder;
-                mp3SendPlayFolder(newFolder);
-              }
-            }
-#endif
-          }
-        } else {
+#if USE_RADIO
+      if (radioEnabled) {
+        if (tmp) {
           if (++temp >= MODE_AMOUNT) temp = 0;
-          currentMode = eff_num_correct[temp];
-#if USE_MP3_PLAYER
-          if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-            uint8_t newFolder = effects_folders[currentMode];
-            if (mp3_folder != newFolder) {
-              mp3_folder = newFolder;
-              mp3_folder_last = newFolder;
-              mp3SendPlayFolder(newFolder);
-            }
-          }
-#endif
-        }
-      } else {
-        if (Favorit_only) {
-          uint8_t lastMode = currentMode;
-          do {
-            if (temp == 0) temp = MODE_AMOUNT;
-            temp--;
-            currentMode = eff_num_correct[temp];
-#if USE_MP3_PLAYER
-            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-              uint8_t newFolder = effects_folders[currentMode];
-              if (mp3_folder != newFolder) {
-                mp3_folder = newFolder;
-                mp3_folder_last = newFolder;
-                mp3SendPlayFolder(newFolder);
-              }
-            }
-#endif
-          }
-          while (Favorites::instance().FavoriteModes[currentMode] == 0 && currentMode != lastMode);
-          if (currentMode == lastMode) {
-            if (temp == 0) temp = MODE_AMOUNT;
-            temp--;
-            currentMode = eff_num_correct[temp];
-#if USE_MP3_PLAYER
-            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-              uint8_t newFolder = effects_folders[currentMode];
-              if (mp3_folder != newFolder) {
-                mp3_folder = newFolder;
-                mp3_folder_last = newFolder;
-                mp3SendPlayFolder(newFolder);
-              }
-            }
-#endif
-          }
         } else {
           if (temp == 0) temp = MODE_AMOUNT;
           temp--;
-          currentMode = eff_num_correct[temp];
-#if USE_MP3_PLAYER
-          if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-            uint8_t newFolder = effects_folders[currentMode];
-            if (mp3_folder != newFolder) {
-              mp3_folder = newFolder;
-              mp3_folder_last = newFolder;
-              mp3SendPlayFolder(newFolder);
+        }
+
+        if (Favorit_only) {
+          uint8_t startTemp = temp;
+          bool found = false;
+          do {
+            currentMode = eff_num_correct[temp];
+            if (Favorites::instance().FavoriteModes[currentMode] != 0) {
+              found = true;
+              break;
             }
+            if (tmp) {
+              if (++temp >= MODE_AMOUNT) temp = 0;
+            } else {
+              if (temp == 0) temp = MODE_AMOUNT;
+              temp--;
+            }
+            if (temp == startTemp) break;
+          } while (true);
+          if (!found) {
+            currentMode = eff_num_correct[temp];
           }
+        } else {
+          currentMode = eff_num_correct[temp];
+        }
+
+        // звук (если лампа включена)
+        if (ONflag) {
+          uint8_t stId = radioGetStationForMode(currentMode);
+          if (stId > 0) radioPlayStation(stId);
+          else radioStop();
+        } else {
+          radioStop();
+        }
+      }
+
+      if (!radioEnabled)
 #endif
+      {
+        if (tmp) {
+          if (Favorit_only) {
+            uint8_t lastMode = currentMode;
+            do {
+              if (++temp >= MODE_AMOUNT) temp = 0;
+              currentMode = eff_num_correct[temp];
+#if USE_MP3_PLAYER
+              if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+                uint8_t newFolder = effects_folders[currentMode];
+                if (mp3_folder != newFolder) {
+                  mp3_folder = newFolder;
+                  mp3_folder_last = newFolder;
+                  mp3SendPlayFolder(newFolder);
+                }
+              }
+#endif
+            } while (Favorites::instance().FavoriteModes[currentMode] == 0 && currentMode != lastMode);
+            if (currentMode == lastMode) {
+              if (++temp >= MODE_AMOUNT) temp = 0;
+              currentMode = eff_num_correct[temp];
+#if USE_MP3_PLAYER
+              if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+                uint8_t newFolder = effects_folders[currentMode];
+                if (mp3_folder != newFolder) {
+                  mp3_folder = newFolder;
+                  mp3_folder_last = newFolder;
+                  mp3SendPlayFolder(newFolder);
+                }
+              }
+#endif
+            }
+          } else {
+            if (++temp >= MODE_AMOUNT) temp = 0;
+            currentMode = eff_num_correct[temp];
+#if USE_MP3_PLAYER
+            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+              uint8_t newFolder = effects_folders[currentMode];
+              if (mp3_folder != newFolder) {
+                mp3_folder = newFolder;
+                mp3_folder_last = newFolder;
+                mp3SendPlayFolder(newFolder);
+              }
+            }
+#endif
+          }
+        } else {
+          if (Favorit_only) {
+            uint8_t lastMode = currentMode;
+            do {
+              if (temp == 0) temp = MODE_AMOUNT;
+              temp--;
+              currentMode = eff_num_correct[temp];
+#if USE_MP3_PLAYER
+              if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+                uint8_t newFolder = effects_folders[currentMode];
+                if (mp3_folder != newFolder) {
+                  mp3_folder = newFolder;
+                  mp3_folder_last = newFolder;
+                  mp3SendPlayFolder(newFolder);
+                }
+              }
+#endif
+            } while (Favorites::instance().FavoriteModes[currentMode] == 0 && currentMode != lastMode);
+            if (currentMode == lastMode) {
+              if (temp == 0) temp = MODE_AMOUNT;
+              temp--;
+              currentMode = eff_num_correct[temp];
+#if USE_MP3_PLAYER
+              if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+                uint8_t newFolder = effects_folders[currentMode];
+                if (mp3_folder != newFolder) {
+                  mp3_folder = newFolder;
+                  mp3_folder_last = newFolder;
+                  mp3SendPlayFolder(newFolder);
+                }
+              }
+#endif
+            }
+          } else {
+            if (temp == 0) temp = MODE_AMOUNT;
+            temp--;
+            currentMode = eff_num_correct[temp];
+#if USE_MP3_PLAYER
+            if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+              uint8_t newFolder = effects_folders[currentMode];
+              if (mp3_folder != newFolder) {
+                mp3_folder = newFolder;
+                mp3_folder_last = newFolder;
+                mp3SendPlayFolder(newFolder);
+              }
+            }
+#endif
+          }
         }
       }
 
@@ -197,6 +252,10 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     } else {
       memcpy(buff, &inputBuffer[3], strlen(inputBuffer));
       temp = (uint8_t)atoi(buff);
+      if (temp >= MODE_AMOUNT) {
+        inputBuffer[0] = '\0';
+        return;
+      }
       currentMode = eff_num_correct[temp];
 
       if (currentMode != eff_num_correct[EFF_CLOCK]) {
@@ -206,15 +265,27 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         saveConfig();
       }
 
-#if USE_MP3_PLAYER
-      if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
-        uint8_t newFolder = effects_folders[currentMode];
-        if (mp3_folder != newFolder) {
-          mp3_folder = newFolder;
-          mp3_folder_last = newFolder;
-          mp3SendPlayFolder(newFolder);
+      // радио или MP3 (переключение источника звука при смене эффекта)
+#if USE_RADIO
+      if (radioEnabled) {
+        if (ONflag) {
+          uint8_t stId = radioGetStationForMode(currentMode);
+          if (stId > 0) radioPlayStation(stId);
+          else radioStop();
+        } else {
+          radioStop();
         }
-      }
+      } else
+#endif
+#if USE_MP3_PLAYER
+        if (ONflag && mp3Enabled && mp3_player_connect == 4 && eff_sound_on) {
+          uint8_t newFolder = effects_folders[currentMode];
+          if (mp3_folder != newFolder) {
+            mp3_folder = newFolder;
+            mp3_folder_last = newFolder;
+            mp3SendPlayFolder(newFolder);
+          }
+        }
 #endif
       updateSets();
       jsonWrite(configSetup, "eff_sel", temp);
@@ -247,7 +318,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 
 #if USE_MP3_PLAYER
   else if (!strncmp_P(inputBuffer, PSTR("VOL"), 3)) {
-    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
+    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));
     uint8_t eff_sound_on_tmp = (uint8_t)atoi(buff);
     if (eff_sound_on_tmp)  {
       eff_sound_on = eff_volume = constrain( eff_sound_on_tmp, 1, 30 );
@@ -331,7 +402,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
   else if (!strncmp_P(inputBuffer, PSTR("LANG"), 4)) {
-    memcpy(buff, &inputBuffer[4], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
+    memcpy(buff, &inputBuffer[4], strlen(inputBuffer));
     jsonWrite(configSetup, "lang", buff);
     saveConfig();
     Lang_set();
@@ -341,7 +412,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
   else if (!strncmp_P(inputBuffer, PSTR("BRI"), 3)) {
-    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
+    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));
     modes[currentMode].Brightness = constrain(atoi(buff), 1, 255);
     jsonWrite(configSetup, "br", modes[currentMode].Brightness);
 
@@ -366,7 +437,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
   else if (!strncmp_P(inputBuffer, PSTR("SPD"), 3)) {
-    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
+    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));
     modes[currentMode].Speed = atoi(buff);
     jsonWrite(configSetup, "sp", modes[currentMode].Speed);
 
@@ -385,7 +456,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
   else if (!strncmp_P(inputBuffer, PSTR("SCA"), 3)) {
-    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
+    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));
     modes[currentMode].Scale = atoi(buff);
     jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
@@ -452,7 +523,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     }
 #endif
 
-    // обычное включение лампы (если не был активен рассвет)
+    // обычное включение лампы
     ONflag = true;
     jsonWrite(configSetup, "Power", ONflag);
     Eeprom::instance().EepromGet(modes);
@@ -572,32 +643,33 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
 #if USE_MULTILAMP
-  else if (!strncmp_P(inputBuffer, PSTR("MULTI"), 5)) { // Управление несколькими лампами
+  else if (!strncmp_P(inputBuffer, PSTR("MULTI"), 5)) {
     uint8_t valid = 0, i = 0;
-    while (inputBuffer[i]) { // пакет должен иметь вид MULTI,%U,%U,%U,%U,%U соответственно ON/OFF,№эффекта,яркость,скорость,масштаб или + №текущей папки или + озвучування_on/off, гучнисть
-      if (inputBuffer[i] == ',') {
-        valid++;  // Проверка на правильность пакета (по количеству запятых)
-      }
+    while (inputBuffer[i]) {
+      if (inputBuffer[i] == ',') valid++;
       i++;
     }
-    if (valid == 5 || valid == 6 || valid == 8) { // Если пакет правильный выделяем лексемы,разделённые запятыми, и присваиваем параметрам эффектов
-      char *tmp = strtok (inputBuffer, ","); // Первая лексема MULTI пропускается
+    if (valid == 5 || valid == 6 || valid == 8) {
+      char *tmp = strtok (inputBuffer, ",");
       tmp = strtok (NULL, ",");
       bool onflg = false;
       if (ONflag != atoi(tmp)) {
-        ONflag = atoi( tmp);
+        ONflag = atoi(tmp);
         onflg = true;
       }
       tmp = strtok (NULL, ",");
-      if (currentMode != atoi(tmp)) {
-        if (atoi (tmp) < MODE_AMOUNT) {
-          currentMode = atoi (tmp);
+      uint8_t incomingMode = (uint8_t)atoi(tmp);
+      bool modeChanged = false;
+
+      if (currentMode != incomingMode) {
+        if (incomingMode < MODE_AMOUNT) {
+          currentMode = incomingMode;
           tmp = strtok (NULL, ",");
-          modes[currentMode].Brightness = atoi (tmp);
+          modes[currentMode].Brightness = atoi(tmp);
           tmp = strtok (NULL, ",");
-          modes[currentMode].Speed = atoi (tmp);
+          modes[currentMode].Speed = atoi(tmp);
           tmp = strtok (NULL, ",");
-          modes[currentMode].Scale = atoi (tmp);
+          modes[currentMode].Scale = atoi(tmp);
 
 #if USE_MP3_PLAYER
           if (valid == 8) {
@@ -609,11 +681,9 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 #if USE_DAWN
             canChangeVolume = canChangeVolume && !dawnFlag;
 #endif
-
 #if USE_SUNSET
             canChangeVolume = canChangeVolume && !sunsetFlag;
 #endif
-
             if (canChangeVolume) {
               mp3SendCmd(0x06, FEEDBACK, 0, eff_volume);
             }
@@ -632,7 +702,6 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 #if USE_DAWN
               canChangeFolder = canChangeFolder && !dawnFlag;
 #endif
-
 #if USE_SUNSET
               canChangeFolder = canChangeFolder && !sunsetFlag;
 #endif
@@ -644,28 +713,31 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
             }
           }
 #endif // USE_MP3_PLAYER
-          loadingFlag = true; // Перезапуск эффекта
-          SetBrightness(modes[currentMode].Brightness); // применение яркости
+          loadingFlag = true;
+          SetBrightness(modes[currentMode].Brightness);
+          modeChanged = true;
         } else {
-          currentMode = MODE_AMOUNT - 3;  // Если полученный номер эффекта больше , чем количество эффектов в лампе,включаем последний "адекватный" эффект
-          loadingFlag = true; // Перезапуск эффекта
-          SetBrightness(modes[currentMode].Brightness); // применение яркости
+          // невалидный код — берём «предпоследний адекватный» эффект
+          currentMode = eff_num_correct[MODE_AMOUNT - 3];
+          loadingFlag = true;
+          SetBrightness(modes[currentMode].Brightness);
+          modeChanged = true;
         }
       } else {
         tmp = strtok (NULL, ",");
         if (modes[currentMode].Brightness != atoi(tmp)) {
-          modes[currentMode].Brightness = atoi (tmp);
-          SetBrightness(modes[currentMode].Brightness); // применение яркости
+          modes[currentMode].Brightness = atoi(tmp);
+          SetBrightness(modes[currentMode].Brightness);
         }
         tmp = strtok (NULL, ",");
         if (modes[currentMode].Speed != atoi(tmp)) {
-          modes[currentMode].Speed = atoi (tmp);
-          loadingFlag = true; // Перезапуск эффекта
+          modes[currentMode].Speed = atoi(tmp);
+          loadingFlag = true;
         }
         tmp = strtok (NULL, ",");
         if (modes[currentMode].Scale != atoi(tmp)) {
-          modes[currentMode].Scale = atoi (tmp);
-          loadingFlag = true; // перезапуск эффекта
+          modes[currentMode].Scale = atoi(tmp);
+          loadingFlag = true;
         }
 
 #if USE_MP3_PLAYER
@@ -678,7 +750,6 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 #if USE_DAWN
           canChangeVolume = canChangeVolume && !dawnFlag;
 #endif
-
 #if USE_SUNSET
           canChangeVolume = canChangeVolume && !sunsetFlag;
 #endif
@@ -694,7 +765,6 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 #if USE_DAWN
             canChangeFolder = canChangeFolder && !dawnFlag;
 #endif
-
 #if USE_SUNSET
             canChangeFolder = canChangeFolder && !sunsetFlag;
 #endif
@@ -706,46 +776,56 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
           }
         }
 #endif // USE_MP3_PLAYER
-
       }
+
       if (onflg) {
 #if USE_MP3_PLAYER
         if (ONflag) mp3_folder = effects_folders[currentMode];
-#endif // USE_MP3_PLAYER
-
-        changePower(); // активация состояния ON/OFF
+#endif
+        changePower();
       }
+
+      // Переключение радиостанции (после смены эффекта и/или включения)
+#if USE_RADIO
+      if (radioEnabled && modeChanged) {
+        if (ONflag) {
+          uint8_t stId = radioGetStationForMode(currentMode);
+          if (stId > 0) radioPlayStation(stId);
+          else radioStop();
+        } else {
+          radioStop();
+        }
+      }
+#endif
+
 #if GENERAL_LOG
-      SYSLOG.add ("Принято MULTI ");
+      SYSLOG.add("Принято MULTI ");
       SYSLOG.add("ONflag: %d", ONflag);
       SYSLOG.add("currentMode: %u", currentMode);
       SYSLOG.add("Brightness: %u", modes[currentMode].Brightness);
       SYSLOG.add("Speed: %u", modes[currentMode].Speed);
       SYSLOG.add("Scale: %u", modes[currentMode].Scale);
-
 #if USE_MP3_PLAYER
       SYSLOG.add("CurrentFolder: %u", CurrentFolder);
       SYSLOG.add("eff_sound_on: %u", eff_sound_on);
       SYSLOG.add("eff_volume: %u", eff_volume);
-#endif // USE_MP3_PLAYER
+#endif
 #endif  // GENERAL_LOG
 
-      jsonWrite(configSetup, "br", modes[currentMode].Brightness); //Передаём в веб интерфейс новые параметры
-      jsonWrite(configSetup, "sp", modes[currentMode].Speed); //для правильного отображения
+      jsonWrite(configSetup, "br", modes[currentMode].Brightness);
+      jsonWrite(configSetup, "sp", modes[currentMode].Speed);
       jsonWrite(configSetup, "sc", modes[currentMode].Scale);
-      jsonWrite(configSetup, "eff_sel", currentMode);
 
 #if USE_MP3_PLAYER
       jsonWrite(configMP3, "on_sound", eff_sound_on > 0 ? 1 : 0);
       jsonWrite(configMP3, "vol", eff_volume);
       jsonWrite(configMP3, "fold_sel", CurrentFolder);
-#endif // USE_MP3_PLAYER
+#endif
 
-      for ( uint8_t n = 0; n < MODE_AMOUNT; n++) {
-        if (eff_num_correct[n] == currentMode)  {
-          jsonWrite(configSetup, "eff_sel", n);
-          break;
-        }
+      // Записываем UI-индекс эффекта (не код!)
+      uint8_t uiIndex = findUiIndexByMode(currentMode);
+      if (uiIndex != 255) {
+        jsonWrite(configSetup, "eff_sel", uiIndex);
       }
 
       jsonWrite(configSetup, "Power", ONflag);
@@ -836,7 +916,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   else if (!strncmp_P(inputBuffer, PSTR("BTN"), 3)) {
     if (strstr_P(inputBuffer, PSTR("ON")) - inputBuffer == 4) {
       buttonEnabled = true;
-    } else { // OFF
+    } else {
       buttonEnabled = false;
     }
     jsonWrite(configSetup, "button_enabled", buttonEnabled ? "1" : "0");
@@ -847,8 +927,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 
   // ------------------
 
-  else if (!strncmp_P(inputBuffer, PSTR("GBR"), 3)) { // выставляем общую яркость для всех эффектов без сохранения в EEPROM, если приложение присылает такую строку
-    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));   // взять подстроку, состоящую последних символов строки inputBuffer, начиная с символа 4
+  else if (!strncmp_P(inputBuffer, PSTR("GBR"), 3)) {
+    memcpy(buff, &inputBuffer[3], strlen(inputBuffer));
     uint8_t ALLbri = constrain(atoi(buff), 1, 255);
     for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
       modes[i].Brightness = ALLbri;
@@ -865,17 +945,17 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
 #ifdef USE_RANDOM_SETS_IN_APP
-  else if (!strncmp_P(inputBuffer, PSTR("RND_"), 4)) { // управление включением случайных настроек
-    if (!strncmp_P(inputBuffer, PSTR("RND_0"), 5)) { // вернуть настройки по умолчанию текущему эффекту
+  else if (!strncmp_P(inputBuffer, PSTR("RND_"), 4)) {
+    if (!strncmp_P(inputBuffer, PSTR("RND_0"), 5)) {
       setModeSettings();
       updateSets();
 
 #if USE_MULTILAMP
       repeat_multiple_lamp_control = true;
-#endif  // USE_MULTILAMP
+#endif
 
       sendCurrent(inputBuffer);
-    } else if (!strncmp_P(inputBuffer, PSTR("RND_1"), 5)) { // выбрать случайные настройки текущему эффекту  // раньше была идея, что будут числа RND_1, RND_2, RND_3 - выбор из предустановленных настроек, но потом всё свелось к единственному варианту случайных настроек
+    } else if (!strncmp_P(inputBuffer, PSTR("RND_1"), 5)) {
       selectedSettings = 1U;
       updateSets();
 
@@ -883,54 +963,52 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       repeat_multiple_lamp_control = true;
 #endif
 
-      // -------------------
-
-    } else if (!strncmp_P(inputBuffer, PSTR("RND_Z"), 5)) { // вернуть настройки по умолчанию всем эффектам
+    } else if (!strncmp_P(inputBuffer, PSTR("RND_Z"), 5)) {
       restoreSettings();
       selectedSettings = 0U;
       updateSets();
 
 #if USE_MULTILAMP
       repeat_multiple_lamp_control = true;
-#endif  // USE_MULTILAMP
+#endif
       sendCurrent(inputBuffer);
 
 #if USE_BLYNK
       updateRemoteBlynkParams();
-#endif // USE_BLYNK
+#endif
 
-    } else if (!strncmp_P(inputBuffer, PSTR("RND_C1"), 5)) { // Включаем случайный выбор эффектов в цикле
+    } else if (!strncmp_P(inputBuffer, PSTR("RND_C1"), 5)) {
       Favorites::instance().rndCycle = 1;
       jsonWrite(configSetup, "rnd_cycle", 1);
       saveConfig();
-    } else if (!strncmp_P(inputBuffer, PSTR("RND_C0"), 5)) { // Выключаем случайный выбор эффектов в цикле
+    } else if (!strncmp_P(inputBuffer, PSTR("RND_C0"), 5)) {
       Favorites::instance().rndCycle = 0;
       jsonWrite(configSetup, "rnd_cycle", 0);
       saveConfig();
-    } else if (!strncmp_P(inputBuffer, PSTR("RND_ON"), 6)) { // включить выбор случайных настроек в режиме Цикл
+    } else if (!strncmp_P(inputBuffer, PSTR("RND_ON"), 6)) {
       random_on = 1U;
       jsonWrite(configSetup, "random_on", (int)random_on);
       saveConfig();
-      showWarning(CRGB::Blue, 1000U, 500U);                    // мигание синим цветом 1 секунду
-    } else if (!strncmp_P(inputBuffer, PSTR("RND_OFF"), 7)) { // отключить выбор случайных настроек в режиме Цикл
+      showWarning(CRGB::Blue, 1000U, 500U);
+    } else if (!strncmp_P(inputBuffer, PSTR("RND_OFF"), 7)) {
       random_on = 0U;
       jsonWrite(configSetup, "random_on", (int)random_on);
       saveConfig();
-      showWarning(CRGB::Blue, 1000U, 500U);                    // мигание синим цветом 1 секунду
+      showWarning(CRGB::Blue, 1000U, 500U);
     }
   }
 #endif // USE_RANDOM_SETS_IN_APP
 
   // ------------------
 
-  else if (!strncmp_P(inputBuffer, PSTR("RUN_"), 4)) {          // Настройка бегущей строки
-    if (!strncmp_P(inputBuffer, PSTR("RUN_C"), 5)) {             // Цвет бегущей строки (0-255)
+  else if (!strncmp_P(inputBuffer, PSTR("RUN_"), 4)) {
+    if (!strncmp_P(inputBuffer, PSTR("RUN_C"), 5)) {
       memcpy(buff, &inputBuffer[5], strlen(inputBuffer));
       ColorRunningText = (uint8_t)atoi(buff);
       jsonWrite(configLedPanel, "sct", ColorRunningText);
       bitSet (save_file_changes, 0);
       timeout_save_file_changes = millis();
-    } else if (!strncmp_P(inputBuffer, PSTR("RUN_S"), 5)) {      // скорость бегущей строки
+    } else if (!strncmp_P(inputBuffer, PSTR("RUN_S"), 5)) {
       memcpy(buff, &inputBuffer[5], strlen(inputBuffer));
       SpeedRunningText = (uint8_t)atoi(buff);
       jsonWrite(configLedPanel, "spt", SpeedRunningText);
@@ -971,7 +1049,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
 #if USE_DAWN
-  else if (!strncmp_P(inputBuffer, PSTR("ALM_"), 4)) { // сокращаем GET и SET для ускорения регулярного цикла
+  else if (!strncmp_P(inputBuffer, PSTR("ALM_"), 4)) {
     if (!strncmp_P(inputBuffer, PSTR("ALM_SET"), 7)) {
       uint8_t alarmNum = (char)inputBuffer[7] - '0';
       alarmNum -= 1;
@@ -1009,7 +1087,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
   // ------------------
 
 #if USE_SUNSET
-  else if (!strncmp_P(inputBuffer, PSTR("SUN_"), 4)) { // обработка команд заката
+  else if (!strncmp_P(inputBuffer, PSTR("SUN_"), 4)) {
     if (!strncmp_P(inputBuffer, PSTR("SUN_SET"), 7)) {
       uint8_t sunsetNum = (char)inputBuffer[7] - '0';
       sunsetNum -= 1;
@@ -1029,10 +1107,10 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
         strcpy(Mqtt::instance().mqttBuffer, inputBuffer);
         Mqtt::instance().needToPublish = true;
       }
-#endif // USE_MQTT
+#endif
     } else
       sendSunsets(inputBuffer);
-  } // else if (!strncmp_P(inputBuffer, PSTR("SUN_"), 4))
+  }
   else if (!strncmp_P(inputBuffer, PSTR("SUNSET"), 6)) {
     memcpy(buff, &inputBuffer[6], strlen(inputBuffer));
     sunsetMode = atoi(buff) - 1;
@@ -1041,7 +1119,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
     if (Wifi::instance().isConnected()) {
       Mqtt::instance().needToPublish = true;
     }
-#endif // USE_MQTT
+#endif
   }
 #endif // USE_SUNSET
 
@@ -1060,8 +1138,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 
   // ------------------
 
-  else if (!strncmp_P(inputBuffer, PSTR("LIST"), 4)) { // передача списка эффектов
-    memcpy(buff, &inputBuffer[4], strlen(inputBuffer));  // взять подстроку, начиная с символа 5
+  else if (!strncmp_P(inputBuffer, PSTR("LIST"), 4)) {
+    memcpy(buff, &inputBuffer[4], strlen(inputBuffer));
     switch (atoi(buff)) {
       case 1U: {
           EffectList(F("/efflist1"));
@@ -1079,8 +1157,8 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
           updateSets();
 #if USE_BLYNK_PLUS
           updateRemoteBlynkParams();
-#endif // USE_BLYNK_PLUS
-#endif // USE_DEFAULT_SETTINGS_RESET
+#endif
+#endif
           break;
         }
     }
@@ -1182,6 +1260,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
       case 1U: {
           memcpy(buff, &inputBuffer[5], strlen(inputBuffer));
           uint8_t eff = getValue(buff, ';', 0).toInt();
+          if (eff >= MODE_AMOUNT) break;   // защита от выхода за границы
           modes[eff].Brightness = getValue(buff, ';', 1).toInt();
           modes[eff].Speed = getValue(buff, ';', 2).toInt();
           modes[eff].Scale = getValue(buff, ';', 3).toInt();
@@ -1230,9 +1309,7 @@ void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutp
 
   inputBuffer[0] = '\0';
 
-  // ------------------
-
-} // void processInputBuffer(char *inputBuffer, char *outputBuffer, bool generateOutput)
+} // void processInputBuffer(...)
 
 // --------------------------------------------------------------------
 
@@ -1288,7 +1365,6 @@ void NEWsendCurrent(char *outputBuffer) {
   }
   sprintf_P(outputBuffer, PSTR("%s %s"), outputBuffer, timeBuf);
 
-  // Язык
   String str = jsonRead(configSetup, "lang");
   char temp[3];
   str.toCharArray(temp, sizeof(temp));

@@ -12,29 +12,30 @@ void User_settings() {
 
   // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
-  HTTP.on("/get_settings", HTTP_GET, []() {
+  HTTP.on("/get_settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(4096);
     deserializeJson(doc, configSetup);
     String output;
     serializeJson(doc, output);
-    HTTP.send(200, "application/json", output);
+    request->send(200, "application/json", output);
   });
 
-  HTTP.on("/rename", HTTP_POST, []() {
-    if (!requireFileManagerAuth(true)) return;
+  HTTP.on("/rename", HTTP_POST, [](AsyncWebServerRequest * request) {
+    if (!requireFileManagerAuth(request, true)) return;
 
-    if (!HTTP.hasArg("old") || !HTTP.hasArg("new")) {
-      HTTP.send(400, "text/plain", "Missing old or new path");
+    if (!request->hasParam("old") || !request->hasParam("new")) {
+      request->send(400, "text/plain", "Missing old or new path");
       return;
     }
 
-    String oldPath = HTTP.arg("old");
-    String newPath = HTTP.arg("new");
+    String oldPath = request->getParam("old")->value();
+    String newPath = request->getParam("new")->value();
+
     oldPath.trim();
     newPath.trim();
 
     if (oldPath.length() == 0 || newPath.length() == 0) {
-      HTTP.send(400, "text/plain", "Empty path");
+      request->send(400, "text/plain", "Empty path");
       return;
     }
 
@@ -42,7 +43,7 @@ void User_settings() {
     if (!newPath.startsWith("/")) newPath = "/" + newPath;
 
     if (isDangerousPath(oldPath) || isDangerousPath(newPath)) {
-      HTTP.send(400, "text/plain", "Invalid path");
+      request->send(400, "text/plain", "Invalid path");
       return;
     }
 
@@ -50,7 +51,6 @@ void User_settings() {
     String cleanOld = isDir ? oldPath.substring(0, oldPath.length() - 1) : oldPath;
     String cleanNew = newPath.endsWith("/") ? newPath.substring(0, newPath.length() - 1) : newPath;
 
-    // --- рантайм-выбор FS ---
     auto fsExists = [](const String & p) -> bool {
       return (sdType == 1) ? LittleFS.exists(p) : SD.exists(p);
     };
@@ -62,11 +62,11 @@ void User_settings() {
     };
 
     if (!fsExists(cleanOld)) {
-      HTTP.send(404, "text/plain", "Source not found");
+      request->send(404, "text/plain", "Source not found");
       return;
     }
     if (fsExists(cleanNew)) {
-      HTTP.send(409, "text/plain", "Destination already exists");
+      request->send(409, "text/plain", "Destination already exists");
       return;
     }
 
@@ -91,64 +91,142 @@ void User_settings() {
     }
 
     if (ok) {
-      HTTP.send(200, "text/plain", "Renamed");
+      request->send(200, "text/plain", "Renamed");
     } else {
-      HTTP.send(500, "text/plain", "Rename failed");
+      request->send(500, "text/plain", "Rename failed");
     }
   });
 
   // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
-  HTTP.on("/PassOn", handle_PassOn);                         // Пароль на страницу настроек
-  HTTP.on("/Power", handle_Power);                           // Управление питанием
-  HTTP.on("/index", handle_index);                           // Переключение на финальную страницу
-  HTTP.on("/lang", handle_lang);                             // Язык
+  HTTP.on("/PassOn", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_PassOn(request);
+  });
+  HTTP.on("/Power", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_Power(request);
+  });   // Управление питанием
+  HTTP.on("/index", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_index(request);
+  });   // Переключение на финальную страницу
+  HTTP.on("/lang", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_lang(request);
+  });     // Язык
 
   // ------------------------------------------------------------ РЕГУЛИРОВКА НАСТРОЕК ЭФФЕКТОВ ---------------------------------------------------------
 
-  HTTP.on("/all_br", handle_all_br);                         // Общая яркость всех эффектов
-  HTTP.on("/br", handle_br);                                 // Яркость эффекта
-  HTTP.on("/brm", handle_brm);                               // Уменьшение яркости (-1)
-  HTTP.on("/brp", handle_brp);                               // Увеличение яркости (+1)
-  HTTP.on("/sp", handle_sp);                                 // Скорость эффекта
-  HTTP.on("/spm", handle_spm);                               // Уменьшение скорости (-1)
-  HTTP.on("/spp", handle_spp);                               // Увеличение скорости (+1)
-  HTTP.on("/sc", handle_sc);                                 // Масштаб / Цвет эффекта
-  HTTP.on("/scm", handle_scm);                               // Уменьшение масштаба (-1)
-  HTTP.on("/scp", handle_scp);                               // Увеличение масштаба (+1)
-  HTTP.on("/auto_bri", handle_auto_bri);                     // Автояркость по времени суток
-  HTTP.on("/eff_sel", handle_eff_sel);                       // Выбор эффекта из списка
-  HTTP.on("/eff", handle_eff);                               // Следующий / Предыдущий эффект
-  HTTP.on("/eff_all", handle_eff_all);                       // Выбрать все
-  HTTP.on("/eff_clr", handle_eff_clr);                       // Сбросить выбор
-  HTTP.on("/time_eff", handle_time_eff);                     // Время переключения
-  HTTP.on("/eff_save", handle_eff_save);                     // Сохранить настройки эффектов в файл
-  HTTP.on("/eff_read", handle_eff_read);                     // Загрузить настройки из файла
-  HTTP.on("/def", handle_def);                               // Настройки текущего эффекта по умолчанию
-  HTTP.on("/eff_reset", handle_eff_reset);                   // Сброс настроек всех эффектов по умолчанию
-  HTTP.on("/favorit", handle_favorit);                       // Включить / Выключить переход кнопкой только по эффектам из избранного
-  HTTP.on("/random_on", handle_random);                      // Случайные настройки эффектов в режиме цикл
-  HTTP.on("/effect_always", handle_effect_always);           // Не возобновлять эффекты после обесточивания лампы
+  HTTP.on("/all_br", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_all_br(request);
+  });                // Общая яркость всех эффектов
+  HTTP.on("/br", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_br(request);
+  });                        // Яркость эффекта
+  HTTP.on("/brm", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_brm(request);
+  });                      // Уменьшение яркости (-1)
+  HTTP.on("/brp", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_brp(request);
+  });                      // Увеличение яркости (+1)
+  HTTP.on("/sp", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sp(request);
+  });                        // Скорость эффекта
+  HTTP.on("/spm", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_spm(request);
+  });                      // Уменьшение скорости (-1)
+  HTTP.on("/spp", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_spp(request);
+  });                      // Увеличение скорости (+1)
+  HTTP.on("/sc", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sc(request);
+  });                        // Масштаб / Цвет эффекта
+  HTTP.on("/scm", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_scm(request);
+  });                      // Уменьшение масштаба (-1)
+  HTTP.on("/scp", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_scp(request);
+  });                      // Увеличение масштаба (+1)
+  HTTP.on("/auto_bri", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_auto_bri(request);
+  });            // Автояркость по времени суток
+  HTTP.on("/eff_sel", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff_sel(request);
+  });              // Выбор эффекта из списка
+  HTTP.on("/eff", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff(request);
+  });                      // Следующий / Предыдущий эффект
+  HTTP.on("/eff_all", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff_all(request);
+  });              // Выбрать все
+  HTTP.on("/eff_clr", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff_clr(request);
+  });              // Сбросить выбор
+  HTTP.on("/time_eff", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_time_eff(request);
+  });            // Время переключения
+  HTTP.on("/eff_save", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff_save(request);
+  });            // Сохранить настройки эффектов в файл
+  HTTP.on("/eff_read", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff_read(request);
+  });            // Загрузить настройки из файла
+  HTTP.on("/def", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_def(request);
+  });                      // Настройки текущего эффекта по умолчанию
+  HTTP.on("/eff_reset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_eff_reset(request);
+  });          // Сброс настроек всех эффектов по умолчанию
+  HTTP.on("/favorit", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_favorit(request);
+  });              // Включить / Выключить переход кнопкой только по эффектам из избранного
+  HTTP.on("/random_on", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_random(request);
+  });             // Случайные настройки эффектов в режиме цикл
+  HTTP.on("/effect_always", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_effect_always(request);
+  });  // Не возобновлять эффекты после обесточивания лампы
 
   // -------------------------------------------------------------------------- ЦИКЛ --------------------------------------------------------------------
 
-  HTTP.on("/cycle_on", handle_cycle_on);                     // Вкл/Выкл режим Цикл
-  HTTP.on("/rnd_cycle", handle_rnd_cycle);                   // Перемешивать или по порядку
-  HTTP.on("/cycle_always", handle_cycle_always);             // Запускать цикл после включения
-  HTTP.on("/cycle_set", handle_cycle_set);                   // Выбор эффектов для цикла
+  HTTP.on("/cycle_on", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_cycle_on(request);
+  });          // Вкл/Выкл режим Цикл
+  HTTP.on("/rnd_cycle", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_rnd_cycle(request);
+  });        // Перемешивать или по порядку
+  HTTP.on("/cycle_always", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_cycle_always(request);
+  });  // Запускать цикл после включения
+  HTTP.on("/cycle_set", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_cycle_set(request);
+  });        // Выбор эффектов для цикла
 
   // ------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ В ВЭБ-ИНТЕРФЕЙС -----------------------------------------------
 
-  HTTP.on("/button_enable", handle_button_enable);
-  HTTP.on("/ir_enable", handle_ir_enable);
-  HTTP.on("/rf_enable", handle_rf_enable);
-  HTTP.on("/tm1637_enable", handle_tm1637_enable);
-  HTTP.on("/st7789_enable", handle_st7789_enable);
-  HTTP.on("/mp3_enable", handle_mp3_enable);
-  HTTP.on("/sd_enable", handle_sd_enable);
-  HTTP.on("/sd_type", handle_sd_type);
+  HTTP.on("/button_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_button_enable(request);
+  });
+  HTTP.on("/ir_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_ir_enable(request);
+  });
+  HTTP.on("/rf_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_rf_enable(request);
+  });
+  HTTP.on("/tm1637_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tm1637_enable(request);
+  });
+  HTTP.on("/st7789_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_st7789_enable(request);
+  });
+  HTTP.on("/mp3_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_mp3_enable(request);
+  });
+  HTTP.on("/sd_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sd_enable(request);
+  });
+  HTTP.on("/sd_type", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sd_type(request);
+  });
 
-  HTTP.on("/get_module_states", HTTP_GET, []() {
+  HTTP.on("/get_module_states", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(512);
     doc["button_enable"] = buttonEnabled ? "1" : "0";
     doc["ir_enable"] = irEnabled ? "1" : "0";
@@ -156,6 +234,7 @@ void User_settings() {
     doc["tm1637_enable"] = tm1637Enabled ? "1" : "0";
     doc["st7789_enable"] = st7789Enabled ? "1" : "0";
     doc["mp3_enable"] = mp3Enabled ? "1" : "0";
+    doc["radio_enable"] = radioEnabled ? "1" : "0";
     doc["sd_enable"] = sdEnabled ? "1" : "0";
     doc["sd_type"] = String(sdType);
 #if MULTI_MATRIX
@@ -167,88 +246,140 @@ void User_settings() {
 #endif
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json", response);
+    request->send(200, "application/json", response);
   });
 
   // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 #if USE_BUTTON
-  HTTP.on("/button_type", handle_button_type);         // Сенсорная / механическая кнопка
-  HTTP.on("/save_btn_clicks", handle_save_btn_clicks); // Настройки действий по количеству нажатий на кнопку
+  HTTP.on("/button_type", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_button_type(request);
+  });         // Сенсорная / механическая кнопка
+  HTTP.on("/save_btn_clicks", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_save_btn_clicks(request);
+  }); // Настройки действий по количеству нажатий на кнопку
 #endif
 
 #if USE_SUNSET
-  HTTP.on("/sunset", handle_sunset); // Закат
-  HTTP.on("/config_sunset.json", HTTP_GET, []() {
-    HTTP.send(200, "application/json", configSunset);
+  HTTP.on("/sunset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sunset_http(request);
+  });
+  HTTP.on("/config_sunset.json", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", configSunset);
   });
 #endif
 
 #if USE_DAWN
-  HTTP.on("/alarm", handle_alarm); // Рассвет
-  HTTP.on("/config_alarm.json", HTTP_GET, []() {
-    HTTP.send(200, "application/json", configAlarm);
+  HTTP.on("/alarm", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_alarm_http(request);
+  });
+  HTTP.on("/config_alarm.json", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", configAlarm);
   });
 #endif
 
 #if USE_SCHEDULE
-  HTTP.on("/schedule", handle_schedule); // Расписание
-  HTTP.on("/config_schedule.json", HTTP_GET, []() {
-    HTTP.send(200, "application/json", configSchedule);
+  HTTP.on("/schedule", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_schedule(request);
+  });
+  HTTP.on("/config_schedule.json", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", configSchedule);
   });
 #endif
 
   // -------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
 
 #if USE_MULTILAMP
-  HTTP.on("/multi", HTTP_GET, handle_multiple_lamp);
-  HTTP.on("/config_multilamp.json", HTTP_GET, []() {
-    HTTP.send(200, "application/json", configMultilamp);
+  HTTP.on("/multi", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_multiple_lamp(request);
+  });
+  HTTP.on("/config_multilamp.json", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "application/json", configMultilamp);
   });
 #endif
 
-  HTTP.on("/setup_multilamp", HTTP_GET, []() {
+  HTTP.on("/setup_multilamp", HTTP_GET, [](AsyncWebServerRequest * request) {
 #ifndef USE_MULTILAMP
-    HTTP.send(404, "text/plain", "Управление несколькими лампами отключено в прошивке");
+    request->send(404, "text/plain", "Управление несколькими лампами отключено в прошивке");
 #else
-    handleFileRead("/setup_multilamp.htm");
+    request->send(LittleFS, "/setup_multilamp.htm", "text/html; charset=utf-8");
 #endif
   });
 
   // --------------------------------------------------------------------- ДИСПЛЕЙ ST7789 ----------------------------------------------------------------
 
 #if USE_ST7789
-  HTTP.on("/tft_clock_color", handle_tft_clock_color);
-  HTTP.on("/tft_weather_color", handle_tft_weather_color);
-  HTTP.on("/tft_ticker_on", handle_tft_ticker_on);
-  HTTP.on("/tft_ticker_color", handle_tft_ticker_color);
-  HTTP.on("/tft_ticker_speed", handle_tft_ticker_speed);
-  HTTP.on("/tft_ticker_period", handle_tft_ticker_period);
-  HTTP.on("/tft_ticker_text", handle_tft_ticker_text);
-  HTTP.on("/tft_brightness", handle_tft_brightness);
-  HTTP.on("/tft_auto_brightness", handle_tft_auto_brightness);
-  HTTP.on("/tft_date_color", HTTP_GET, handle_tft_date_color);
+  HTTP.on("/tft_clock_color", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_clock_color(request);
+  });
+  HTTP.on("/tft_weather_color", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_weather_color(request);
+  });
+  HTTP.on("/tft_ticker_on", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_ticker_on(request);
+  });
+  HTTP.on("/tft_ticker_color", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_ticker_color(request);
+  });
+  HTTP.on("/tft_ticker_speed", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_ticker_speed(request);
+  });
+  HTTP.on("/tft_ticker_period", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_ticker_period(request);
+  });
+  HTTP.on("/tft_ticker_text", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_ticker_text(request);
+  });
+  HTTP.on("/tft_brightness", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_brightness(request);
+  });
+  HTTP.on("/tft_auto_brightness", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_auto_brightness(request);
+  });
+  HTTP.on("/tft_date_color", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tft_date_color(request);
+  });
 #endif
 
   // --------------------------------------------------------------------- ДИСПЛЕЙ TM1637 ----------------------------------------------------------------
 
 #if USE_TM1637
-  HTTP.on("/tm1637_brightness", handle_tm1637_brightness);
-  HTTP.on("/tm1637_auto_brightness", handle_tm1637_auto_brightness);
+  HTTP.on("/tm1637_brightness", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tm1637_brightness(request);
+  });
+  HTTP.on("/tm1637_auto_brightness", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tm1637_auto_brightness(request);
+  });
 #endif
 
   // -------------------------------------------------------------------------- ВРЕМЯ -------------------------------------------------------------------
 
-  HTTP.on("/save_brightness", handle_save_brightness);
-  HTTP.on("/night_time", handle_night_time);
-  HTTP.on("/print_time", handle_print_time);
-  HTTP.on("/clock_vert", handle_clock_vert);
-  HTTP.on("/clock_leading_zero", handle_clock_leading_zero);
-  HTTP.on("/auto_move_clock", handle_auto_move_clock);
-  HTTP.on("/night_clock_enabled", handle_night_clock_enabled);
-  HTTP.on("/night_clock_brightness", handle_night_clock_brightness);
+  HTTP.on("/save_brightness", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_save_brightness(request);
+  });
+  HTTP.on("/night_time", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_time(request);
+  });
+  HTTP.on("/print_time", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_print_time(request);
+  });
+  HTTP.on("/clock_vert", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_clock_vert(request);
+  });
+  HTTP.on("/clock_leading_zero", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_clock_leading_zero(request);
+  });
+  HTTP.on("/auto_move_clock", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_auto_move_clock(request);
+  });
+  HTTP.on("/night_clock_enabled", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_clock_enabled(request);
+  });
+  HTTP.on("/night_clock_brightness", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_clock_brightness(request);
+  });
 
-  HTTP.on("/get_time", HTTP_GET, []() {
+  HTTP.on("/get_time", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(256);
 
     if (!myTime.isTimeSet()) {
@@ -257,7 +388,7 @@ void User_settings() {
       doc["date"] = "";
       String out;
       serializeJson(doc, out);
-      HTTP.send(200, "application/json", out);
+      request->send(200, "application/json", out);
       return;
     }
 
@@ -336,7 +467,6 @@ void User_settings() {
       else if (tz == "MSK-3_Ulyanovsk") cityName = "Ульяновск";
       else if (tz == "MSK-3_Simferopol") cityName = "Симферополь";
       else if (tz == "MSK-3_Minsk") cityName = "Минск";
-
       else if (tz == "MSK-3_Zelenodolsk") cityName = "Зеленодольск";
       else if (tz == "MSK-3_Podolsk") cityName = "Подольск";
       else if (tz == "MSK-3_Lubertsy") cityName = "Люберцы";
@@ -367,14 +497,11 @@ void User_settings() {
       else if (tz == "MSK-3_NaroFominsk") cityName = "Наро-Фоминск";
       else if (tz == "MSK-3_Klin") cityName = "Клин";
       else if (tz == "MSK-3_Krasnogorsk") cityName = "Красногорск";
-
       else if (tz == "EET-2") cityName = "Калининград";
-
       else if (tz == "SAMT-4") cityName = "Самара";
       else if (tz == "SAMT-4_Astrakhan") cityName = "Астрахань";
       else if (tz == "SAMT-4_Saratov") cityName = "Саратов";
       else if (tz == "SAMT-4_Tolyatti") cityName = "Тольятти";
-
       else if (tz == "YEKT-5") cityName = "Екатеринбург";
       else if (tz == "YEKT-5_Chelyabinsk") cityName = "Челябинск";
       else if (tz == "YEKT-5_Perm") cityName = "Пермь";
@@ -382,9 +509,7 @@ void User_settings() {
       else if (tz == "YEKT-5_Orenburg") cityName = "Оренбург";
       else if (tz == "YEKT-5_Kurgan") cityName = "Курган";
       else if (tz == "YEKT-5_Tyumen") cityName = "Тюмень";
-
       else if (tz == "OMST-6") cityName = "Омск";
-
       else if (tz == "KRAT-7") cityName = "Красноярск";
       else if (tz == "KRAT-7_Novosibirsk") cityName = "Новосибирск";
       else if (tz == "KRAT-7_Tomsk") cityName = "Томск";
@@ -392,30 +517,24 @@ void User_settings() {
       else if (tz == "KRAT-7_Kemerovo") cityName = "Кемерово";
       else if (tz == "KRAT-7_Novokuznetsk") cityName = "Новокузнецк";
       else if (tz == "KRAT-7_Sayanogorsk") cityName = "Саяногорск";
-
       else if (tz == "IRKT-8") cityName = "Иркутск";
       else if (tz == "IRKT-8_UlanUde") cityName = "Улан-Удэ";
-
       else if (tz == "YAKT-9") cityName = "Якутск";
       else if (tz == "YAKT-9_Chita") cityName = "Чита";
       else if (tz == "YAKT-9_Blagoveshchensk") cityName = "Благовещенск";
       else if (tz == "YAKT-9_Khandyga") cityName = "Хандыга";
-
       else if (tz == "VLAT-10") cityName = "Владивосток";
       else if (tz == "VLAT-10_Khabarovsk") cityName = "Хабаровск";
       else if (tz == "VLAT-10_Ussuriysk") cityName = "Уссурийск";
       else if (tz == "VLAT-10_Komsomolsk") cityName = "Комсомольск-на-Амуре";
       else if (tz == "VLAT-10_UstNera") cityName = "Усть-Нера";
-
       else if (tz == "MAGT-11") cityName = "Магадан";
       else if (tz == "MAGT-11_Sakhalin") cityName = "Сахалин";
       else if (tz == "MAGT-11_YuzhnoSakhalinsk") cityName = "Южно-Сахалинск";
       else if (tz == "MAGT-11_Srednekolymsk") cityName = "Среднеколымск";
-
       else if (tz == "PETT-12") cityName = "Камчатка";
       else if (tz == "PETT-12_Anadyr") cityName = "Анадырь";
       else if (tz == "PETT-12_Petropavlovsk") cityName = "Петропавловск-Камчатский";
-
       else if (tz == "ALMT-5") cityName = "Алматы";
       else if (tz == "ALMT-5_Astana") cityName = "Астана";
       else if (tz == "ALMT-5_Karaganda") cityName = "Караганда";
@@ -425,7 +544,6 @@ void User_settings() {
       else if (tz == "ALMT-5_Kostanay") cityName = "Костанай";
       else if (tz == "ALMT-5_Aktau") cityName = "Актау";
       else if (tz == "ALMT-5_Aktobe") cityName = "Актобе";
-
       // IANA-форматы
       else if (tz == "Europe/Moscow") cityName = "Москва";
       else if (tz == "Europe/Volgograd") cityName = "Волгоград";
@@ -472,14 +590,14 @@ void User_settings() {
 
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 
   // сохранение времени
-  HTTP.on("/save_time", HTTP_GET, []() {
+  HTTP.on("/save_time", HTTP_GET, [](AsyncWebServerRequest * request) {
     bool changed = false;
 
-    String tz = HTTP.arg("tz");
+    String tz = request->getParam("tz")->value();
     tz.trim();
     if (tz.length() > 0) {
       String currentTz = jsonRead(configSetup, "tz");
@@ -506,7 +624,7 @@ void User_settings() {
             jsonWrite(configSetup, "tz_is_custom", "1");
             jsonWrite(configSetup, "use_auto_tz", "0");
           } else {
-            HTTP.send(400, "text/plain", "INVALID_TZ");
+            request->send(400, "text/plain", "INVALID_TZ");
             return;
           }
         }
@@ -514,9 +632,9 @@ void User_settings() {
       }
     }
 
-    String ntp1_arg = HTTP.arg("ntp1"); ntp1_arg.trim();
-    String ntp2_arg = HTTP.arg("ntp2"); ntp2_arg.trim();
-    String ntp3_arg = HTTP.arg("ntp3"); ntp3_arg.trim();
+    String ntp1_arg = request->getParam("ntp1")->value(); ntp1_arg.trim();
+    String ntp2_arg = request->getParam("ntp2")->value(); ntp2_arg.trim();
+    String ntp3_arg = request->getParam("ntp3")->value(); ntp3_arg.trim();
 
     if (ntp1_arg.length() > 0 && jsonRead(configSetup, "ntp1") != ntp1_arg) {
       jsonWrite(configSetup, "ntp1", ntp1_arg);
@@ -532,7 +650,7 @@ void User_settings() {
     }
 
     if (!changed) {
-      HTTP.send(200, "text/plain", "NO_CHANGE");
+      request->send(200, "text/plain", "NO_CHANGE");
       return;
     }
 
@@ -565,34 +683,34 @@ void User_settings() {
 
     myTime.tzsetup(current_tz.c_str());
 
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
-  HTTP.on("/force_time_sync", HTTP_GET, []() {
+  HTTP.on("/force_time_sync", HTTP_GET, [](AsyncWebServerRequest * request) {
     if (Wifi::instance().isConnected()) {
       myTime.forcesync();
-      HTTP.send(200, "text/plain", "SYNC_STARTED");
+      request->send(200, "text/plain", "SYNC_STARTED");
     } else {
-      HTTP.send(503, "text/plain", "Нет подключения к интернету.\nИспользуйте ручную установку времени.");
+      request->send(503, "text/plain", "Нет подключения к интернету.\nИспользуйте ручную установку времени.");
     }
   });
 
   // автоопределение часового пояса
-  HTTP.on("/auto_tz", HTTP_GET, []() {
+  HTTP.on("/auto_tz", HTTP_GET, [](AsyncWebServerRequest * request) {
     jsonWrite(configSetup, "tz", "");
     jsonWrite(configSetup, "use_auto_tz", "1");
     saveConfig();
     g_flagAutoTz = true;
-    HTTP.send(200, "text/plain", "AUTO_OK");
+    request->send(200, "text/plain", "AUTO_OK");
   });
 
   // установка времени с клиента
-  HTTP.on("/set_client_time", HTTP_GET, []() {
+  HTTP.on("/set_client_time", HTTP_GET, [](AsyncWebServerRequest * request) {
     bool timeChanged = false;
     bool tzChanged = false;
 
-    if (HTTP.hasArg("time")) {
-      unsigned long clientTime = HTTP.arg("time").toInt();
+    if (request->hasParam("time")) {
+      unsigned long clientTime = request->getParam("time")->value().toInt();
       if (clientTime > 946684800UL) {
         myTime.disable();
         struct timeval tv = { (time_t)clientTime, 0 };
@@ -601,8 +719,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("tz")) {
-      String tzStr = urldecode(HTTP.arg("tz"));
+    if (request->hasParam("tz")) {
+      String tzStr = urldecode(request->getParam("tz")->value());
       tzStr.trim();
 
       if (tzStr.length() > 0 && tzStr != "undefined" && tzStr != "null") {
@@ -633,21 +751,21 @@ void User_settings() {
 
     myTime.enable();
     if (!timeChanged && !tzChanged) {
-      HTTP.send(400, "text/plain", "Missing parameters");
+      request->send(400, "text/plain", "Missing parameters");
       return;
     }
 
-    HTTP.send(200, "text/plain", "OK_TIME_SET");
+    request->send(200, "text/plain", "OK_TIME_SET");
   });
 
   // установка часового пояса
-  HTTP.on("/tz", HTTP_GET, []() {
-    if (!HTTP.hasArg("tz")) {
-      HTTP.send(400, "text/plain", "Missing tz parameter");
+  HTTP.on("/tz", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("tz")) {
+      request->send(400, "text/plain", "Missing tz parameter");
       return;
     }
 
-    String newTz = HTTP.arg("tz");
+    String newTz = request->getParam("tz")->value();
     newTz.trim();
 
     if (newTz.length() == 0 || newTz == "auto") {
@@ -655,7 +773,7 @@ void User_settings() {
       jsonWrite(configSetup, "use_auto_tz", "1");
       saveConfig();
       g_flagAutoTz = true;
-      HTTP.send(200, "text/plain", "OK_TZ_SET");
+      request->send(200, "text/plain", "OK_TZ_SET");
       return;
     }
 
@@ -672,7 +790,7 @@ void User_settings() {
     if (!isPreset) {
       posixTz = ianaToPosix(newTz);
       if (posixTz == newTz && !isValidPosixFormat(newTz)) {
-        HTTP.send(400, "text/plain", "INVALID_TZ_FORMAT");
+        request->send(400, "text/plain", "INVALID_TZ_FORMAT");
         return;
       }
     }
@@ -684,21 +802,21 @@ void User_settings() {
     saveConfig();
     myTime.tzsetup(posixTz.c_str());
 
-    HTTP.send(200, "text/plain", "OK_TZ_SET");
+    request->send(200, "text/plain", "OK_TZ_SET");
   });
 
   // установка пользовательского часового пояса
-  HTTP.on("/set_custom_tz", HTTP_GET, []() {
-    if (!HTTP.hasArg("tz")) {
-      HTTP.send(400, "text/plain", "Missing tz parameter");
+  HTTP.on("/set_custom_tz", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("tz")) {
+      request->send(400, "text/plain", "Missing tz parameter");
       return;
     }
 
-    String customTz = urldecode(HTTP.arg("tz"));
+    String customTz = urldecode(request->getParam("tz")->value());
     customTz.trim();
 
     if (customTz.length() == 0) {
-      HTTP.send(400, "text/plain", "Empty timezone");
+      request->send(400, "text/plain", "Empty timezone");
       return;
     }
 
@@ -717,7 +835,7 @@ void User_settings() {
       if (!isPreset) {
         posixTz = ianaToPosix(customTz);
         if (posixTz == customTz && !isValidPosixFormat(customTz)) {
-          HTTP.send(400, "text/plain", "Invalid timezone format");
+          request->send(400, "text/plain", "Invalid timezone format");
           return;
         }
       }
@@ -731,29 +849,29 @@ void User_settings() {
 
     myTime.tzsetup(posixTz.c_str());
 
-    HTTP.send(200, "text/plain", "OK_TZ_SET");
+    request->send(200, "text/plain", "OK_TZ_SET");
   });
 
   // установка часового пояса по координатам
-  HTTP.on("/set_geo_tz", HTTP_GET, []() {
+  HTTP.on("/set_geo_tz", HTTP_GET, [](AsyncWebServerRequest * request) {
     bool changed = false;
 
-    if (HTTP.hasArg("enabled")) {
-      String v = HTTP.arg("enabled");
+    if (request->hasParam("enabled")) {
+      String v = request->getParam("enabled")->value();
       if (jsonRead(configSetup, "geo_tz_enabled") != v) {
         jsonWrite(configSetup, "geo_tz_enabled", v);
         changed = true;
       }
     }
-    if (HTTP.hasArg("lat")) {
-      String v = HTTP.arg("lat"); v.replace(",", "."); v.trim();
+    if (request->hasParam("lat")) {
+      String v = request->getParam("lat")->value(); v.replace(",", "."); v.trim();
       if (jsonRead(configSetup, "geo_tz_lat") != v) {
         jsonWrite(configSetup, "geo_tz_lat", v);
         changed = true;
       }
     }
-    if (HTTP.hasArg("lon")) {
-      String v = HTTP.arg("lon"); v.replace(",", "."); v.trim();
+    if (request->hasParam("lon")) {
+      String v = request->getParam("lon")->value(); v.replace(",", "."); v.trim();
       if (jsonRead(configSetup, "geo_tz_lon") != v) {
         jsonWrite(configSetup, "geo_tz_lon", v);
         changed = true;
@@ -800,25 +918,25 @@ void User_settings() {
     doc["tz"] = jsonRead(configSetup, "tz");
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 
   // определение города по координатам
-  HTTP.on("/resolve_city", HTTP_GET, []() {
-    if (!HTTP.hasArg("lat") || !HTTP.hasArg("lon")) {
-      HTTP.send(400, "text/plain", "Missing lat or lon");
+  HTTP.on("/resolve_city", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("lat") || !request->hasParam("lon")) {
+      request->send(400, "text/plain", "Missing lat or lon");
       return;
     }
 
-    float lat = HTTP.arg("lat").toFloat();
-    float lon = HTTP.arg("lon").toFloat();
+    float lat = request->getParam("lat")->value().toFloat();
+    float lon = request->getParam("lon")->value().toFloat();
 
     String city = getCityNameFromCoords(lat, lon);
-    HTTP.send(200, "text/plain", city);
+    request->send(200, "text/plain", city);
   });
 
   // получить текущие настройки geo TZ
-  HTTP.on("/get_geo_tz", HTTP_GET, []() {
+  HTTP.on("/get_geo_tz", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(512);
     doc["enabled"] = jsonReadtoInt(configSetup, "geo_tz_enabled") == 1;
     doc["lat"] = jsonRead(configSetup, "geo_tz_lat");
@@ -827,60 +945,53 @@ void User_settings() {
     doc["tz"] = jsonRead(configSetup, "tz");
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 
-  HTTP.on("/get_tz_info", HTTP_GET, []() {
+  HTTP.on("/get_tz_info", HTTP_GET, [](AsyncWebServerRequest * request) {
     String info = getTimezoneInfo();
-    HTTP.send(200, "application/json", info);
+    request->send(200, "application/json", info);
   });
 
   // разноцветные часы на матрице (которые EFF_CLOCK)
-  HTTP.on("/rainbow_clock", HTTP_GET, []() {
-    if (HTTP.hasArg("value")) {
-      rainbowClock = (HTTP.arg("value") == "1" || HTTP.arg("value") == "true");
+  HTTP.on("/rainbow_clock", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("value")) {
+      String rclVal = request->getParam("value")->value();
+      rainbowClock = (rclVal == "1" || rclVal == "true");
       jsonWrite(configLedPanel, "rainbow_clock", rainbowClock ? "1" : "0");
       saveConfig();
       loadingFlag = true;
     }
-    HTTP.send(200, "text/plain", rainbowClock ? "1" : "0");
+    request->send(200, "text/plain", rainbowClock ? "1" : "0");
   });
 
-  HTTP.on("/save_geo_tz_param", HTTP_GET, []() {
-    if (!HTTP.hasArg("key") || !HTTP.hasArg("value")) {
-      HTTP.send(400, "text/plain", "Missing key or value");
+  HTTP.on("/save_geo_tz_param", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("key") || !request->hasParam("value")) {
+      request->send(400, "text/plain", "Missing key or value");
       return;
     }
-    String key = HTTP.arg("key");
-    String value = HTTP.arg("value");
+
+    String key = request->getParam("key")->value();
+    String value = request->getParam("value")->value();
     if (jsonRead(configSetup, key) != value) {
       jsonWrite(configSetup, key, value);
       saveConfig();
     }
-    HTTP.send(200, "text/plain", "OK");
-  });
-
-  HTTP.on("/resolve_city", HTTP_GET, []() {
-    if (!HTTP.hasArg("lat") || !HTTP.hasArg("lon")) {
-      HTTP.send(400, "text/plain", "Missing lat or lon");
-      return;
-    }
-
-    float lat = HTTP.arg("lat").toFloat();
-    float lon = HTTP.arg("lon").toFloat();
-
-    String city = getCityNameFromCoords(lat, lon);
-    HTTP.send(200, "text/plain", city);
+    request->send(200, "text/plain", "OK");
   });
 
   // --------------------------------------------------------------- ПОГОДА (ЯНДЕКС, OPENWEATHER) --------------------------------------------------------
 
 #if USE_WEATHER
-  HTTP.on("/print_weather", handle_print_weather); // Интервал вывода погоды
-  HTTP.on("/run_weather_text_enabled", handle_run_weather_text_enabled); // Включение/выключение погоды бегущей строкой
-  HTTP.on("/get_weather", HTTP_GET, []() {
-    DynamicJsonDocument doc(1024);
+  HTTP.on("/print_weather", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_print_weather(request);
+  }); // Интервал вывода погоды
+  HTTP.on("/run_weather_text_enabled", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_run_weather_text_enabled(request);
+  }); // Включение/выключение погоды бегущей строкой
 
+  HTTP.on("/get_weather", HTTP_GET, [](AsyncWebServerRequest * request) {
+    DynamicJsonDocument doc(1024);
     auto& weather = Weather::instance();
     if (weather.isAvailable()) {
       String source = weather.isUsingYandex() ? "Яндекс" : "OpenWeather";
@@ -956,17 +1067,17 @@ void User_settings() {
 
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 
-  HTTP.on("/save_weather_param", HTTP_GET, []() {
-    if (!HTTP.hasArg("key") || !HTTP.hasArg("value")) {
-      HTTP.send(400, "text/plain", "Missing key or value");
+  HTTP.on("/save_weather_param", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("key") || !request->hasParam("value")) {
+      request->send(400, "text/plain", "Missing key or value");
       return;
     }
 
-    String key = HTTP.arg("key");
-    String value = HTTP.arg("value");
+    String key = request->getParam("key")->value();
+    String value = request->getParam("value")->value();
     bool needForceUpdate = false;
     bool configChanged = false;
 
@@ -991,11 +1102,11 @@ void User_settings() {
       Weather::instance().forceUpdate();
     }
 
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
   // кнопка "Применить"
-  HTTP.on("/save_weather_params", HTTP_GET, []() {
+  HTTP.on("/save_weather_params", HTTP_GET, [](AsyncWebServerRequest * request) {
     bool configChanged = false;
 
     String oldLat = jsonRead(configWeather, "custom_lat");
@@ -1015,17 +1126,17 @@ void User_settings() {
       }
     };
 
-    if (HTTP.hasArg("weather_source")) saveIfChanged("weather_source", HTTP.arg("weather_source"));
-    if (HTTP.hasArg("yandex_geo")) saveIfChanged("yandex_geo", HTTP.arg("yandex_geo"));
-    if (HTTP.hasArg("custom_yandex_geo")) saveIfChanged("custom_yandex_geo", HTTP.arg("custom_yandex_geo"), true);
-    if (HTTP.hasArg("city")) saveIfChanged("city", HTTP.arg("city"));
-    if (HTTP.hasArg("custom_city")) saveIfChanged("custom_city", HTTP.arg("custom_city"), true);
-    if (HTTP.hasArg("custom_lat")) saveIfChanged("custom_lat", HTTP.arg("custom_lat"),  true, true);
-    if (HTTP.hasArg("custom_lon")) saveIfChanged("custom_lon", HTTP.arg("custom_lon"),  true, true);
-    if (HTTP.hasArg("yandex_api_key")) saveIfChanged("yandex_api_key", HTTP.arg("yandex_api_key"), true);
+    if (request->hasParam("weather_source")) saveIfChanged("weather_source", request->getParam("weather_source")->value());
+    if (request->hasParam("yandex_geo")) saveIfChanged("yandex_geo", request->getParam("yandex_geo")->value());
+    if (request->hasParam("custom_yandex_geo")) saveIfChanged("custom_yandex_geo", request->getParam("custom_yandex_geo")->value(), true);
+    if (request->hasParam("city")) saveIfChanged("city", request->getParam("city")->value());
+    if (request->hasParam("custom_city")) saveIfChanged("custom_city", request->getParam("custom_city")->value(), true);
+    if (request->hasParam("custom_lat")) saveIfChanged("custom_lat", request->getParam("custom_lat")->value(), true, true);
+    if (request->hasParam("custom_lon")) saveIfChanged("custom_lon", request->getParam("custom_lon")->value(), true, true);
+    if (request->hasParam("yandex_api_key")) saveIfChanged("yandex_api_key", request->getParam("yandex_api_key")->value(), true);
 
-    String latNow  = jsonRead(configWeather, "custom_lat");
-    String lonNow  = jsonRead(configWeather, "custom_lon");
+    String latNow = jsonRead(configWeather, "custom_lat");
+    String lonNow = jsonRead(configWeather, "custom_lon");
     latNow.trim(); lonNow.trim();
 
     bool coordsChanged = (oldLat != latNow) || (oldLon != lonNow);
@@ -1034,8 +1145,8 @@ void User_settings() {
       jsonWrite(configWeather, "custom_coord_name", "");
       configChanged = true;
     } else {
-      if (HTTP.hasArg("custom_coord_name")) {
-        String value = HTTP.arg("custom_coord_name");
+      if (request->hasParam("custom_coord_name")) {
+        String value = request->getParam("custom_coord_name")->value();
         value.trim();
         if (jsonRead(configWeather, "custom_coord_name") != value) {
           jsonWrite(configWeather, "custom_coord_name", value);
@@ -1047,12 +1158,10 @@ void User_settings() {
     String nameNow = jsonRead(configWeather, "custom_coord_name");
     nameNow.trim();
 
-    if (nameNow.length() == 0 && latNow.length() > 0 && lonNow.length() > 0
-        && Wifi::instance().isConnected()) {
+    if (nameNow.length() == 0 && latNow.length() > 0 && lonNow.length() > 0 && Wifi::instance().isConnected()) {
       float latF = latNow.toFloat();
       float lonF = lonNow.toFloat();
-      if (latF >= -90.0f && latF <= 90.0f && lonF >= -180.0f && lonF <= 180.0f
-          && !(latF == 0.0f && lonF == 0.0f)) {
+      if (latF >= -90.0f && latF <= 90.0f && lonF >= -180.0f && lonF <= 180.0f && !(latF == 0.0f && lonF == 0.0f)) {
         String cityResolved = getCityNameFromCoords(latF, lonF);
         cityResolved.trim();
         if (cityResolved.length() > 0) {
@@ -1070,11 +1179,11 @@ void User_settings() {
       }
     }
 
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
   // текущие настройки
-  HTTP.on("/get_weather_settings", HTTP_GET, []() {
+  HTTP.on("/get_weather_settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(2048);
 
     String weather_source = jsonRead(configWeather, "weather_source");
@@ -1100,13 +1209,13 @@ void User_settings() {
 
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 
 #else
   // заглушки
   // возвращает статус "ОТКЛЮЧЕНО В ПРОШИВКЕ"
-  HTTP.on("/get_weather", HTTP_GET, []() {
+  HTTP.on("/get_weather", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(128);
     doc["enabled"] = false;
     doc["text"] = "ОТКЛЮЧЕНО В ПРОШИВКЕ";
@@ -1116,18 +1225,18 @@ void User_settings() {
     doc["provider"] = "";
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 
-  HTTP.on("/save_weather_param", HTTP_GET, []() {
-    HTTP.send(200, "text/plain", "OK (weather disabled)");
+  HTTP.on("/save_weather_param", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "OK (weather disabled)");
   });
 
-  HTTP.on("/save_weather_params", HTTP_GET, []() {
-    HTTP.send(200, "text/plain", "OK (weather disabled)");
+  HTTP.on("/save_weather_params", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "OK (weather disabled)");
   });
 
-  HTTP.on("/get_weather_settings", HTTP_GET, []() {
+  HTTP.on("/get_weather_settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(128);
     doc["weather_source"] = "0";
     doc["yandex_geo"] = "";
@@ -1136,28 +1245,34 @@ void User_settings() {
     doc["custom_city"] = "";
     String out;
     serializeJson(doc, out);
-    HTTP.send(200, "application/json", out);
+    request->send(200, "application/json", out);
   });
 #endif
 
   // ------------------------------------------------------------------------ НАСТРОЙКИ МАТРИЦЫ ---------------------------------------------------------
 
-  HTTP.on("/m_t", handle_matrix_tipe);
-  HTTP.on("/m_o", handle_matrix_orientation);
+  HTTP.on("/m_t", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_matrix_tipe(request);
+  });
+  HTTP.on("/m_o", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_matrix_orientation(request);
+  });
 #if MULTI_MATRIX
-  HTTP.on("/multi_matrix_enable", HTTP_GET, handle_multi_matrix_enable);
+  HTTP.on("/multi_matrix_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_multi_matrix_enable(request);
+  });
 #endif
 
   // чип светодиодов, порядок цветов
-  HTTP.on("/save_led_settings", HTTP_GET, []() {
+  HTTP.on("/save_led_settings", HTTP_GET, [](AsyncWebServerRequest * request) {
     String configLED = readFile(F("config_led_matrix.json"), 2048);
     if (configLED == "Failed" || configLED == "Large" || configLED.isEmpty()) {
       configLED = "{}";
     }
 
     bool changed = false;
-    if (HTTP.hasArg("led_chip")) {
-      String val = HTTP.arg("led_chip");
+    if (request->hasParam("led_chip")) {
+      String val = request->getParam("led_chip")->value();
       String oldVal = jsonRead(configLED, "led_chip");
       if (oldVal != val) {
         jsonWrite(configLED, "led_chip", val);
@@ -1165,8 +1280,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("color_order")) {
-      String val = HTTP.arg("color_order");
+    if (request->hasParam("color_order")) {
+      String val = request->getParam("color_order")->value();
       String oldVal = jsonRead(configLED, "color_order");
       if (oldVal != val) {
         jsonWrite(configLED, "color_order", val);
@@ -1176,22 +1291,22 @@ void User_settings() {
 
     if (changed) {
       writeFile(F("config_led_matrix.json"), configLED);
-      HTTP.send(200, "text/plain", "OK_REBOOT");
+      request->send(200, "text/plain", "OK_REBOOT");
       pendingRestart = true;
     } else {
-      HTTP.send(200, "text/plain", "NO_CHANGE");
+      request->send(200, "text/plain", "NO_CHANGE");
     }
   });
 
-  HTTP.on("/save_matrix", HTTP_GET, []() {
+  HTTP.on("/save_matrix", HTTP_GET, [](AsyncWebServerRequest * request) {
     bool changed = false;
     bool needReboot = false;
     String configLED = readFile(F("config_led_matrix.json"), 2048);
     if (configLED == "Failed" || configLED == "Large") configLED = "{}";
 
     // с перезагрузкой
-    if (HTTP.hasArg("led_chip")) {
-      String val = HTTP.arg("led_chip");
+    if (request->hasParam("led_chip")) {
+      String val = request->getParam("led_chip")->value();
       String old = jsonRead(configLED, "led_chip");
       if (old != val) {
         jsonWrite(configLED, "led_chip", val);
@@ -1200,8 +1315,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("color_order")) {
-      String val = HTTP.arg("color_order");
+    if (request->hasParam("color_order")) {
+      String val = request->getParam("color_order")->value();
       String old = jsonRead(configLED, "color_order");
       if (old != val) {
         jsonWrite(configLED, "color_order", val);
@@ -1210,8 +1325,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("width")) {
-      String val = HTTP.arg("width");
+    if (request->hasParam("width")) {
+      String val = request->getParam("width")->value();
       String old = jsonRead(configLED, "width");
       if (old != val) {
         uint16_t newW = val.toInt();
@@ -1223,8 +1338,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("height")) {
-      String val = HTTP.arg("height");
+    if (request->hasParam("height")) {
+      String val = request->getParam("height")->value();
       String old = jsonRead(configLED, "height");
       if (old != val) {
         uint16_t newH = val.toInt();
@@ -1237,8 +1352,8 @@ void User_settings() {
     }
 
 #if MULTI_MATRIX
-    if (HTTP.hasArg("segMatrix_w")) {
-      String val = HTTP.arg("segMatrix_w");
+    if (request->hasParam("segMatrix_w")) {
+      String val = request->getParam("segMatrix_w")->value();
       String old = jsonRead(configLED, "segMatrix_w");
       if (old != val) {
         uint8_t newW = val.toInt();
@@ -1250,8 +1365,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("segMatrix_h")) {
-      String val = HTTP.arg("segMatrix_h");
+    if (request->hasParam("segMatrix_h")) {
+      String val = request->getParam("segMatrix_h")->value();
       String old = jsonRead(configLED, "segMatrix_h");
       if (old != val) {
         uint8_t newH = val.toInt();
@@ -1262,9 +1377,10 @@ void User_settings() {
         }
       }
     }
+
     // перезагрузка автоматическая
-    if (HTTP.hasArg("panel_flip")) {
-      String val = HTTP.arg("panel_flip");
+    if (request->hasParam("panel_flip")) {
+      String val = request->getParam("panel_flip")->value();
       String old = jsonRead(configLED, "panel_flip");
       if (old != val) {
         jsonWrite(configLED, "panel_flip", val);
@@ -1276,8 +1392,8 @@ void User_settings() {
 #endif
 
     // без перезагрузки
-    if (HTTP.hasArg("m_t")) {
-      String val = HTTP.arg("m_t");
+    if (request->hasParam("m_t")) {
+      String val = request->getParam("m_t")->value();
       String old = jsonRead(configLED, "m_t");
       if (old != val) {
         jsonWrite(configLED, "m_t", val);
@@ -1286,8 +1402,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("m_o")) {
-      String val = HTTP.arg("m_o");
+    if (request->hasParam("m_o")) {
+      String val = request->getParam("m_o")->value();
       String old = jsonRead(configLED, "m_o");
       if (old != val) {
         jsonWrite(configLED, "m_o", val);
@@ -1296,8 +1412,8 @@ void User_settings() {
       }
     }
 
-    if (HTTP.hasArg("cur_lim")) {
-      String val = HTTP.arg("cur_lim");
+    if (request->hasParam("cur_lim")) {
+      String val = request->getParam("cur_lim")->value();
       String old = jsonRead(configLED, "cur_lim");
       if (old != val) {
         jsonWrite(configLED, "cur_lim", val);
@@ -1313,28 +1429,29 @@ void User_settings() {
       writeFile(F("config_led_matrix.json"), configLED);
 
       if (needReboot) {
-        HTTP.send(200, "text/plain", "OK_REBOOT");
+        request->send(200, "text/plain", "OK_REBOOT");
         pendingRestart = true;
       } else {
-        HTTP.send(200, "text/plain", "OK");
+        request->send(200, "text/plain", "OK");
       }
     } else {
-      HTTP.send(200, "text/plain", "NO_CHANGE");
+      request->send(200, "text/plain", "NO_CHANGE");
     }
   });
 
   // --------------------------------------------------------------------- АНИМАЦИОННЫЕ ЭФФЕКТЫ ---------------------------------------------------------
 
 #if USE_ANIMATIONS
-  HTTP.on("/get_anim_list", HTTP_GET, []() {
+  HTTP.on("/get_anim_list", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(1024);
     JsonArray array = doc.to<JsonArray>();
 
     String list = animations_list;
     if (list.length() == 0) {
-      HTTP.send(200, "application/json; charset=utf-8", "[]");
+      request->send(200, "application/json; charset=utf-8", "[]");
       return;
     }
+
     int start = 0;
     while (true) {
       int comma = list.indexOf(',', start);
@@ -1355,12 +1472,13 @@ void User_settings() {
         start = comma + 1;
       }
     }
+
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json; charset=utf-8", response);
+    request->send(200, "application/json; charset=utf-8", response);
   });
 
-  HTTP.on("/set_anim", HTTP_GET, []() {
+  HTTP.on("/set_anim", HTTP_GET, [](AsyncWebServerRequest * request) {
 #if USE_SD
     if (outFile) {
       outFile.close();
@@ -1368,14 +1486,14 @@ void User_settings() {
     }
 #endif
     outEffectActive = false;
-    if (!HTTP.hasArg("anim")) {
-      HTTP.send(400, "text/plain", "Missing anim parameter");
+    if (!request->hasParam("anim")) {
+      request->send(400, "text/plain", "Missing anim parameter");
       return;
     }
 
-    int idx = HTTP.arg("anim").toInt();
+    int idx = request->getParam("anim")->value().toInt();
     if (idx < 0 || idx > max_image_num) {
-      HTTP.send(400, "text/plain", "Invalid animation index");
+      request->send(400, "text/plain", "Invalid animation index");
       return;
     }
 
@@ -1405,7 +1523,7 @@ void User_settings() {
     saveConfig();
 
     String response = "{\"anim_sel\":" + String(idx) + ",\"eff_sel\":0}";
-    HTTP.send(200, "application/json", response);
+    request->send(200, "application/json", response);
 
 #if USE_MULTILAMP
     repeat_multiple_lamp_control = true;
@@ -1425,9 +1543,9 @@ void User_settings() {
 
 #if USE_SD
 
-  HTTP.on("/list_sd", HTTP_GET, []() {
+  HTTP.on("/list_sd", HTTP_GET, [](AsyncWebServerRequest * request) {
     String path = "/";
-    if (HTTP.hasArg("dir")) path = HTTP.arg("dir");
+    if (request->hasParam("dir")) path = request->getParam("dir")->value();
 
     auto openDir = [](const String & p) -> File {
       if (sdType == 1) return LittleFS.open(p);
@@ -1437,7 +1555,7 @@ void User_settings() {
     File root = openDir(path);
     if (!root || !root.isDirectory()) {
       if (root) root.close();
-      HTTP.send(404, "text/plain", "SD dir not found: " + path);
+      request->send(404, "text/plain", "SD dir not found: " + path);
       return;
     }
 
@@ -1457,27 +1575,29 @@ void User_settings() {
     }
     root.close();
     output += "]";
-    HTTP.send(200, "application/json", output);
+    request->send(200, "application/json", output);
   });
 
-  HTTP.on("/list_out_files", handle_list_out_files);
+  HTTP.on("/list_out_files", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_list_out_files(request);
+  });
 
-  HTTP.on("/set_out_effect", HTTP_GET, []() {
-    if (!HTTP.hasArg("file")) {
-      HTTP.send(400, "text/plain", "Missing file parameter");
+  HTTP.on("/set_out_effect", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("file")) {
+      request->send(400, "text/plain", "Missing file parameter");
       return;
     }
     if (!ONflag) {
-      HTTP.send(403, "text/plain", "Lamp is off");
+      request->send(403, "text/plain", "Lamp is off");
       return;
     }
 
-    String fileName = HTTP.arg("file");
+    String fileName = request->getParam("file")->value();
     String sizeFolder = String(matrixWidth) + "x" + String(matrixHeight);
     String path = "/effects/" + sizeFolder + "/" + fileName;
 
     if (!sdFileExists(path)) {
-      HTTP.send(404, "text/plain", "File not found");
+      request->send(404, "text/plain", "File not found");
       return;
     }
 
@@ -1505,47 +1625,63 @@ void User_settings() {
       outEffectActive = true;
       FastLED.show();
 
-      HTTP.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     } else {
-      HTTP.send(500, "text/plain", "Failed to start");
+      request->send(500, "text/plain", "Failed to start");
     }
   });
 #else // !USE_SD
-  HTTP.on("/set_out_effect", []() {
-    HTTP.send(404, F("text/plain"), F("SD card not enabled"));
+  HTTP.on("/set_out_effect", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(404, "text/plain", "SD card not enabled");
   });
 #endif // USE_SD
 
-  HTTP.on("/get_eff_sd_index", HTTP_GET, []() {
-    HTTP.send(200, "text/plain", String(effSdIndex));
+  HTTP.on("/get_eff_sd_index", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", String(effSdIndex));
   });
 
   // --------------------------------------------------------------------
-  HTTP.on("/debug.log", HTTP_GET, []() {
-    File logFile = LittleFS.open("/debug.log", "r");
-    if (!logFile) {
-      HTTP.send(404, "text/plain", "Log file not found");
+  HTTP.on("/debug.log", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!LittleFS.exists("/debug.log")) {
+      request->send(404, "text/plain", "Log file not found");
       return;
     }
-    HTTP.send(200, "text/plain", logFile.readString());
-    logFile.close();
+    request->send(LittleFS, "/debug.log", "text/plain");
   });
 
   // ------------------------------------------------------------------------- LED ПАНЕЛЬ ---------------------------------------------------------------
 
   // бегущая строка
 #if LED_PANEL
-  HTTP.on("/spt", handle_spt);                             // Скорость бегущей строки
-  HTTP.on("/sct", handle_sct);                             // Цвет бегущей строки
-  HTTP.on("/font_size", handle_font_size);                 // Шрифт текста
-  HTTP.on("/run_text", handle_run_text);                   // Текст бегущей строки
-  HTTP.on("/run_text_enabled", handle_run_text_enabled);   // Чекбокс "Включить бегущую строку"
-  HTTP.on("/run_text_over", handle_run_text_over);         // Чекбокс "Бегущая строка поерх эффекта"
-  HTTP.on("/interval_run_text", handle_interval_run_text); // Интервал вывода текста бегущей строкой"
-  HTTP.on("/run_time_text_enabled", handle_run_time_text_enabled); // Включение/выключение часов бегущей строкой
-  HTTP.on("/rainbow_text", HTTP_GET, []() {                // Чекбокс "Разноцветный текст"
-    if (HTTP.hasArg("value")) {
-      rainbowText = (HTTP.arg("value") == "1" || HTTP.arg("value") == "true");
+  HTTP.on("/spt", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_spt(request);
+  });                                     // Скорость бегущей строки
+  HTTP.on("/sct", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sct(request);
+  });                                     // Цвет бегущей строки
+  HTTP.on("/font_size", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_font_size(request);
+  });                         // Шрифт текста
+  HTTP.on("/run_text", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_run_text(request);
+  });                           // Текст бегущей строки
+  HTTP.on("/run_text_enabled", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_run_text_enabled(request);
+  });           // Чекбокс "Включить бегущую строку"
+  HTTP.on("/run_text_over", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_run_text_over(request);
+  });                 // Чекбокс "Бегущая строка поерх эффекта"
+  HTTP.on("/interval_run_text", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_interval_run_text(request);
+  });         // Интервал вывода текста бегущей строкой"
+  HTTP.on("/run_time_text_enabled", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_run_time_text_enabled(request);
+  }); // Включение/выключение часов бегущей строкой
+
+  HTTP.on("/rainbow_text", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("value")) {
+      String rtVal = request->getParam("value")->value();
+      rainbowText = (rtVal == "1" || rtVal == "true");
       if (rainbowText) {
         runTextColorCycle = false;
         autoRunTextHue = false;
@@ -1558,13 +1694,13 @@ void User_settings() {
       offset = matrixWidth + 10;
       scrollTimer = millis();
     }
-    HTTP.send(200, "text/plain", rainbowText ? "1" : "0");
+    request->send(200, "text/plain", rainbowText ? "1" : "0");
   });
 
   // оттенок текста
-  HTTP.on("/run_text_hue", []() {
-    if (HTTP.hasArg("value")) {
-      int val = HTTP.arg("value").toInt();
+  HTTP.on("/run_text_hue", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("value")) {
+      int val = request->getParam("value")->value().toInt();
       if (val >= 253) {
         runTextColorCycle = true;
         runTextHue = 0;
@@ -1578,179 +1714,333 @@ void User_settings() {
       saveConfig();
       loadingFlag = true;
     }
-    HTTP.send(200, "text/plain", String(runTextHue));
+    request->send(200, "text/plain", String(runTextHue));
   });
 
   // если интервал вывода бегущей строки установлен 0, то текст будет бежать непрерывно
-  HTTP.on("/run_text_cycle", []() {
-    if (HTTP.hasArg("value")) {
-      runTextColorCycle = (HTTP.arg("value") == "1");
+  HTTP.on("/run_text_cycle", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("value")) {
+      String rtcVal = request->getParam("value")->value();
+      runTextColorCycle = (rtcVal == "1");
+
       jsonWrite(configLedPanel, "run_text_cycle", runTextColorCycle ? "1" : "0");
       saveConfig();
       loadingFlag = true;
     }
-    HTTP.send(200, "text/plain", runTextColorCycle ? "1" : "0");
+    request->send(200, "text/plain", runTextColorCycle ? "1" : "0");
   });
-  HTTP.on("/text_y_offset", handle_text_y_offset);              // Смещение текста по Y (по высоте)
-  // часы
-  HTTP.on("/clock_x_offset", handle_clock_x_offset);            // Смещение текста по X (по ширине)
-  HTTP.on("/clock_y_offset", handle_clock_y_offset);            // Смещение текста по Y (по высоте)
-  HTTP.on("/clock_hue", handle_clock_hue); // Оттенок часов
-  // дата
-  HTTP.on("/date_enabled", handle_date_enabled);                 // Чекбокс "Включить дату"
-  HTTP.on("/date_y_offset", handle_date_y_offset);               // Смещение даиы по Y (по ширине)
-  HTTP.on("/date_x_offset", handle_date_x_offset);               // Смещение даты по X (по ширине)
-  HTTP.on("/date_hue", handle_date_hue);                         // Оттенок даты
-  HTTP.on("/date_full_year", handle_date_full_year);             // Показывать 4 цифры года
-  HTTP.on("/date_separator_blink", handle_date_separator_blink); // Плавное мигание разделительных точек
-  HTTP.on("/date_show_year", handle_date_show_year);             // Показывать год
 
-  HTTP.on("/rainbow_date", HTTP_GET, []() {
-    if (HTTP.hasArg("value")) {
-      String val = HTTP.arg("value");
-      rainbowDate = (val == "1" || val.equalsIgnoreCase("true") || val == "on");
+  HTTP.on("/text_y_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_text_y_offset(request);
+  }); // Смещение текста по Y (по высоте)
+  // часы
+  HTTP.on("/clock_x_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_clock_x_offset(request);
+  }); // Смещение текста по X (по ширине)
+  HTTP.on("/clock_y_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_clock_y_offset(request);
+  }); // Смещение текста по Y (по высоте)
+  HTTP.on("/clock_hue", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_clock_hue(request);
+  }); // Оттенок часов
+  // дата
+  HTTP.on("/date_enabled", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_enabled(request);
+  });  // Чекбокс "Включить дату"
+  HTTP.on("/date_y_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_y_offset(request);
+  }); // Смещение даиы по Y (по ширине)
+  HTTP.on("/date_x_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_x_offset(request);
+  }); // Смещение даты по X (по ширине)
+  HTTP.on("/date_hue", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_hue(request);
+  }); // Оттенок даты
+  HTTP.on("/date_full_year", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_full_year(request);
+  }); // Показывать 4 цифры года
+  HTTP.on("/date_separator_blink", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_separator_blink(request);
+  }); // Плавное мигание разделительных точек
+  HTTP.on("/date_show_year", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_date_show_year(request);
+  }); // Показывать год
+
+  HTTP.on("/rainbow_date", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("value")) {
+      String dVal = request->getParam("value")->value();
+      rainbowDate = (dVal == "1" || dVal.equalsIgnoreCase("true") || dVal == "on");
       jsonWrite(configLedPanel, "rainbow_date", rainbowDate ? "1" : "0");
       saveConfig();
       dateNeedRedraw = true;
       loadingFlag = true;
     }
-    HTTP.send(200, "text/plain", rainbowDate ? "1" : "0");
+    request->send(200, "text/plain", rainbowDate ? "1" : "0");
   });
 
   // погода
 #if USE_WEATHER
-  HTTP.on("/weather_enabled", handle_weather_enabled);   // Чекбокс "Включить погоду"
-  HTTP.on("/weather_hue", handle_weather_hue);           // Регулировка цвета
-  HTTP.on("/weather_x_offset", handle_weather_x_offset); // Смещение по X
-  HTTP.on("/weather_y_offset", handle_weather_y_offset); // Смещение по Y
-  HTTP.on("/degree_blink", handle_degree_blink);         // Мигание знака градуса (маленький кружок)
+  HTTP.on("/weather_enabled", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_enabled(request);
+  });           // Чекбокс "Включить погоду"
+  HTTP.on("/weather_hue", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_hue(request);
+  });                   // Регулировка цвета
+  HTTP.on("/weather_x_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_x_offset(request);
+  });         // Смещение по X
+  HTTP.on("/weather_y_offset", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_y_offset(request);
+  });         // Смещение по Y
+  HTTP.on("/degree_blink", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_degree_blink(request);
+  });                 // Мигание знака градуса (маленький кружок)
   // таймеры и интервалы
-  HTTP.on("/timer_c_d_w", handle_timer_c_d_w);                   // таймер часы/дата/погоды
-  HTTP.on("/timer_clock_fixed", handle_timer_clock_fixed);       // таймер часы + дата/погоды
-  HTTP.on("/interval_c_d_w", handle_interval_c_d_w);             // интервал часы/дата/погоды
-  HTTP.on("/interval_clock_fixed", handle_interval_clock_fixed); // интервал часы + дата/погоды
-  HTTP.on("/timer_d_w", handle_timer_d_w);                       // таймер дата/погода
-  HTTP.on("/interval_d_w", handle_interval_d_w);                 // интервал дата/погода
-  HTTP.on("/timer_c_w", handle_timer_c_w);                       // таймер часы/погода
-  HTTP.on("/interval_c_w", handle_interval_c_w);                 // интервал часы/погода
+  HTTP.on("/timer_c_d_w", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_timer_c_d_w(request);
+  });                   // таймер часы/дата/погоды
+  HTTP.on("/timer_clock_fixed", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_timer_clock_fixed(request);
+  });       // таймер часы + дата/погоды
+  HTTP.on("/interval_c_d_w", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_interval_c_d_w(request);
+  });             // интервал часы/дата/погоды
+  HTTP.on("/interval_clock_fixed", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_interval_clock_fixed(request);
+  }); // интервал часы + дата/погоды
+  HTTP.on("/timer_d_w", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_timer_d_w(request);
+  });                       // таймер дата/погода
+  HTTP.on("/interval_d_w", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_interval_d_w(request);
+  });                 // интервал дата/погода
+  HTTP.on("/timer_c_w", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_timer_c_w(request);
+  });                       // таймер часы/погода
+  HTTP.on("/interval_c_w", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_interval_c_w(request);
+  });                 // интервал часы/погода
 
-  HTTP.on("/rainbow_weather", HTTP_GET, []() {
-    if (HTTP.hasArg("value")) {
-      rainbowWeather = (HTTP.arg("value") == "1" || HTTP.arg("value") == "true");
+  HTTP.on("/rainbow_weather", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("value")) {
+      String wVal = request->getParam("value")->value();
+      rainbowWeather = (wVal == "1" || wVal == "true");
       jsonWrite(configLedPanel, "rainbow_weather", rainbowWeather ? "1" : "0");
       saveConfig();
       weatherNeedRedraw = true;
       loadingFlag = true;
     }
-    HTTP.send(200, "text/plain", rainbowWeather ? "1" : "0");
+    request->send(200, "text/plain", rainbowWeather ? "1" : "0");
   });
 #endif // USE_WEATHER
   // таймер и интервал часы/дата
-  HTTP.on("/timer_c_d",  handle_timer_c_d);
-  HTTP.on("/interval_c_d", handle_interval_c_d);
+  HTTP.on("/timer_c_d", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_timer_c_d(request);
+  });
+  HTTP.on("/interval_c_d", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_interval_c_d(request);
+  });
 #endif // LED_PANEL
 
   // ------------------------------------------------------------------------- МП3 ПЛЕЕР ----------------------------------------------------------------
 
 #if USE_MP3_PLAYER
-  HTTP.on("/save_sound_settings", HTTP_GET, handle_save_sound_settings);
-  HTTP.on("/on_sound", handle_on_sound);
-  HTTP.on("/on_day_adv", handle_day_advert_on_sound);
-  HTTP.on("/on_night_adv", handle_night_advert_on_sound);
-  HTTP.on("/on_alm_adv", handle_alarm_advert_sound_on);
-  HTTP.on("/vol", handle_volume);
-  HTTP.on("/alm_vol", handle_alarm_volume);
-  HTTP.on("/sun_vol", handle_sunset_volume);
-  HTTP.on("/day_vol", handle_day_advert_volume);
-  HTTP.on("/night_vol", handle_night_advert_volume);
-  HTTP.on("/tim_h", handle_tim_h);
-  HTTP.on("/tim_m", handle_tim_m);
-  HTTP.on("/delay", handle_delay);
-  HTTP.on("/on_alm_snd", handle_alarm_on_sound);
-  HTTP.on("/on_sun_snd", handle_sunset_on_sound);
-  HTTP.on("/alm_fold_sel", handle_alarm_fold_sel);
-  HTTP.on("/sun_fold_sel", handle_sunset_fold_sel);
-  HTTP.on("/sound_set", handle_sound_set);
-  HTTP.on("/track_down", handle_folder_down);
-  HTTP.on("/track_up", handle_folder_up);
-  HTTP.on("/fold_sel", handle_folder_select);
-  HTTP.on("/eq", handle_equalizer);
-  HTTP.on("/play_time", HTTP_GET, handle_play_time);
-  HTTP.on("/play_weather", HTTP_GET, handle_play_weather);
-  HTTP.on("/weather_speak", HTTP_GET, handle_weather_speak);
-  HTTP.on("/time_speak", HTTP_GET, handle_time_speak);
-  HTTP.on("/weather_temp_delay", HTTP_GET, handle_weather_temp_delay);
-  HTTP.on("/weather_desc_delay", HTTP_GET, handle_weather_desc_delay);
-  HTTP.on("/weather_day_vol", handle_weather_day_volume);
-  HTTP.on("/weather_night_vol", handle_weather_night_volume);
-  HTTP.on("/day_weather_adv", handle_day_weather_adv);
-  HTTP.on("/day_weather_desc", handle_day_weather_desc);
-  HTTP.on("/night_weather_adv", handle_night_weather_adv);
-  HTTP.on("/night_weather_desc", handle_night_weather_desc);
-  HTTP.on("/show_weather_desc", handle_show_weather_desc);
-  HTTP.on("/time_always", handle_time_always);
-  HTTP.on("/weather_always", handle_weather_always);
 
-  HTTP.on("/stop_weather_sound", HTTP_GET, []() {
+  HTTP.on("/save_sound_settings", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_save_sound_settings(request);
+  });
+  HTTP.on("/on_sound", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_on_sound(request);
+  });
+  HTTP.on("/on_day_adv", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_day_advert_on_sound(request);
+  });
+  HTTP.on("/on_night_adv", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_advert_on_sound(request);
+  });
+  HTTP.on("/on_alm_adv", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_alarm_advert_sound_on(request);
+  });
+  HTTP.on("/vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_volume(request);
+  });
+  HTTP.on("/alm_vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_alarm_volume(request);
+  });
+  HTTP.on("/sun_vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sunset_volume(request);
+  });
+  HTTP.on("/day_vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_day_advert_volume(request);
+  });
+  HTTP.on("/night_vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_advert_volume(request);
+  });
+  HTTP.on("/tim_h", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tim_h(request);
+  });
+  HTTP.on("/tim_m", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_tim_m(request);
+  });
+  HTTP.on("/delay", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_delay(request);
+  });
+  HTTP.on("/on_alm_snd", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_alarm_on_sound(request);
+  });
+  HTTP.on("/on_sun_snd", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sunset_on_sound(request);
+  });
+  HTTP.on("/alm_fold_sel", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_alarm_fold_sel(request);
+  });
+  HTTP.on("/sun_fold_sel", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sunset_fold_sel(request);
+  });
+  HTTP.on("/sound_set", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_sound_set(request);
+  });
+  HTTP.on("/track_down", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_folder_down(request);
+  });
+  HTTP.on("/track_up", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_folder_up(request);
+  });
+  HTTP.on("/fold_sel", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_folder_select(request);
+  });
+  HTTP.on("/eq", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_equalizer(request);
+  });
+  HTTP.on("/play_time", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_play_time(request);
+  });
+  HTTP.on("/play_weather", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_play_weather(request);
+  });
+  HTTP.on("/weather_speak", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_speak(request);
+  });
+  HTTP.on("/time_speak", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_time_speak(request);
+  });
+  HTTP.on("/weather_temp_delay", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_temp_delay(request);
+  });
+  HTTP.on("/weather_desc_delay", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_desc_delay(request);
+  });
+  HTTP.on("/weather_day_vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_day_volume(request);
+  });
+  HTTP.on("/weather_night_vol", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_night_volume(request);
+  });
+  HTTP.on("/day_weather_adv", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_day_weather_adv(request);
+  });
+  HTTP.on("/day_weather_desc", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_day_weather_desc(request);
+  });
+  HTTP.on("/night_weather_adv", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_weather_adv(request);
+  });
+  HTTP.on("/night_weather_desc", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_night_weather_desc(request);
+  });
+  HTTP.on("/show_weather_desc", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_show_weather_desc(request);
+  });
+  HTTP.on("/time_always", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_time_always(request);
+  });
+  HTTP.on("/weather_always", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_weather_always(request);
+  });
+
+  HTTP.on("/stop_weather_sound", HTTP_GET, [](AsyncWebServerRequest * request) {
     if (mp3_player_connect == 4) {
       mp3SendCmd(0x0E, 0x01, 0, 0);
       mp3_stop = true;
       pause_on = false;
-      HTTP.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     } else {
-      HTTP.send(503, "text/plain", "MP3 player not ready");
+      request->send(503, "text/plain", "MP3 player not ready");
     }
   });
 #endif // USE_MP3_PLAYER
 
-  HTTP.on("/setup_sound", HTTP_GET, []() {
+  HTTP.on("/setup_sound", HTTP_GET, [](AsyncWebServerRequest * request) {
 #ifndef USE_MP3_PLAYER
-    HTTP.send(404, "text/plain", "Настройки звука отключены в прошивке");
+    request->send(404, "text/plain", "Настройки звука отключены в прошивке");
 #else
-    handleFileRead("/setup_sound.htm");
+    request->send(LittleFS, "/setup_sound.htm", "text/html; charset=utf-8");
 #endif
   });
+
+  // ------------------------------------------------------------------- ИНТЕРНЕТ-РАДИО ---------------------------------------------------------
+
+#if USE_RADIO
+  HTTP.on("/radio_enable", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_radio_enable(request);
+  });
+  HTTP.on("/radio_volume", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_radio_volume(request);
+  });
+  HTTP.on("/get_radio_stations", HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_get_radio_stations(request);
+  });
+  HTTP.on("/save_radio_stations", HTTP_POST, [](AsyncWebServerRequest * request) {
+    handle_save_radio_stations(request);
+  });
+  HTTP.on("/radio_map_batch", HTTP_POST, [](AsyncWebServerRequest * request) {
+    handle_radio_map_batch(request);
+  });
+  HTTP.on("/setup_radio", HTTP_GET, [](AsyncWebServerRequest * request) {
+#ifndef USE_RADIO
+    request->send(404, "text/plain", "Radio disabled");
+#else
+    request->send(LittleFS, "/setup_radio.json", "application/json");
+#endif
+  });
+#endif
 
   // ------------------------------------------------------------------- УПРАВЛЕНИЕ ИК ПУЛЬТАМИ ---------------------------------------------------------
 
 #if USE_IR_RECEIVER
   // список всех пультов
-  HTTP.on("/api/ir/remotes", HTTP_GET, []() {
+  HTTP.on("/api/ir/remotes", HTTP_GET, [](AsyncWebServerRequest * request) {
     String remotes = irManager.getRemotesList();
-    HTTP.send(200, "application/json; charset=utf-8", remotes);
+    request->send(200, "application/json; charset=utf-8", remotes);
   });
 
   // страница настройки ИК пульта
-  HTTP.on("/setup_ir", HTTP_GET, []() {
-    String page = readFile("setup_ir.htm", 32768);
-    if (page == "Failed" || page.isEmpty()) {
-      HTTP.send(500, "text/plain; charset=utf-8", "Ошибка загрузки страницы");
-      return;
-    }
-
-    HTTP.send(200, "text/html; charset=utf-8", page);
+  HTTP.on("/setup_ir", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(LittleFS, "/setup_ir.htm", "text/html; charset=utf-8");
   });
 
   // текущий пульт
-  HTTP.on("/api/ir/current", HTTP_GET, []() {
+  HTTP.on("/api/ir/current", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(256);
     doc["id"] = irManager.getCurrentRemoteId();
     doc["name"] = irManager.getCurrentRemoteName();
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json; charset=utf-8", response);
+    request->send(200, "application/json; charset=utf-8", response);
   });
 
   // установка пульта
-  HTTP.on("/api/ir/set", HTTP_POST, []() {
-    DynamicJsonDocument doc(256);
-    DeserializationError error = deserializeJson(doc, HTTP.arg("plain"));
-
-    if (error) {
-      HTTP.send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+  HTTP.on("/api/ir/set", HTTP_POST, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("plain", true)) {
+      request->send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Missing body\"}");
       return;
     }
-
+    DynamicJsonDocument doc(256);
+    DeserializationError error = deserializeJson(doc, request->getParam("plain", true)->value());
+    if (error) {
+      request->send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+      return;
+    }
     String remoteId = doc["remote_id"];
     if (irManager.loadRemote(remoteId)) {
       DynamicJsonDocument response(256);
@@ -1759,9 +2049,9 @@ void User_settings() {
       response["id"] = irManager.getCurrentRemoteId();
       String resp;
       serializeJson(response, resp);
-      HTTP.send(200, "application/json; charset=utf-8", resp);
+      request->send(200, "application/json; charset=utf-8", resp);
     } else {
-      HTTP.send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Remote not found\"}");
+      request->send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Remote not found\"}");
     }
   });
 
@@ -1770,18 +2060,19 @@ void User_settings() {
   DynamicJsonDocument learningDoc(4096);
   bool isLearning = false;
 
-  HTTP.on("/api/ir/learn/save", HTTP_POST, []() {
-    DynamicJsonDocument doc(2048);
-    DeserializationError error = deserializeJson(doc, HTTP.arg("plain"));
-
-    if (error) {
-      HTTP.send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+  HTTP.on("/api/ir/learn/save", HTTP_POST, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("plain", true)) {
+      request->send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Missing body\"}");
       return;
     }
-
+    DynamicJsonDocument doc(2048);
+    DeserializationError error = deserializeJson(doc, request->getParam("plain", true)->value());
+    if (error) {
+      request->send(400, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Invalid JSON\"}");
+      return;
+    }
     String remoteName = doc["name"].as<String>();
     if (remoteName.length() == 0) remoteName = "Мой пульт";
-
     File file = LittleFS.open("/ir_codes.json", "r");
     DynamicJsonDocument jsonDoc(8192);
     if (file) {
@@ -1791,7 +2082,7 @@ void User_settings() {
       jsonDoc["remotes"] = JsonArray();
     }
 
-    String remoteId = "custom_" + String(millis());
+    String remoteId = "custom_" + String((uint32_t)ESP.getEfuseMac(), HEX);
 
     // новый пульт
     JsonObject newRemote = jsonDoc["remotes"].createNestedObject();
@@ -1805,7 +2096,7 @@ void User_settings() {
 
     file = LittleFS.open("/ir_codes.json", "w");
     if (!file) {
-      HTTP.send(500, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Cannot save file\"}");
+      request->send(500, "application/json; charset=utf-8", "{\"success\":false,\"message\":\"Cannot save file\"}");
       return;
     }
     serializeJson(jsonDoc, file);
@@ -1813,16 +2104,16 @@ void User_settings() {
 
     irManager.loadRemote(remoteId);
 
-    HTTP.send(200, "application/json; charset=utf-8", "{\"success\":true,\"id\":\"" + remoteId + "\",\"name\":\"" + remoteName + "\"}");
+    request->send(200, "application/json; charset=utf-8", "{\"success\":true,\"id\":\"" + remoteId + "\",\"name\":\"" + remoteName + "\"}");
   });
 
   // получение последнего ИК кода
-  HTTP.on("/api/ir/last_code", HTTP_GET, []() {
+  HTTP.on("/api/ir/last_code", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(64);
     doc["code"] = String(lastIRCode, HEX);
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json; charset=utf-8", response);
+    request->send(200, "application/json; charset=utf-8", response);
     lastIRCode = 0;
   });
 
@@ -1830,19 +2121,19 @@ void User_settings() {
 
   // ----------------------------------------------------------------------- НАСТРОЙКА ШРИФТА -----------------------------------------------------------
 
-  HTTP.on("/static_font", HTTP_GET, []() {
-    if (!HTTP.hasArg("static_font")) {
-      HTTP.send(400, "text/plain", "Missing static_font parameter");
+  HTTP.on("/static_font", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("static_font")) {
+      request->send(400, "text/plain", "Missing static_font parameter");
       return;
     }
-    String arg = HTTP.arg("static_font");
+    String arg = request->getParam("static_font")->value();
     int val = arg.toInt();
     if (val < 0 || val > 3) {
-      HTTP.send(400, "text/plain", "Invalid static_font value (must be 0-3)");
+      request->send(400, "text/plain", "Invalid static_font value (must be 0-3)");
       return;
     }
     if (staticFont == val) {
-      HTTP.send(200, "text/plain", "OK (no change)");
+      request->send(200, "text/plain", "OK (no change)");
       return;
     }
     staticFont = val;
@@ -1851,9 +2142,11 @@ void User_settings() {
     loadingFlag = true;
     clockNeedRedraw = true;
     dateNeedRedraw = true;
+#if USE_WEATHER
     weatherNeedRedraw = true;
+#endif
     needFullRedraw = true;
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
   // -------------------------------------------------------------- МОДАЛЬНЫЕ ОКНА МЕНЮ ВЭБ-ИНТЕРФЕЙСА --------------------------------------------------
@@ -1864,12 +2157,16 @@ void User_settings() {
   HTTP.on("/mqtt_status", HTTP_GET, handle_mqtt_status);
   HTTP.on("/multilamp_status", HTTP_GET, handle_multilamp_status);
   HTTP.on("/mp3_status", HTTP_GET, handle_mp3_status);
+#if USE_RADIO
+  HTTP.on("/radio_status", HTTP_GET, handle_radio_status);
+#endif
   HTTP.on("/tm1637_status", HTTP_GET, handle_tm1637_status);
   HTTP.on("/button_status", HTTP_GET, handle_button_status);
   HTTP.on("/ir_rf_status", HTTP_GET, handle_ir_rf_status);
   HTTP.on("/st7789_status", HTTP_GET, handle_st7789_status);
   HTTP.on("/show_weather", HTTP_GET, handle_show_weather);
-  HTTP.on("/version", HTTP_GET, []() { // Инфа о прошивке
+
+  HTTP.on("/version", HTTP_GET, [](AsyncWebServerRequest * request) { // Инфа о прошивке
     DynamicJsonDocument doc(1024);
 #ifdef VERSION
     doc["version"] = VERSION;
@@ -1898,7 +2195,7 @@ void User_settings() {
     if (mode == WIFI_AP_STA)  wifiModeStr = "AP + Station";
     else if (mode == WIFI_AP) wifiModeStr = "AP only";
     else if (mode == WIFI_STA) wifiModeStr = "Station only";
-    else                        wifiModeStr = "WiFi выключен";
+    else wifiModeStr = "WiFi выключен";
     doc["wifi_mode"] = wifiModeStr;
 
     auto& wifi = Wifi::instance();
@@ -1937,11 +2234,11 @@ void User_settings() {
 
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json; charset=utf-8", response);
+    request->send(200, "application/json; charset=utf-8", response);
   });
 
   // IP адрес
-  HTTP.on("/wifi_ip", HTTP_GET, []() {
+  HTTP.on("/wifi_ip", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(512);
     auto& wifi = Wifi::instance();
     bool staConnected = wifi.isConnected();
@@ -1954,7 +2251,7 @@ void User_settings() {
     if (ap == "0.0.0.0") doc["ap_ip"] = "192.168.4.1";
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json; charset=utf-8", response);
+    request->send(200, "application/json; charset=utf-8", response);
   });
 
 #endif // STATUS_DEVICE
@@ -1962,7 +2259,7 @@ void User_settings() {
   // ------------------------------------------------------------
 #if SOFT_INFO
   // информация о памяти
-  HTTP.on("/heap", HTTP_GET, []() {
+  HTTP.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(1280);
     uint32_t freeHeap = ESP.getFreeHeap();
     uint32_t totalHeap = ESP.getHeapSize();
@@ -1996,25 +2293,28 @@ void User_settings() {
 
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json", response);
+    request->send(200, "application/json", response);
   });
 
   // ----------------------------------------------------------------------
-  HTTP.on("/get_version", HTTP_GET, []() {
+  HTTP.on("/get_version", HTTP_GET, [](AsyncWebServerRequest * request) {
+#if USE_UPDATE_CHECK
     StaticJsonDocument<512> doc;
     String resp;
 
+    doc["mod_author"] = "AnCore";
     doc["current_version"] = String(VERSION);
     doc["build_datetime"] = buildDateTimeString();
     doc["folder_url"] = "https://github.com/an-core/FieryLedLamp_mod/tree/main/FieryLedLamp_mod";
 
     serializeJson(doc, resp);
-    HTTP.send(200, "application/json; charset=utf-8", resp);
+    request->send(200, "application/json; charset=utf-8", resp);
+#endif
   });
 
-  HTTP.on("/check_update", HTTP_GET, []() {
+  HTTP.on("/check_update", HTTP_GET, [](AsyncWebServerRequest * request) {
     if (updateCache.valid && (millis() - updateCache.timestamp < 600000)) {
-      HTTP.send(200, "application/json; charset=utf-8", updateCache.response);
+      request->send(200, "application/json; charset=utf-8", updateCache.response);
       return;
     }
 
@@ -2024,7 +2324,7 @@ void User_settings() {
       doc["message"] = "Проверка обновлений уже выполняется, попробуйте позже";
       String resp;
       serializeJson(doc, resp);
-      HTTP.send(200, "application/json; charset=utf-8", resp);
+      request->send(200, "application/json; charset=utf-8", resp);
       return;
     }
 
@@ -2035,23 +2335,25 @@ void User_settings() {
       doc["message"] = "Проверка обновлений запущена, обновите страницу через минуту";
       String resp;
       serializeJson(doc, resp);
-      HTTP.send(200, "application/json; charset=utf-8", resp);
+      request->send(200, "application/json; charset=utf-8", resp);
       return;
     }
 
-    HTTP.send(200, "application/json; charset=utf-8", "{\"has_update\":false,\"message\":\"Попробуйте позже\"}");
+    request->send(200, "application/json; charset=utf-8", "{\"has_update\":false,\"message\":\"Попробуйте позже\"}");
   });
 
 #endif // SOFT_INFO
 
   // ---------------------------------------------------------------------- СКРЫТИЕ ПУНКТОВ МЕНЮ --------------------------------------------------------
 
-  HTTP.on("/features", HTTP_GET, []() {
+  HTTP.on("/features", HTTP_GET, [](AsyncWebServerRequest * request) {
     DynamicJsonDocument doc(512);
     doc["mqtt"]           = !!USE_MQTT;
     doc["mp3"]            = !!USE_MP3_PLAYER;
+    doc["radio"]          = !!USE_RADIO;
     doc["sd"]             = !!USE_SD;
     doc["ota"]            = !!USE_OTA;
+    doc["update_check"]   = !!USE_UPDATE_CHECK;
     doc["tm1637"]         = !!USE_TM1637;
     doc["st7789"]         = !!USE_ST7789;
     doc["button"]         = !!USE_BUTTON;
@@ -2079,28 +2381,32 @@ void User_settings() {
 
     String response;
     serializeJson(doc, response);
-    HTTP.send(200, "application/json", response);
+    request->send(200, "application/json", response);
   });
 
   // ------------------------------------------------------------------------ MQTT ПОДКЛЮЧЕНИЕ ----------------------------------------------------------
 
 #if USE_MQTT
-  HTTP.on("/mqtt_set", handle_mqtt_set);
-  HTTP.on("/mqtt_on", handle_mqtt_on);
-  HTTP.on("/mqtt_prd", handle_mqtt_period);
+  HTTP.on("/mqtt_set",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_mqtt_set(request);
+  });
+  HTTP.on("/mqtt_on",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_mqtt_on(request);
+  });
+  HTTP.on("/mqtt_prd",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_mqtt_period(request);
+  });
 #endif
 
-  HTTP.on("/setup_mqtt.json.gz", HTTP_GET, []() {
+  HTTP.on("/setup_mqtt.json.gz", HTTP_GET, [](AsyncWebServerRequest * request) {
 #ifndef USE_MQTT
-    HTTP.send(404, "text/plain", "MQTT disabled in firmware");
+    request->send(404, "text/plain", "MQTT disabled in firmware");
 #else
-    File file = LittleFS.open("/setup_mqtt.json.gz", "r");
-    if (!file) {
-      HTTP.send(404, "text/plain", "File not found");
+    if (!LittleFS.exists("/setup_mqtt.json.gz")) {
+      request->send(404, "text/plain", "File not found");
       return;
     }
-    HTTP.streamFile(file, "application/octet-stream");
-    file.close();
+    request->send(LittleFS, "/setup_mqtt.json.gz", "application/octet-stream");
 #endif
   });
 
@@ -2108,15 +2414,15 @@ void User_settings() {
 
 #if USE_OTA
   // страница OTA ОБНОВЛЕНИЕ
-  HTTP.on("/update", HTTP_GET, []() {
+  HTTP.on("/update", HTTP_GET, [](AsyncWebServerRequest * request) {
     if (!Wifi::instance().isConnected()) {
-      HTTP.send(403, "text/plain; charset=utf-8", "WiFi не подключён");
+      request->send(403, "text/plain; charset=utf-8", "WiFi не подключён");
       return;
     }
 
     String page = readFile("update.htm", 32768);
     if (page == "Failed" || page.isEmpty()) {
-      HTTP.send(500, "text/plain; charset=utf-8", "Ошибка загрузки страницы обновления");
+      request->send(500, "text/plain; charset=utf-8", "Ошибка загрузки страницы обновления");
       return;
     }
 
@@ -2134,166 +2440,70 @@ void User_settings() {
     page.replace("{OTA_TIMEOUT}", String(ESP_CONF_TIMEOUT));
     page.replace("{PLATFORM}", platform);
 
-    HTTP.send(200, "text/html; charset=utf-8", page);
+    request->send(200, "text/html; charset=utf-8", page);
   });
 
   // обновление прошивки
-  HTTP.on("/update_upload", HTTP_POST, []() {
-    HTTP.send(200, "text/plain", "OK");
-  }, []() {
-    static bool updateStarted = false;
-    static uint32_t expectedSize = 0;
-    static uint32_t totalReceived = 0;
-
-    HTTPUpload& upload = HTTP.upload();
-
-    if (upload.status == UPLOAD_FILE_START) {
-      updateStarted = false;
-      expectedSize = upload.totalSize;
-      totalReceived = 0;
-
-      if (expectedSize == 0) {
-        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-        if (!Update.begin(maxSketchSpace, U_FLASH)) {
-          upload.status = UPLOAD_FILE_ABORTED;
-          return;
-        }
-        updateStarted = true;
-      } else {
-        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-
-        if (expectedSize > maxSketchSpace) {
-          upload.status = UPLOAD_FILE_ABORTED;
-          return;
-        }
-
-        if (!Update.begin(expectedSize, U_FLASH)) {
-          upload.status = UPLOAD_FILE_ABORTED;
-          return;
-        }
-        updateStarted = true;
+  HTTP.on("/update_upload", HTTP_POST, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "OK");
+  }, [](AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    if (!index) {
+      uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+      if (!Update.begin(maxSketchSpace, U_FLASH)) {
+        return;
       }
-    } else if (upload.status == UPLOAD_FILE_WRITE) {
-      if (updateStarted) {
-        size_t written = Update.write(upload.buf, upload.currentSize);
-        if (written != upload.currentSize) {
-          Update.abort();
-          upload.status = UPLOAD_FILE_ABORTED;
-        } else {
-          totalReceived += written;
-          if (expectedSize > 0) {
-          }
-        }
-      }
-    } else if (upload.status == UPLOAD_FILE_END) {
-
-      if (updateStarted && Update.end(true)) {
-
-        HTTP.send(200, "text/plain", "SUCCESS");
-        delay(100);
+    }
+    if (len) {
+      Update.write(data, len);
+    }
+    if (final) {
+      if (Update.end(true)) {
         delay(1000);
         ESP.restart();
-      } else {
-        HTTP.send(500, "text/plain", "Update failed");
       }
-      updateStarted = false;
-    } else if (upload.status == UPLOAD_FILE_ABORTED) {
-      if (updateStarted) {
-        Update.abort();
-      }
-      updateStarted = false;
     }
-  });
+  }
+         );
 
   // обновление файловой системы
-  HTTP.on("/update_fs", HTTP_POST, []() {}, []() {
-    static bool updateStarted = false;
-    static uint32_t expectedSize = 0;
-    static uint32_t totalReceived = 0;
-
-    HTTPUpload& upload = HTTP.upload();
-
-    if (upload.status == UPLOAD_FILE_START) {
-      updateStarted = false;
-      expectedSize = upload.totalSize;
-      totalReceived = 0;
-
+  HTTP.on("/update_fs", HTTP_POST, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "FS_UPDATE_SUCCESS");
+  }, [](AsyncWebServerRequest * request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+    if (!index) {
       LittleFS.end();
       delay(200);
-
-      uint32_t maxFSSize = 0;
-
       const esp_partition_t* partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, NULL);
-
-      if (partition) {
-        maxFSSize = partition->size;
-      } else {
-        partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "littlefs");
-        if (partition) {
-          maxFSSize = partition->size;
-        }
-      }
-
-      if (maxFSSize == 0) {
-        maxFSSize = 4 * 1024 * 1024;
-      }
-
-      if (expectedSize > 0 && expectedSize > maxFSSize) {
-        upload.status = UPLOAD_FILE_ABORTED;
-        LittleFS.begin();
-        return;
-      }
-
+      uint32_t maxFSSize = partition ? partition->size : (4 * 1024 * 1024);
       if (!Update.begin(maxFSSize, U_SPIFFS)) {
-        upload.status = UPLOAD_FILE_ABORTED;
         LittleFS.begin();
         return;
       }
-
-      updateStarted = true;
-    } else if (upload.status == UPLOAD_FILE_WRITE) {
-      if (updateStarted) {
-        size_t written = Update.write(upload.buf, upload.currentSize);
-        if (written != upload.currentSize) {
-          Update.abort();
-          upload.status = UPLOAD_FILE_ABORTED;
-        } else {
-          totalReceived += written;
-          if (expectedSize > 0) {
-          }
-        }
-      }
-    } else if (upload.status == UPLOAD_FILE_END) {
-      if (updateStarted && Update.end(true)) {
-        HTTP.send(200, "text/plain", "FS_UPDATE_SUCCESS");
-        delay(100);
+    }
+    if (len) {
+      Update.write(data, len);
+    }
+    if (final) {
+      if (Update.end(true)) {
         delay(1000);
         ESP.restart();
       } else {
-        HTTP.send(500, "text/plain", "FS update failed");
         LittleFS.begin();
       }
-      updateStarted = false;
-    } else if (upload.status == UPLOAD_FILE_ABORTED) {
-      if (updateStarted) {
-        Update.abort();
-      }
-      LittleFS.begin();
-      updateStarted = false;
     }
-  });
+  }
+         );
 
   // OTA обновление из Arduino IDE
-  HTTP.on("/ota_request", HTTP_GET, []() {
+  HTTP.on("/ota_request", HTTP_GET, [](AsyncWebServerRequest * request) {
     if (!Wifi::instance().isConnected()) {
-      HTTP.send(403, "text/plain; charset=utf-8", "WiFi не подключён");
+      request->send(403, "text/plain; charset=utf-8", "WiFi не подключён");
       return;
     }
 
     if (Ota::instance().RequestOtaUpdate()) {
-      HTTP.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     } else {
-      HTTP.send(400, "text/plain", "Не удалось запустить OTA. Возможно обновление уже выполняется?");
+      request->send(400, "text/plain", "Не удалось запустить OTA. Возможно обновление уже выполняется?");
     }
   });
 
@@ -2302,63 +2512,62 @@ void User_settings() {
   // -------------------------------------------------- ПЕРЕКЛЮЧЕНИЕ "ЧАСЫ / ПОГОДА" НА ДИСПЛЕЯХ TM1637 и ST7789 ----------------------------------------
 
 #if (USE_TM1637 || USE_ST7789)
-  HTTP.on("/save_display_switch", HTTP_GET, []() {
-    int interval = HTTP.arg("value").toInt();
+  HTTP.on("/save_display_switch", HTTP_GET, [](AsyncWebServerRequest * request) {
+    int interval = request->getParam("value")->value().toInt();
     if (interval >= 5 && interval <= 60) {
       jsonWrite(configSetup, "disp_switch", interval);
       saveConfig();
       DISPLAY_SWITCH_INTERVAL = (uint32_t)interval * 1000UL;
       displaySwitchTimer = millis();
-      HTTP.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     } else if (interval == 0) {
       jsonWrite(configSetup, "disp_switch", 0);
       saveConfig();
       DISPLAY_SWITCH_INTERVAL = 0;
-      HTTP.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     } else {
-      HTTP.send(400, "text/plain", "Invalid value. Use 0 or 5-60 seconds");
+      request->send(400, "text/plain", "Invalid value. Use 0 or 5-60 seconds");
     }
   });
 
-  HTTP.on("/date_switch", HTTP_GET, []() {
-    int value = HTTP.arg("value").toInt();
+  HTTP.on("/date_switch", HTTP_GET, [](AsyncWebServerRequest * request) {
+    int value = request->getParam("value")->value().toInt();
     dateSwitchEnabled = (value != 0);
     jsonWrite(configSetup, "date_switch", dateSwitchEnabled ? 1 : 0);
     saveConfig();
     rebuildActiveModes();
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
-  HTTP.on("/weather_switch", HTTP_GET, []() {
-    int value = HTTP.arg("value").toInt();
+  HTTP.on("/weather_switch", HTTP_GET, [](AsyncWebServerRequest * request) {
+    int value = request->getParam("value")->value().toInt();
     weatherSwitchEnabled = (value != 0);
     jsonWrite(configSetup, "weather_switch", weatherSwitchEnabled ? 1 : 0);
     saveConfig();
     rebuildActiveModes();
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
 #endif // (USE_TM1637 || USE_ST7789)
 
   // ---------------------------------------------------------------------- ПАРОЛЬ ДЛЯ РЕДАКТОРА --------------------------------------------------------
 
-  HTTP.on("/set_local_auth", HTTP_GET, []() {
-    if (!HTTP.hasArg("value")) {
-      HTTP.send(400, "text/plain", "Missing value");
+  HTTP.on("/set_local_auth", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("value")) {
+      request->send(400, "text/plain", "Missing value");
       return;
     }
-    String val = HTTP.arg("value");
+    String val = request->getParam("value")->value();
     bool newState = (val == "1" || val.equalsIgnoreCase("true") || val.equalsIgnoreCase("on"));
 
     if (ONflag) changePower();
-    delay(200);
 
     jsonWrite(configSetup, "local_auth", newState ? "1" : "0");
     saveConfig();
 
     if (LittleFS.exists("/auth_local.txt")) LittleFS.remove("/auth_local.txt");
 
-    HTTP.send(200, "text/html", "<html><body>OK, restart...</body></html>");
+    request->send(200, "text/html", "<html><body>OK, restart...</body></html>");
     pendingRestart = true;
   });
 
@@ -2366,93 +2575,111 @@ void User_settings() {
 
 #if DEBUG_ENABLED
   // Чекбокс "Включить получение новых логов"
-  HTTP.on("/set_syslog", HTTP_GET, []() {
-    if (!HTTP.hasArg("value")) {
-      HTTP.send(400, "text/plain", "Missing value");
+  HTTP.on("/set_syslog", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (!request->hasParam("value")) {
+      request->send(400, "text/plain", "Missing value");
       return;
     }
 
-    bool newState = (HTTP.arg("value") == "1");
+    bool newState = (request->getParam("value")->value() == "1");
 
     SystemLog::instance().setEnabled(newState);
 
     jsonWrite(configSetup, "syslog_enabled", newState ? "1" : "0");
     saveConfig();
 
-    HTTP.send(200, "text/plain", newState ? "1" : "0");
+    request->send(200, "text/plain", newState ? "1" : "0");
   });
 
-  HTTP.on("/logs", HTTP_GET, []() {
+  HTTP.on("/logs", HTTP_GET, [](AsyncWebServerRequest * request) {
     String logs = SystemLog::instance().getAll();
-    HTTP.send(200, "text/plain; charset=utf-8", logs);
+    request->send(200, "text/plain; charset=utf-8", logs);
   });
 
-  HTTP.on("/logs_clear", HTTP_GET, []() {
+  HTTP.on("/logs_clear", HTTP_GET, [](AsyncWebServerRequest * request) {
     SystemLog::instance().clear();
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
-  HTTP.on("/logs_page", HTTP_GET, []() {
-    handleFileRead("/logs.htm");
+  HTTP.on("/logs_page", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(LittleFS, "/logs.htm", "text/html; charset=utf-8");
   });
 #else
   // Заглушки, если логи отключены
-  HTTP.on("/set_syslog", HTTP_GET, []() {
-    HTTP.send(404, "text/plain", "Logs disabled");
+  HTTP.on("/set_syslog", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(404, "text/plain", "Logs disabled");
   });
-  HTTP.on("/logs", HTTP_GET, []() {
-    HTTP.send(404, "text/plain", "Logs disabled");
+  HTTP.on("/logs", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(404, "text/plain", "Logs disabled");
   });
-  HTTP.on("/logs_clear", HTTP_GET, []() {
-    HTTP.send(404, "text/plain", "Logs disabled");
+  HTTP.on("/logs_clear", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(404, "text/plain", "Logs disabled");
   });
-  HTTP.on("/logs_page", HTTP_GET, []() {
-    HTTP.send(404, "text/plain", "Logs disabled");
+  HTTP.on("/logs_page", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(404, "text/plain", "Logs disabled");
   });
 #endif // DEBUG_ENABLED
 
   // --------------------------------------------------------------------- Wi-Fi ПОДКЛЮЧЕНИЕ ------------------------------------------------------------
 
-  HTTP.on("/ssdp", handle_ssdp);
-  HTTP.on("/save_wifi", HTTP_GET, handle_save_wifi);
-  HTTP.on("/wifi_reconnect_interval", handle_wifi_reconnect_interval);
-  HTTP.on("/wifi_check_interval", handle_wifi_check_interval);
-  HTTP.on("/ap_always", handle_ap_always); // Чекбокс "Показывать точку доступа"
-  HTTP.on("/res_to_def", handle_reset_to_default);
-  HTTP.on("/reset_to_default", handle_reset_to_default);
-  HTTP.on("/s_IP", handle_use_static_ip);
-  HTTP.on("/set_ip", handle_set_static_ip);
+  HTTP.on("/ssdp",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_ssdp(request);
+  });
+  HTTP.on("/save_wifi",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_save_wifi(request);
+  });
+  HTTP.on("/wifi_reconnect_interval",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_wifi_reconnect_interval(request);
+  });
+  HTTP.on("/wifi_check_interval",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_wifi_check_interval(request);
+  });
+  HTTP.on("/ap_always",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_ap_always(request);
+  }); // Чекбокс "Показывать точку доступа"
+  HTTP.on("/res_to_def",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_reset_to_default(request);
+  });
+  HTTP.on("/reset_to_default",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_reset_to_default(request);
+  });
+  HTTP.on("/s_IP",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_use_static_ip(request);
+  });
+  HTTP.on("/set_ip",  HTTP_GET, [](AsyncWebServerRequest * request) {
+    handle_set_static_ip(request);
+  });
 
-  HTTP.on("/restart", HTTP_GET, []() {
-    HTTP.send(200, "text/plain", "OK");
+  HTTP.on("/restart", HTTP_GET, [](AsyncWebServerRequest * request) {
+    request->send(200, "text/plain", "OK");
     pendingRestart = true;
   });
 
-  HTTP.on("/display_ip", HTTP_GET, []() {  // Чекбокс "Показывать IP адрес при старте"
-    int value = HTTP.arg("value").toInt();
+  HTTP.on("/display_ip", HTTP_GET, [](AsyncWebServerRequest * request) { // Чекбокс "Показывать IP адрес при старте"
+    int value = request->getParam("value")->value().toInt();
     displayIpAtStart = (value != 0);
     jsonWrite(configSetup, "display_ip", displayIpAtStart ? 1 : 0);
     saveConfig();
-    HTTP.send(200, "text/plain", displayIpAtStart ? "1" : "0");
+    request->send(200, "text/plain", displayIpAtStart ? "1" : "0");
   });
 
 
-  HTTP.on("/wifi_multi", HTTP_GET, []() {
-    if (HTTP.hasArg("wifi_multi")) {
-      int val = HTTP.arg("wifi_multi").toInt();
-      jsonWrite(configWiFi, "wifi_multi", val);
+  HTTP.on("/wifi_multi", HTTP_GET, [](AsyncWebServerRequest * request) {
+    if (request->hasParam("wifi_multi")) {
+      int multi = request->getParam("wifi_multi")->value().toInt();
+      jsonWrite(configWiFi, "wifi_multi", multi);
+      wifi_multi_enabled = multi;
       saveConfig();
-      wifi_multi_enabled = val;
-      HTTP.send(200, "text/plain", "OK");
+      request->send(200, "text/plain", "OK");
     } else {
-      HTTP.send(400, "text/plain", "Missing parameter");
+      request->send(400, "text/plain", "Missing parameter");
     }
   });
 
   // Точка доступа
-  HTTP.on("/ssidap", HTTP_GET, []() {
-    String newSSID = HTTP.arg("ssidAP");
-    String newPass = HTTP.arg("passwordAP");
+  HTTP.on("/ssidap", HTTP_GET, [](AsyncWebServerRequest * request) {
+    String newSSID = request->hasParam("ssidAP") ? request->getParam("ssidAP")->value() : "";
+    String newPass = request->hasParam("passwordAP") ? request->getParam("passwordAP")->value() : "";
     if (newSSID.length() == 0) newSSID = jsonRead(configWiFi, "ssidAP");
     if (newPass.length() == 0) newPass = jsonRead(configWiFi, "passwordAP");
 
@@ -2463,7 +2690,7 @@ void User_settings() {
     Wifi::instance().setAPSettings(newSSID, newPass);
     Wifi::instance().requestRestartAP();
 
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   });
 
 } // User_settings()
@@ -2471,175 +2698,187 @@ void User_settings() {
 // ========================================================================== ОБРАБОТЧИКИ =============================================================
 
 // Имя лампы
-void handle_ssdp() {
-  jsonWrite(configSetup, "ssdp", HTTP.arg("ssdp"));
-  SSDP.setName(jsonRead(configSetup, "ssdp"));
+void handle_ssdp(AsyncWebServerRequest *request) {
+  if (!request->hasParam("ssdp")) {
+    request->send(400, "text/plain", "Missing ssdp");
+    return;
+  }
+
+  String newName = request->getParam("ssdp")->value();
+  newName.trim();
+
+  jsonWrite(configSetup, "ssdp", newName);
   saveConfig();
-  LAMP_NAME = jsonRead(configSetup, "ssdp");
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+
+  LAMP_NAME = newName;
+  SSDP.setName(LAMP_NAME.c_str());
+
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
 }
 
 // ----------------------------------------------------------------------------- WI-FI ----------------------------------------------------------------
 
 // Показывать точку доступа всегда
-void handle_ap_always() {
-  if (!HTTP.hasArg("ap_always")) {
-    HTTP.send(400, "text/plain", "Missing parameter");
+void handle_ap_always(AsyncWebServerRequest *request) {
+  if (!request->hasParam("ap_always")) {
+    request->send(400, "text/plain", "Missing parameter");
     return;
   }
-
-  bool newVal = (HTTP.arg("ap_always") == "1" || HTTP.arg("ap_always").toInt() == 1);
+  String apVal = request->getParam("ap_always")->value();
+  bool newVal = (apVal == "1" || apVal.toInt() == 1);
   bool oldVal = Always_ap;
-
   if (newVal == oldVal) {
-    HTTP.send(200, "text/plain", newVal ? "1" : "0");
+    request->send(200, "text/plain", newVal ? "1" : "0");
     return;
   }
-
   Wifi::instance().setAPAlways(newVal);
   Always_ap = newVal;
-
-  HTTP.send(200, "text/plain", newVal ? "1" : "0");
+  request->send(200, "text/plain", newVal ? "1" : "0");
 }
 
-void handle_wifi_reconnect_interval() {
-  if (!HTTP.hasArg("interval")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_wifi_reconnect_interval(AsyncWebServerRequest *request) {
+  if (!request->hasParam("interval")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  uint32_t interval = HTTP.arg("interval").toInt();
+  uint32_t interval = request->getParam("interval")->value().toInt();
   interval = constrain(interval, 10, 300);
   Wifi::instance().setReconnectInterval(interval);
 
   jsonWrite(configWiFi, "wifi_reconnect_interval", String(interval));
   saveConfig();
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
-void handle_wifi_check_interval() {
-  if (!HTTP.hasArg("interval")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_wifi_check_interval(AsyncWebServerRequest *request) {
+  if (!request->hasParam("interval")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  uint32_t interval = HTTP.arg("interval").toInt();
+  uint32_t interval = request->getParam("interval")->value().toInt();
   interval = constrain(interval, 1, 30); // минуты
   Wifi::instance().setCheckInterval(interval);
 
   jsonWrite(configWiFi, "wifi_check_interval", String(interval));
   saveConfig();
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
-void handle_save_wifi() {
-  jsonWrite(configWiFi, "ssid", HTTP.arg("ssid"));
-  jsonWrite(configWiFi, "password", HTTP.arg("password"));
+void handle_save_wifi(AsyncWebServerRequest *request) {
+  if (request->hasParam("ssid"))
+    jsonWrite(configWiFi, "ssid", request->getParam("ssid")->value());
+  if (request->hasParam("password"))
+    jsonWrite(configWiFi, "password", request->getParam("password")->value());
 
   for (int i = 2; i <= 5; i++) {
     String ssidKey = "ssid" + String(i);
     String passKey = "password" + String(i);
 
-    if (HTTP.hasArg(ssidKey)) {
-      jsonWrite(configWiFi, ssidKey, HTTP.arg(ssidKey));
+    if (request->hasParam(ssidKey)) {
+      jsonWrite(configWiFi, ssidKey, request->getParam(ssidKey)->value());
     }
-    if (HTTP.hasArg(passKey)) {
-      jsonWrite(configWiFi, passKey, HTTP.arg(passKey));
+    if (request->hasParam(passKey)) {
+      jsonWrite(configWiFi, passKey, request->getParam(passKey)->value());
     }
   }
 
-  if (HTTP.hasArg("wifi_timeout")) {
-    int to = HTTP.arg("wifi_timeout").toInt();
+  if (request->hasParam("wifi_timeout")) {
+    int to = request->getParam("wifi_timeout")->value().toInt();
     if (to < 10 || to > 600) to = 30;
     jsonWrite(configWiFi, "wifi_timeout", to);
     Wifi::instance().setWiFiTimeout(to);
   }
 
-  if (HTTP.hasArg("forced_ap_after")) {
-    int minutes = HTTP.arg("forced_ap_after").toInt();
+  if (request->hasParam("forced_ap_after")) {
+    int minutes = request->getParam("forced_ap_after")->value().toInt();
     if (minutes >= 1 && minutes <= 30) {
       jsonWrite(configWiFi, "forced_ap_after", minutes);
       Wifi::instance().setForcedAPTimeout(minutes);
     }
   }
 
-  if (HTTP.hasArg("wifi_reconnect_interval")) {
-    int reconnectInterval = HTTP.arg("wifi_reconnect_interval").toInt();
+  if (request->hasParam("wifi_reconnect_interval")) {
+    int reconnectInterval = request->getParam("wifi_reconnect_interval")->value().toInt();
     reconnectInterval = constrain(reconnectInterval, 30, 300);
     jsonWrite(configWiFi, "wifi_reconnect_interval", reconnectInterval);
     Wifi::instance().setReconnectInterval(reconnectInterval);
   }
 
-  if (HTTP.hasArg("wifi_check_interval")) {
-    int checkInterval = HTTP.arg("wifi_check_interval").toInt();
+  if (request->hasParam("wifi_check_interval")) {
+    int checkInterval = request->getParam("wifi_check_interval")->value().toInt();
     checkInterval = constrain(checkInterval, 1, 30);
     jsonWrite(configWiFi, "wifi_check_interval", checkInterval);
     Wifi::instance().setCheckInterval(checkInterval);
   }
 
-  if (HTTP.hasArg("wifi_multi")) {
-    int multi = HTTP.arg("wifi_multi").toInt();
+  if (request->hasParam("wifi_multi")) {
+    int multi = request->getParam("wifi_multi")->value().toInt();
     jsonWrite(configWiFi, "wifi_multi", multi);
   }
 
-  if (HTTP.hasArg("ap_always")) {
-    int apAlways = HTTP.arg("ap_always").toInt();
+  if (request->hasParam("ap_always")) {
+    int apAlways = request->getParam("ap_always")->value().toInt();
     Wifi::instance().setAPAlways(apAlways);
     Always_ap = apAlways;
   }
 
   saveConfig();
 
-  //Wifi::instance().begin();
-  HTTP.send(200, "text/plain", "OK_REBOOT");
+  request->send(200, "text/plain", "OK_REBOOT");
   pendingRestart = true;
 
-  // HTTP.send(200, "text/plain", "OK");
 }
 
-void handle_use_static_ip() {
-  bool enable = (HTTP.arg("s_IP").toInt() == 1);
+void handle_use_static_ip(AsyncWebServerRequest *request) {
+  if (!request->hasParam("s_IP")) {
+    request->send(400, "text/plain", "Missing s_IP");
+    return;
+  }
+  bool enable = (request->getParam("s_IP")->value().toInt() == 1);
   jsonWrite(configWiFi, "s_IP", enable ? "1" : "0");
   saveConfig();
-
-  HTTP.send(200, "text/plain", "OK_REBOOT");
   pendingRestart = true;
+  request->send(200, "text/plain", "OK_REBOOT");
 }
 
-void handle_set_static_ip() {
+void handle_set_static_ip(AsyncWebServerRequest *request) {
+  if (!request->hasParam("ip") || !request->hasParam("gateway") ||
+      !request->hasParam("subnet") || !request->hasParam("dns")) {
+    request->send(400, "text/plain", "Missing IP parameters");
+    return;
+  }
   IPAddress ip, gateway, subnet, dns;
-  if (!dns.fromString(HTTP.arg("dns"))) {
+  String dnsStr = request->getParam("dns")->value();
+  if (!dns.fromString(dnsStr)) {
     dns = IPAddress(8, 8, 8, 8);
   }
-  if (ip.fromString(HTTP.arg("ip")) &&
-      gateway.fromString(HTTP.arg("gateway")) &&
-      subnet.fromString(HTTP.arg("subnet")) &&
-      dns.fromString(HTTP.arg("dns"))) {
+  if (ip.fromString(request->getParam("ip")->value()) && gateway.fromString(request->getParam("gateway")->value()) && subnet.fromString(request->getParam("subnet")->value()) && dns.fromString(request->getParam("dns")->value())) {
     Wifi::instance().setStaticIP(ip, gateway, subnet, dns);
     saveConfig();
-    HTTP.send(200, "text/plain", "OK_REBOOT");
     pendingRestart = true;
-    HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+    request->send(200, "text/plain", "OK_REBOOT");
   } else {
-    HTTP.send(400, "text/plain", "Invalid IP format");
+    request->send(400, "text/plain", "Invalid IP format");
   }
 }
 
 // ----------------------------------------------------------------------- НАСТРОЙКИ КНОПКИ -----------------------------------------------------------
 
 #if USE_BUTTON
-void handle_button_type() {
-  if (!HTTP.hasArg("button_type")) {
-    HTTP.send(400, "text/plain", "Missing button_type");
+void handle_button_type(AsyncWebServerRequest *request) {
+  if (!request->hasParam("button_type")) {
+    request->send(400, "text/plain", "Missing button_type");
     return;
   }
   String configButton = readFile(F("config_button.json"), 1024);
   if (configButton == "Failed" || configButton == "Large" || configButton.isEmpty()) {
     configButton = "{}";
   }
-  button_type = HTTP.arg("button_type").toInt();
+  button_type = request->getParam("button_type")->value().toInt();
   if (button_type > 1) button_type = 1;
   jsonWrite(configButton, "button_type", button_type);
   writeFile(F("config_button.json"), configButton);
@@ -2655,14 +2894,14 @@ void handle_button_type() {
   touch.setTimeout(BUTTON_CLICK_TIMEOUT);
   touch.setStepTimeout(BUTTON_STEP_TIMEOUT);
 
-  HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
 }
 
-void handle_save_btn_clicks() {
+void handle_save_btn_clicks(AsyncWebServerRequest *request) {
   const char* required[] = {"btn_click_power", "btn_click_next", "btn_click_prev", "btn_click_action4", "btn_click_ip", "btn_click_time", "btn_click_sound", "btn_click_weather"};
   for (const char* arg : required) {
-    if (!HTTP.hasArg(arg)) {
-      HTTP.send(400, "text/plain", String("Missing ") + arg);
+    if (!request->hasParam(arg)) {
+      request->send(400, "text/plain", String("Missing ") + arg);
       return;
     }
   }
@@ -2672,14 +2911,14 @@ void handle_save_btn_clicks() {
     configButton = "{}";
   }
 
-  btn_click_power = HTTP.arg("btn_click_power").toInt();
-  btn_click_next = HTTP.arg("btn_click_next").toInt();
-  btn_click_prev = HTTP.arg("btn_click_prev").toInt();
-  btn_click_action4 = HTTP.arg("btn_click_action4").toInt();
-  btn_click_ip = HTTP.arg("btn_click_ip").toInt();
-  btn_click_time = HTTP.arg("btn_click_time").toInt();
-  btn_click_sound = HTTP.arg("btn_click_sound").toInt();
-  btn_click_weather = HTTP.arg("btn_click_weather").toInt();
+  btn_click_power = request->getParam("btn_click_power")->value().toInt();
+  btn_click_next = request->getParam("btn_click_next")->value().toInt();
+  btn_click_prev = request->getParam("btn_click_prev")->value().toInt();
+  btn_click_action4 = request->getParam("btn_click_action4")->value().toInt();
+  btn_click_ip = request->getParam("btn_click_ip")->value().toInt();
+  btn_click_time = request->getParam("btn_click_time")->value().toInt();
+  btn_click_sound = request->getParam("btn_click_sound")->value().toInt();
+  btn_click_weather = request->getParam("btn_click_weather")->value().toInt();
 
   jsonWrite(configButton, "btn_click_power", btn_click_power);
   jsonWrite(configButton, "btn_click_next", btn_click_next);
@@ -2692,7 +2931,7 @@ void handle_save_btn_clicks() {
 
   writeFile(F("config_button.json"), configButton);
 
-  HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
 }
 
 #endif // USE_BUTTON
@@ -2701,25 +2940,25 @@ void handle_save_btn_clicks() {
 
 #if USE_MP3_PLAYER
 // Сохранение настроек
-void handle_save_sound_settings() {
+void handle_save_sound_settings(AsyncWebServerRequest *request) {
   uint8_t tmp;
-  if (HTTP.hasArg("tim_h")) {
-    tmp = HTTP.arg("tim_h").toInt();
+  if (request->hasParam("tim_h")) {
+    tmp = request->getParam("tim_h")->value().toInt();
     ADVERT_TIMER_H = 100UL * tmp;
     jsonWrite(configMP3, "tim_h", tmp);
   }
-  if (HTTP.hasArg("tim_m")) {
-    tmp = HTTP.arg("tim_m").toInt();
+  if (request->hasParam("tim_m")) {
+    tmp = request->getParam("tim_m")->value().toInt();
     ADVERT_TIMER_M = 100UL * tmp;
     jsonWrite(configMP3, "tim_m", tmp);
   }
-  if (HTTP.hasArg("delay")) {
-    tmp = HTTP.arg("delay").toInt();
+  if (request->hasParam("delay")) {
+    tmp = request->getParam("delay")->value().toInt();
     mp3_delay = 10UL * tmp;
     jsonWrite(configMP3, "delay", tmp);
   }
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2734,11 +2973,11 @@ void handle_save_sound_settings() {
 
 // --------------------- Чекбоксы ------------------------
 // Чекбокс "Включить звук"
-void handle_on_sound() {
-  eff_sound_on = HTTP.arg("on_sound").toInt();
+void handle_on_sound(AsyncWebServerRequest *request) {
+  eff_sound_on = request->getParam("on_sound")->value().toInt();
   jsonWrite(configMP3, "on_sound", eff_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2752,11 +2991,11 @@ void handle_on_sound() {
 }
 
 // Чекбокс "Озвучивание времени днём"
-void handle_day_advert_on_sound() {
-  day_advert_sound_on = HTTP.arg("on_day_adv").toInt();
+void handle_day_advert_on_sound(AsyncWebServerRequest *request) {
+  day_advert_sound_on = request->getParam("on_day_adv")->value().toInt();
   jsonWrite(configMP3, "on_day_adv", day_advert_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2770,11 +3009,11 @@ void handle_day_advert_on_sound() {
 }
 
 // Чекбокс "Озвучивание времени ночью"
-void handle_night_advert_on_sound() {
-  night_advert_sound_on = HTTP.arg("on_night_adv").toInt();
+void handle_night_advert_on_sound(AsyncWebServerRequest *request) {
+  night_advert_sound_on = request->getParam("on_night_adv")->value().toInt();
   jsonWrite(configMP3, "on_night_adv", night_advert_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2788,11 +3027,11 @@ void handle_night_advert_on_sound() {
 }
 
 // Чекбокс "Озвучивать время на выключенной лампе"
-void handle_time_always() {
-  time_always = HTTP.arg("time_always").toInt();
+void handle_time_always(AsyncWebServerRequest *request) {
+  time_always = request->getParam("time_always")->value().toInt();
   jsonWrite(configMP3, "time_always", time_always);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2806,11 +3045,11 @@ void handle_time_always() {
 }
 
 // Чекбокс "Озвучивать погоду на выключенной лампе"
-void handle_weather_always() {
-  weather_always = HTTP.arg("weather_always").toInt();
+void handle_weather_always(AsyncWebServerRequest *request) {
+  weather_always = request->getParam("weather_always")->value().toInt();
   jsonWrite(configMP3, "weather_always", weather_always);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2824,11 +3063,11 @@ void handle_weather_always() {
 }
 
 // Чекбокс "Озвучивать температуру погоды днём"
-void handle_day_weather_adv() {
-  day_weather_temp_on = HTTP.arg("on_day_wadv").toInt();
+void handle_day_weather_adv(AsyncWebServerRequest *request) {
+  day_weather_temp_on = request->getParam("on_day_wadv")->value().toInt();
   jsonWrite(configMP3, "on_day_wadv", day_weather_temp_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2842,11 +3081,11 @@ void handle_day_weather_adv() {
 }
 
 // Чекбокс "Озвучивать описание погоды днём"
-void handle_day_weather_desc() {
-  day_weather_desc_on = HTTP.arg("on_day_wdesc").toInt();
+void handle_day_weather_desc(AsyncWebServerRequest *request) {
+  day_weather_desc_on = request->getParam("on_day_wdesc")->value().toInt();
   jsonWrite(configMP3, "on_day_wdesc", day_weather_desc_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2860,11 +3099,11 @@ void handle_day_weather_desc() {
 }
 
 // Чекбокс "Озвучивать температуру погоды ночью"
-void handle_night_weather_adv() {
-  night_weather_temp_on = HTTP.arg("on_night_wadv").toInt();
+void handle_night_weather_adv(AsyncWebServerRequest *request) {
+  night_weather_temp_on = request->getParam("on_night_wadv")->value().toInt();
   jsonWrite(configMP3, "on_night_wadv", night_weather_temp_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2878,11 +3117,11 @@ void handle_night_weather_adv() {
 }
 
 // Чекбокс "Озвучивать описание погоды ночью"
-void handle_night_weather_desc() {
-  night_weather_desc_on = HTTP.arg("on_night_wdesc").toInt();
+void handle_night_weather_desc(AsyncWebServerRequest *request) {
+  night_weather_desc_on = request->getParam("on_night_wdesc")->value().toInt();
   jsonWrite(configMP3, "on_night_wdesc", night_weather_desc_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2896,11 +3135,11 @@ void handle_night_weather_desc() {
 }
 
 // Чекбокс "Озвучивать время будильником"
-void handle_alarm_advert_sound_on() {
-  alarm_advert_sound_on = HTTP.arg("on_alm_adv").toInt();
+void handle_alarm_advert_sound_on(AsyncWebServerRequest *request) {
+  alarm_advert_sound_on = request->getParam("on_alm_adv")->value().toInt();
   jsonWrite(configMP3, "on_alm_adv", alarm_advert_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2914,13 +3153,13 @@ void handle_alarm_advert_sound_on() {
 }
 
 // Чекбокс "Озвучивать погоду" (аналог времени: отключает автоматическое озвучивание, но кнопка всегда работает)
-void handle_weather_speak() {
-  if (HTTP.hasArg("value")) {
-    weatherSpeakEnabled = (HTTP.arg("value") == "1");
+void handle_weather_speak(AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    weatherSpeakEnabled = (request->getParam("value")->value() == "1");
     jsonWrite(configMP3, "weather_speak", weatherSpeakEnabled ? "1" : "0");
     writeFile(F("config_mp3.json"), configMP3);
   }
-  HTTP.send(200, "text/plain", weatherSpeakEnabled ? "1" : "0");
+  request->send(200, "text/plain", weatherSpeakEnabled ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2934,13 +3173,13 @@ void handle_weather_speak() {
 }
 
 // Чекбокс "Озвучивать время" (аналог погоды: отключает автоматическое озвучивание, но кнопка всегда работает)
-void handle_time_speak() {
-  if (HTTP.hasArg("value")) {
-    timeAnnounceEnabled = (HTTP.arg("value") == "1");
+void handle_time_speak(AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    timeAnnounceEnabled = (request->getParam("value")->value() == "1");
     jsonWrite(configMP3, "time_speak", timeAnnounceEnabled ? "1" : "0");
     writeFile(F("config_mp3.json"), configMP3);
   }
-  HTTP.send(200, "text/plain", timeAnnounceEnabled ? "1" : "0");
+  request->send(200, "text/plain", timeAnnounceEnabled ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2954,11 +3193,11 @@ void handle_time_speak() {
 }
 
 // Чекбокс "Включить звук будильника"
-void handle_alarm_on_sound() {
-  alarm_sound_on = HTTP.arg("on_alm_snd").toInt();
+void handle_alarm_on_sound(AsyncWebServerRequest *request) {
+  alarm_sound_on = request->getParam("on_alm_snd")->value().toInt();
   jsonWrite(configMP3, "on_alm_snd", alarm_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2972,11 +3211,11 @@ void handle_alarm_on_sound() {
 }
 
 // Чекбокс "Включить звук режима Закат"
-void handle_sunset_on_sound() {
-  sunset_sound_on = HTTP.arg("on_sun_snd").toInt();
+void handle_sunset_on_sound(AsyncWebServerRequest *request) {
+  sunset_sound_on = request->getParam("on_sun_snd")->value().toInt();
   jsonWrite(configMP3, "on_sun_snd", sunset_sound_on);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -2990,13 +3229,13 @@ void handle_sunset_on_sound() {
 }
 
 // Чекбокс "Показывать описание погоды"
-void handle_show_weather_desc() {
-  if (HTTP.hasArg("value")) {
-    show_weather_desc = HTTP.arg("value").toInt();
+void handle_show_weather_desc(AsyncWebServerRequest *request) {
+  if (request->hasParam("value")) {
+    show_weather_desc = request->getParam("value")->value().toInt();
     jsonWrite(configMP3, "show_weather_desc", show_weather_desc);
     writeFile(F("config_mp3.json"), configMP3);
   }
-  HTTP.send(200, F("text/plain"), show_weather_desc ? "1" : "0");
+  request->send(200, F("text/plain"), show_weather_desc ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3011,13 +3250,13 @@ void handle_show_weather_desc() {
 
 // --------------------- Регулировка ------------------------
 // Общая гроикость
-void handle_volume() {
-  eff_volume = constrain(HTTP.arg("vol").toInt(), 0, 30);
+void handle_volume(AsyncWebServerRequest *request) {
+  eff_volume = constrain(request->getParam("vol")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "vol", eff_volume);
   if (mp3Enabled && !dawnflag_sound && !sunsetflag_sound && !isAnnouncing)
     mp3SendCmd(0x06, FEEDBACK, 0, eff_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(eff_volume));
+  request->send(200, "text/plain", String(eff_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3031,12 +3270,12 @@ void handle_volume() {
 }
 
 // Громкость будильника Рассвет
-void handle_alarm_volume() {
-  alarm_volume = constrain(HTTP.arg("alm_vol").toInt(), 0, 30);
+void handle_alarm_volume(AsyncWebServerRequest *request) {
+  alarm_volume = constrain(request->getParam("alm_vol")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "alm_vol", alarm_volume);
   if (mp3Enabled && dawnflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, alarm_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(alarm_volume));
+  request->send(200, "text/plain", String(alarm_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3050,12 +3289,12 @@ void handle_alarm_volume() {
 }
 
 // Громкость режима Закат
-void handle_sunset_volume() {
-  sunset_volume = constrain(HTTP.arg("sun_vol").toInt(), 0, 30);
+void handle_sunset_volume(AsyncWebServerRequest *request) {
+  sunset_volume = constrain(request->getParam("sun_vol")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "sun_vol", sunset_volume);
   if (mp3Enabled && sunsetflag_sound) mp3SendCmd(0x06, FEEDBACK, 0, sunset_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(sunset_volume));
+  request->send(200, "text/plain", String(sunset_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3069,11 +3308,11 @@ void handle_sunset_volume() {
 }
 
 // Громкость озвучивания времени днём
-void handle_day_advert_volume() {
-  day_advert_volume = constrain(HTTP.arg("day_vol").toInt(), 0, 30);
+void handle_day_advert_volume(AsyncWebServerRequest *request) {
+  day_advert_volume = constrain(request->getParam("day_vol")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "day_vol", day_advert_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(day_advert_volume));
+  request->send(200, "text/plain", String(day_advert_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3087,11 +3326,11 @@ void handle_day_advert_volume() {
 }
 
 // Громкость озвучивания времени ночью
-void handle_night_advert_volume() {
-  night_advert_volume = constrain(HTTP.arg("night_vol").toInt(), 0, 30);
+void handle_night_advert_volume(AsyncWebServerRequest *request) {
+  night_advert_volume = constrain(request->getParam("night_vol")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "night_vol", night_advert_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(night_advert_volume));
+  request->send(200, "text/plain", String(night_advert_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3105,12 +3344,12 @@ void handle_night_advert_volume() {
 }
 
 // Длительность звучания часов
-void handle_tim_h() {
-  uint8_t tmp = constrain(HTTP.arg("tim_h").toInt(), 8, 40);
+void handle_tim_h(AsyncWebServerRequest *request) {
+  uint8_t tmp = constrain(request->getParam("tim_h")->value().toInt(), 8, 40);
   ADVERT_TIMER_H = 100UL * tmp;
   jsonWrite(configMP3, "tim_h", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(tmp));
+  request->send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3124,12 +3363,12 @@ void handle_tim_h() {
 }
 
 // Длительность звучания минут
-void handle_tim_m() {
-  uint8_t tmp = constrain(HTTP.arg("tim_m").toInt(), 8, 45);
+void handle_tim_m(AsyncWebServerRequest *request) {
+  uint8_t tmp = constrain(request->getParam("tim_m")->value().toInt(), 8, 45);
   ADVERT_TIMER_M = 100UL * tmp;
   jsonWrite(configMP3, "tim_m", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(tmp));
+  request->send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3143,12 +3382,12 @@ void handle_tim_m() {
 }
 
 // Задержка между командами
-void handle_delay() {
-  uint8_t tmp = constrain(HTTP.arg("delay").toInt(), 3, 23);
+void handle_delay(AsyncWebServerRequest *request) {
+  uint8_t tmp = constrain(request->getParam("delay")->value().toInt(), 3, 23);
   mp3_delay = 10UL * tmp;
   jsonWrite(configMP3, "delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(tmp));
+  request->send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3162,11 +3401,11 @@ void handle_delay() {
 }
 
 // Громкость погоды днём
-void handle_weather_day_volume() {
-  weather_day_volume = constrain(HTTP.arg("val").toInt(), 0, 30);
+void handle_weather_day_volume(AsyncWebServerRequest *request) {
+  weather_day_volume = constrain(request->getParam("val")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "weather_day_vol", weather_day_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(weather_day_volume));
+  request->send(200, "text/plain", String(weather_day_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3180,11 +3419,11 @@ void handle_weather_day_volume() {
 }
 
 // Громкость погоды ночью
-void handle_weather_night_volume() {
-  weather_night_volume = constrain(HTTP.arg("val").toInt(), 0, 30);
+void handle_weather_night_volume(AsyncWebServerRequest *request) {
+  weather_night_volume = constrain(request->getParam("val")->value().toInt(), 0, 30);
   jsonWrite(configMP3, "weather_night_vol", weather_night_volume);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(weather_night_volume));
+  request->send(200, "text/plain", String(weather_night_volume));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3198,12 +3437,12 @@ void handle_weather_night_volume() {
 }
 
 // Пауза после температуры (перед описанием)
-void handle_weather_temp_delay() {
-  uint8_t tmp = constrain(HTTP.arg("weather_temp_delay").toInt(), 5, 60);
-  ADVERT_TIMER_1 = 100UL * tmp; // 500 - 6000 мс
+void handle_weather_temp_delay(AsyncWebServerRequest *request) {
+  uint8_t tmp = constrain(request->getParam("weather_temp_delay")->value().toInt(), 5, 60);
+  ADVERT_TIMER_1 = 100UL * tmp;
   jsonWrite(configMP3, "weather_temp_delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(tmp));
+  request->send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3217,12 +3456,12 @@ void handle_weather_temp_delay() {
 }
 
 // Пауза после описания (перед завершением озвучки)
-void handle_weather_desc_delay() {
-  uint8_t tmp = constrain(HTTP.arg("weather_desc_delay").toInt(), 10, 80);
+void handle_weather_desc_delay(AsyncWebServerRequest *request) {
+  uint8_t tmp = constrain(request->getParam("weather_desc_delay")->value().toInt(), 10, 80);
   ADVERT_TIMER_2 = 100UL * tmp; // 1000 - 8000 мс
   jsonWrite(configMP3, "weather_desc_delay", tmp);
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, "text/plain", String(tmp));
+  request->send(200, "text/plain", String(tmp));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3237,36 +3476,38 @@ void handle_weather_desc_delay() {
 
 // --------------------- Озвучка ------------------------
 // Озвучка времени (по кнопке)
-void handle_play_time() {
+void handle_play_time(AsyncWebServerRequest *request) {
   if (mp3Enabled && mp3_player_connect == 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
     Time::instance().forcesync();
     previous_folder = mp3_folder;
     mp3_pending_time_advert = true;
     mp3_pending_time_force = true;
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   } else {
-    HTTP.send(503, "text/plain", "MP3 not ready, sound off or already speaking");
+    request->send(503, "text/plain", "MP3 not ready, sound off or already speaking");
   }
 }
 
 // Озвучка погоды (по кнопке)
-void handle_play_weather() {
+void handle_play_weather(AsyncWebServerRequest *request) {
 #if USE_WEATHER
   if (mp3Enabled && mp3_player_connect == 4 && !isAnnouncing && !alarm_sound_flag && !sunset_sound_flag) {
     mp3_pending_weather_advert = true;
     mp3_pending_weather_force = true;
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   }
   else {
-    HTTP.send(503, "text/plain", "MP3 not ready, sound off or already speaking");
+    request->send(503, "text/plain", "MP3 not ready, sound off or already speaking");
   }
+#else
+  request->send(404, "text/plain", "Weather disabled");
 #endif
 }
 
 // ----------------------------------------------------------------------
 // Папка будильника
-void handle_alarm_fold_sel() {
-  AlarmFolder = HTTP.arg("alm_fold").toInt();
+void handle_alarm_fold_sel(AsyncWebServerRequest *request) {
+  AlarmFolder = request->getParam("alm_fold")->value().toInt();
   jsonWrite(configMP3, "alm_fold", AlarmFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && alarm_sound_flag) {
@@ -3274,12 +3515,12 @@ void handle_alarm_fold_sel() {
     mp3_folder_last = mp3_folder;
     mp3SendPlayFolder(mp3_folder);
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // Папка Заката
-void handle_sunset_fold_sel() {
-  SunsetFolder = HTTP.arg("sun_fold").toInt();
+void handle_sunset_fold_sel(AsyncWebServerRequest *request) {
+  SunsetFolder = request->getParam("sun_fold")->value().toInt();
   jsonWrite(configMP3, "sun_fold", SunsetFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && sunset_sound_flag) {
@@ -3287,62 +3528,62 @@ void handle_sunset_fold_sel() {
     mp3_folder_last = mp3_folder;
     mp3SendPlayFolder(mp3_folder);
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_sound_set() {
+void handle_sound_set(AsyncWebServerRequest *request) {
   char i[4];
   String configSound = readFile(F("sound_list.json"), 2048);
   for (uint8_t k = 0; k < MODE_AMOUNT; k++) {
     itoa(k, i, 10);
     String e = "e" + String(i);
     if (!first_entry)
-      jsonWrite(configSound, e, HTTP.arg(e).toInt());
+      jsonWrite(configSound, e, request->getParam(e.c_str())->value().toInt());
     effects_folders[k] = jsonReadtoInt(configSound, e);
     yield();
   }
   if (!first_entry) {
     writeFile(F("sound_list.json"), configSound);
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_folder_down() {
+void handle_folder_down(AsyncWebServerRequest *request) {
   CurrentFolder = constrain(CurrentFolder - 1, 0, 99);
   jsonWrite(configMP3, "fold_sel", CurrentFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && !pause_on && !mp3_stop && eff_sound_on && !isAnnouncing) {
     mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
   }
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
 }
 
-void handle_folder_up() {
+void handle_folder_up(AsyncWebServerRequest *request) {
   CurrentFolder = constrain(CurrentFolder + 1, 0, 99);
   jsonWrite(configMP3, "fold_sel", CurrentFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && !pause_on && !mp3_stop && eff_sound_on && !isAnnouncing) {
     mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
   }
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
 #endif
 }
 
-void handle_folder_select() {
-  CurrentFolder = HTTP.arg("fold_sel").toInt();
+void handle_folder_select(AsyncWebServerRequest *request) {
+  CurrentFolder = request->getParam("fold_sel")->value().toInt();
   jsonWrite(configMP3, "fold_sel", CurrentFolder);
   writeFile(F("config_mp3.json"), configMP3);
   if (mp3Enabled && !pause_on && !mp3_stop && eff_sound_on && !isAnnouncing) {
     mp3SendCmd(0x17, FEEDBACK, 0, CurrentFolder);
   }
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3351,14 +3592,14 @@ void handle_folder_select() {
 
 // ----------------------------------------------------------------------
 // Эквалайзер
-void handle_equalizer() {
-  Equalizer = HTTP.arg("eq").toInt();
+void handle_equalizer(AsyncWebServerRequest *request) {
+  Equalizer = request->getParam("eq")->value().toInt();
   jsonWrite(configMP3, "eq", Equalizer);
   if (mp3Enabled) {
     mp3SendCmd(0x07, FEEDBACK, 0, Equalizer);
   }
   writeFile(F("config_mp3.json"), configMP3);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3373,11 +3614,189 @@ void handle_equalizer() {
 
 #endif // USE_MP3_PLAYER
 
+// ------------------------------------------------------------------------ ИНТЕРНЕТ-РАДИО ------------------------------------------------------------
+
+#if USE_RADIO
+void handle_get_radio_stations(AsyncWebServerRequest *request) {
+  DynamicJsonDocument doc(8192);
+  if (deserializeJson(doc, configRadio) != DeserializationError::Ok) doc.clear();
+
+  JsonObject src = doc.as<JsonObject>();
+  DynamicJsonDocument out(8192);
+  JsonObject o = out.to<JsonObject>();
+
+  JsonArray stations = o.createNestedArray("stations");
+  JsonArray srcStations = src["stations"].as<JsonArray>();
+
+  if (srcStations) {
+    for (JsonObject st : srcStations) {
+      JsonObject copy = stations.createNestedObject();
+      copy["name"] = st["name"].as<String>();
+      copy["url"]  = st["url"].as<String>();
+    }
+  }
+
+  JsonObject map = o.createNestedObject("map");
+  JsonObject eff = src["effects"].as<JsonObject>();
+  if (!eff) eff = src["map"].as<JsonObject>();
+
+  if (eff) {
+    for (JsonPair kv : eff) {
+      int v = kv.value().as<int>();
+      if (v > 0 && v <= 255) {
+        map[kv.key()] = v;
+      }
+    }
+  }
+
+  o["volume"] = src["volume"] | radioVolume;
+  o["enabled"] = radioEnabled ? 1 : 0;
+
+  uint8_t currentUiIndex = 0;
+  for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+    if (eff_num_correct[i] == currentMode) {
+      currentUiIndex = i;
+      break;
+    }
+  }
+  o["current_effect"] = currentUiIndex;
+
+  uint8_t currentStationId = 0;
+  if (currentMode < MODE_AMOUNT) {
+    currentStationId = effects_stations[currentMode];
+  }
+  o["current_station"] = currentStationId;
+
+  String resp;
+  serializeJson(out, resp);
+  request->send(200, "application/json; charset=utf-8", resp);
+}
+
+void handle_radio_volume(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
+    return;
+  }
+  radioSetVolume(constrain(request->getParam("value")->value().toInt(), 0, 21));
+  request->send(200, "text/plain", "OK");
+}
+
+void handle_save_radio_stations(AsyncWebServerRequest *request) {
+  if (!request->hasParam("plain", true)) {
+    request->send(400, "text/plain", "Missing body");
+    return;
+  }
+  DynamicJsonDocument req(8192);
+  if (deserializeJson(req, request->getParam("plain", true)->value()) != DeserializationError::Ok) {
+    request->send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+  JsonArray stations = req["stations"].as<JsonArray>();
+  if (!stations) {
+    request->send(400, "text/plain", "No stations array");
+    return;
+  }
+
+  DynamicJsonDocument doc(8192);
+  if (deserializeJson(doc, configRadio) != DeserializationError::Ok) doc.clear();
+
+  JsonArray dst = doc.createNestedArray("stations");
+  for (JsonObject st : stations) {
+    JsonObject o = dst.createNestedObject();
+    o["name"] = st["name"].as<String>();
+    o["url"]  = st["url"].as<String>();
+  }
+
+  JsonObject eff = doc["effects"].as<JsonObject>();
+  if (!eff) {
+    JsonObject oldMap = doc["map"].as<JsonObject>();
+    if (oldMap) {
+      eff = doc.createNestedObject("effects");
+      for (JsonPair kv : oldMap) eff[kv.key()] = kv.value();
+      doc.remove("map");
+    } else {
+      eff = doc.createNestedObject("effects");
+    }
+  }
+
+  uint8_t newCount = (uint8_t)stations.size();
+  for (JsonPair kv : eff) {
+    int stId = kv.value().as<int>();
+    if (stId > newCount) {
+      eff[kv.key()] = 0;
+    }
+  }
+
+  if (doc["volume"].isNull()) doc["volume"] = radioVolume;
+
+  configRadio = "";
+  serializeJson(doc, configRadio);
+  writeFile(F("config_radio.json"), configRadio);
+
+  for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+    effects_stations[i] = eff[String(i)] | 0;
+  }
+
+  request->send(200, "text/plain", "OK");
+}
+
+void handle_radio_map_batch(AsyncWebServerRequest *request) {
+  if (!request->hasParam("plain", true)) {
+    request->send(400, "text/plain", "Missing body");
+    return;
+  }
+
+  DynamicJsonDocument req(8192);
+  if (deserializeJson(req, request->getParam("plain", true)->value()) != DeserializationError::Ok) {
+    request->send(400, "text/plain", "Invalid JSON");
+    return;
+  }
+
+  DynamicJsonDocument doc(8192);
+  if (deserializeJson(doc, configRadio) != DeserializationError::Ok) doc.clear();
+
+  JsonObject eff = doc["effects"].as<JsonObject>();
+  if (!eff) {
+    JsonObject oldMap = doc["map"].as<JsonObject>();
+    doc.remove("map");
+    eff = doc.createNestedObject("effects");
+    if (oldMap) {
+      for (JsonPair kv : oldMap) eff[kv.key()] = kv.value();
+    }
+  }
+  eff.clear();
+
+  for (JsonPair kv : req.as<JsonObject>()) {
+    int effIdRaw = atoi(kv.key().c_str());
+    if (effIdRaw < 0 || effIdRaw >= MODE_AMOUNT) continue;
+    uint8_t effectId = (uint8_t)effIdRaw;
+    int rawStationId = kv.value().as<int>();
+    if (rawStationId < 1 || rawStationId > 255) continue;
+    eff[String(effectId)] = (uint8_t)rawStationId;
+  }
+
+  for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
+    effects_stations[i] = eff[String(i)] | 0;
+  }
+
+  if (doc["volume"].isNull()) doc["volume"] = radioVolume;
+  configRadio = "";
+  serializeJson(doc, configRadio);
+  writeFile(F("config_radio.json"), configRadio);
+
+  request->send(200, "text/plain", "OK");
+}
+#endif
+
 // ------------------------------------------------------ РЕГУЛИРОВКА НАСТРОЕК ЭФФЕКТОВ НА ГЛАВНОЙ СТРАНИЦЕ -------------------------------------------
 
 // Общая яркость
-void handle_all_br() {
-  jsonWrite(configSetup, "all_br", HTTP.arg("all_br").toInt());
+void handle_all_br(AsyncWebServerRequest *request) {
+  if (!request->hasParam("all_br")) {
+    request->send(400, "text/plain", "Missing all_br");
+    return;
+  }
+  jsonWrite(configSetup, "all_br", request->getParam("all_br")->value().toInt());
   uint8_t ALLbri = jsonReadtoInt(configSetup, "all_br");
 
   for (uint8_t i = 0; i < MODE_AMOUNT; i++) {
@@ -3390,7 +3809,7 @@ void handle_all_br() {
   Eeprom::instance().EepromPut(modes);
   loadingFlag = true;
 
-  HTTP.send(200, "text/plain", String(ALLbri));
+  request->send(200, "text/plain", String(ALLbri));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3398,12 +3817,16 @@ void handle_all_br() {
 }
 
 // Яркость
-void handle_br() {
-  if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+void handle_br(AsyncWebServerRequest *request) {
+  if (!request->hasParam("br")) {
+    request->send(400, "text/plain", "Missing br");
     return;
   }
-  int newBri = constrain(HTTP.arg("br").toInt(), 1, 255);
+  if (!ONflag) {
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    return;
+  }
+  int newBri = constrain(request->getParam("br")->value().toInt(), 1, 255);
   modes[currentMode].Brightness = newBri;
   jsonWrite(configSetup, "br", newBri);
   SetBrightness(newBri);
@@ -3411,7 +3834,7 @@ void handle_br() {
   saveConfig();
   Eeprom::instance().EepromPut(modes);
 
-  HTTP.send(200, "text/plain", String(newBri));
+  request->send(200, "text/plain", String(newBri));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3425,12 +3848,16 @@ void handle_br() {
 }
 
 // Скорость
-void handle_sp() {
-  if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+void handle_sp(AsyncWebServerRequest *request) {
+  if (!request->hasParam("sp")) {
+    request->send(400, "text/plain", "Missing sp");
     return;
   }
-  uint8_t newSpeed = constrain(HTTP.arg("sp").toInt(), 1, 255);
+  if (!ONflag) {
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    return;
+  }
+  uint8_t newSpeed = constrain(request->getParam("sp")->value().toInt(), 1, 255);
   modes[currentMode].Speed = newSpeed;
   jsonWrite(configSetup, "sp", newSpeed);
   loadingFlag = true;
@@ -3439,7 +3866,7 @@ void handle_sp() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, "text/plain", String(newSpeed));
+  request->send(200, "text/plain", String(newSpeed));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3453,12 +3880,16 @@ void handle_sp() {
 }
 
 // Масштаб
-void handle_sc() {
-  if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+void handle_sc(AsyncWebServerRequest *request) {
+  if (!request->hasParam("sc")) {
+    request->send(400, "text/plain", "Missing sc");
     return;
   }
-  uint8_t newScale = constrain(HTTP.arg("sc").toInt(), 1, 100);
+  if (!ONflag) {
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    return;
+  }
+  uint8_t newScale = constrain(request->getParam("sc")->value().toInt(), 1, 100);
   modes[currentMode].Scale = newScale;
   jsonWrite(configSetup, "sc", newScale);
   loadingFlag = true;
@@ -3467,7 +3898,7 @@ void handle_sc() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, "text/plain", String(newScale));
+  request->send(200, "text/plain", String(newScale));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3481,9 +3912,9 @@ void handle_sc() {
 }
 
 // Яркость -1
-void handle_brm() {
+void handle_brm(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
     return;
   }
   modes[currentMode].Brightness = constrain(modes[currentMode].Brightness - 1, 1, 255);
@@ -3494,7 +3925,7 @@ void handle_brm() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3508,9 +3939,9 @@ void handle_brm() {
 }
 
 // Яркость +1
-void handle_brp() {
+void handle_brp(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
     return;
   }
   modes[currentMode].Brightness = constrain(modes[currentMode].Brightness + 1, 1, 255);
@@ -3521,7 +3952,7 @@ void handle_brp() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3535,9 +3966,9 @@ void handle_brp() {
 }
 
 // Скорость -1
-void handle_spm() {
+void handle_spm(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
     return;
   }
   modes[currentMode].Speed = constrain(modes[currentMode].Speed - 1, 1, 255);
@@ -3548,7 +3979,7 @@ void handle_spm() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3562,9 +3993,9 @@ void handle_spm() {
 }
 
 // Скорость +1
-void handle_spp() {
+void handle_spp(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
     return;
   }
   modes[currentMode].Speed = constrain(modes[currentMode].Speed + 1, 1, 255);
@@ -3575,7 +4006,7 @@ void handle_spp() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3589,9 +4020,9 @@ void handle_spp() {
 }
 
 // Масштаб -1
-void handle_scm() {
+void handle_scm(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
     return;
   }
   modes[currentMode].Scale = constrain(modes[currentMode].Scale - 1, 1, 100);
@@ -3602,7 +4033,7 @@ void handle_scm() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3616,9 +4047,9 @@ void handle_scm() {
 }
 
 // Масштаб +1
-void handle_scp() {
+void handle_scp(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
+    request->send(403, F("application/json"), F("{\"error\": \"Lamp is off\"}"));
     return;
   }
   modes[currentMode].Scale = constrain(modes[currentMode].Scale + 1, 1, 100);
@@ -3629,7 +4060,7 @@ void handle_scp() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3642,7 +4073,7 @@ void handle_scp() {
 #endif
 }
 
-void handle_eff_sel() {
+void handle_eff_sel(AsyncWebServerRequest *request) {
   systemShuttingDown = false;
 #if USE_SD
   if (outFile) {
@@ -3651,8 +4082,15 @@ void handle_eff_sel() {
   }
 #endif
   outEffectActive = false;
-
-  uint8_t temp = HTTP.arg("eff_sel").toInt();
+  if (!request->hasParam("eff_sel")) {
+    request->send(400, "text/plain", "Missing eff_sel");
+    return;
+  }
+  uint8_t temp = request->getParam("eff_sel")->value().toInt();
+  if (temp >= MODE_AMOUNT) {
+    request->send(400, "text/plain", "Invalid eff_sel");
+    return;
+  }
   uint8_t newMode = eff_num_correct[temp];
 
 #if USE_SD
@@ -3665,7 +4103,7 @@ void handle_eff_sel() {
       }
     }
     if (sdIndex == 255) {
-      HTTP.send(500, "text/plain", "EFF_SD not in effect list");
+      request->send(500, "text/plain", "EFF_SD not in effect list");
       return;
     }
 
@@ -3680,7 +4118,7 @@ void handle_eff_sel() {
       FastLED.show();
     }
 
-    HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+    request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
     return;
   }
 #endif
@@ -3692,8 +4130,8 @@ void handle_eff_sel() {
 
 #if USE_ANIMATIONS
   if (newMode == EFF_ANIMATION) {
-    if (HTTP.hasArg("anim")) {
-      int animIdx = HTTP.arg("anim").toInt();
+    if (request->hasParam("anim")) {
+      int animIdx = request->getParam("anim")->value().toInt();
       if (animIdx >= 1 && animIdx <= max_image_num) {
         specialTextEffectParam = animIdx;
         jsonWrite(configSetup, "anim_sel", animIdx);
@@ -3732,12 +4170,23 @@ void handle_eff_sel() {
   effectsTick();
   FastLED.show();
 
-#if USE_MP3_PLAYER
-  if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
-    if (effects_folders[currentMode] != 0) {
-      mp3SendPlayFolder(effects_folders[currentMode]);
+#if USE_RADIO
+  if (radioEnabled && ONflag) {
+    uint8_t stId = radioGetStationForMode(currentMode);
+    if (stId > 0) {
+      radioPlayStation(stId);
+    } else {
+      radioStop();
     }
-  }
+  } else
+#endif
+
+#if USE_MP3_PLAYER
+    if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
+      if (effects_folders[currentMode] != 0) {
+        mp3SendPlayFolder(effects_folders[currentMode]);
+      }
+    }
 #endif
 
   if (random_on && Favorites::instance().FavoritesRunning) {
@@ -3757,7 +4206,7 @@ void handle_eff_sel() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -3766,16 +4215,21 @@ void handle_eff_sel() {
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
-void handle_night_time() {
-  String day_hour_str = HTTP.arg("day_time_hour");
-  String day_min_str = HTTP.arg("day_time_minute");
-  String night_hour_str = HTTP.arg("night_time_hour");
-  String night_min_str = HTTP.arg("night_time_minute");
+void handle_night_time(AsyncWebServerRequest *request) {
+  if (!request->hasParam("day_time_hour") || !request->hasParam("day_time_minute") || !request->hasParam("night_time_hour") || !request->hasParam("night_time_minute") || !request->hasParam("day_bright") || !request->hasParam("night_bright")) {
+    request->send(400, "text/plain", "Missing night time parameters");
+    return;
+  }
+
+  String day_hour_str = request->getParam("day_time_hour")->value();
+  String day_min_str = request->getParam("day_time_minute")->value();
+  String night_hour_str = request->getParam("night_time_hour")->value();
+  String night_min_str = request->getParam("night_time_minute")->value();
 
   int day_hour = day_hour_str.toInt();
   int day_min = day_min_str.toInt();
   int night_hour = night_hour_str.toInt();
-  int night_min  = night_min_str.toInt();
+  int night_min = night_min_str.toInt();
 
   day_hour = constrain(day_hour, 0, 23);
   day_min = constrain(day_min, 0, 59);
@@ -3804,8 +4258,8 @@ void handle_night_time() {
   jsonWrite(configSetup, "day_time", day_time_minutes);
   jsonWrite(configSetup, "night_time", night_time_minutes);
 
-  uint8_t day_bright = constrain(HTTP.arg("day_bright").toInt(), 0, 255);
-  uint8_t night_bright = constrain(HTTP.arg("night_bright").toInt(), 0, 255);
+  uint8_t day_bright = constrain(request->getParam("day_bright")->value().toInt(), 0, 255);
+  uint8_t night_bright = constrain(request->getParam("night_bright")->value().toInt(), 0, 255);
 
   jsonWrite(configSetup, "day_bright", day_bright);
   jsonWrite(configSetup, "night_bright", night_bright);
@@ -3838,45 +4292,57 @@ void handle_night_time() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 // Чекбокс "Включать лампу после обесточивания" (изменённая логика, было наоборот)
-void handle_effect_always () {
-  int value = HTTP.arg("effect_always").toInt();
+void handle_effect_always(AsyncWebServerRequest *request) {
+  if (!request->hasParam("effect_always")) {
+    request->send(400, "text/plain", "Missing effect_always");
+    return;
+  }
+  int value = request->getParam("effect_always")->value().toInt();
   jsonWrite(configSetup, "effect_always", value);
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // --------------------------------------------------------------------------- ИЗБРАННОЕ --------------------------------------------------------------
 
-void handle_favorit() {
-  jsonWrite(configSetup, "favorit", HTTP.arg("favorit").toInt());
+void handle_favorit(AsyncWebServerRequest *request) {
+  if (!request->hasParam("favorit")) {
+    request->send(400, "text/plain", "Missing favorit");
+    return;
+  }
+  jsonWrite(configSetup, "favorit", request->getParam("favorit")->value().toInt());
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
   Favorit_only = jsonReadtoInt(configSetup, "favorit");
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_random() {
-  jsonWrite(configSetup, "random_on", HTTP.arg("random_on").toInt());
+void handle_random(AsyncWebServerRequest *request) {
+  if (!request->hasParam("random_on")) {
+    request->send(400, "text/plain", "Missing random_on");
+    return;
+  }
+  jsonWrite(configSetup, "random_on", request->getParam("random_on")->value().toInt());
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
   random_on = jsonReadtoInt(configSetup, "random_on");
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // ----------------------------------------------------------------------- УПРАВЛЕНИЕ ПИТАНИЕМ ---------------------------------------------------------
 
-void handle_Power() {
+void handle_Power(AsyncWebServerRequest *request) {
   static uint32_t lastPowerCommandMs = 0;
   uint32_t nowMs = millis();
   if (nowMs - lastPowerCommandMs < 500UL) {
-    HTTP.send(200, "application/json", "{\"should_refresh\":\"false\"}");
+    request->send(200, "application/json", "{\"should_refresh\":\"false\"}");
     return;
   }
   lastPowerCommandMs = nowMs;
@@ -3907,7 +4373,7 @@ void handle_Power() {
 
     saveConfig();
     loadingFlag = false;
-    HTTP.send(200, "application/json", "{\"should_refresh\":\"true\"}");
+    request->send(200, "application/json", "{\"should_refresh\":\"true\"}");
     return;
   }
 #endif // USE_DAWN
@@ -3932,7 +4398,7 @@ void handle_Power() {
 
     saveConfig();
     loadingFlag = false;
-    HTTP.send(200, "application/json", "{\"should_refresh\":\"true\"}");
+    request->send(200, "application/json", "{\"should_refresh\":\"true\"}");
     return;
   }
 #endif
@@ -3943,7 +4409,7 @@ void handle_Power() {
     jsonWrite(configLedPanel, "night_clock_enabled", "0");
     nightModeBrightness = 0;
 
-    // ВЫКЛ лампы
+    // выкл лампы
     ONflag = false;
     jsonWrite(configSetup, "Power", ONflag);
 
@@ -3964,7 +4430,7 @@ void handle_Power() {
     justPoweredOn = false;
     loadingFlag = false;
 
-    HTTP.send(200, "application/json", "{\"should_refresh\":\"true\"}");
+    request->send(200, "application/json", "{\"should_refresh\":\"true\"}");
 
 #if USE_MULTILAMP
     multiple_lamp_control();
@@ -3979,7 +4445,7 @@ void handle_Power() {
   }
 
   // обычная логика включения/выключения
-  uint8_t requestedState = HTTP.arg("Power").toInt();
+  uint8_t requestedState = request->getParam("Power")->value().toInt();
   if (requestedState == 2) {
     requestedState = ONflag ? 0 : 1;
   }
@@ -4032,7 +4498,7 @@ void handle_Power() {
     changePower();
   }
 
-  HTTP.send(200, "application/json", "{\"should_refresh\":\"true\"}");
+  request->send(200, "application/json", "{\"should_refresh\":\"true\"}");
 
 #if USE_MULTILAMP
   if (ONflag) repeat_multiple_lamp_control = true;
@@ -4050,7 +4516,7 @@ void handle_Power() {
 
 #if USE_DAWN
 bool firstStartAlarm = true;
-void handle_alarm() {
+static void applyAlarmSettings(bool fromRequest, AsyncWebServerRequest *request) {
   if (configAlarm.isEmpty() || configAlarm == "null") {
     configAlarm = "{}";
   }
@@ -4065,9 +4531,14 @@ void handle_alarm() {
     String key_h = "h" + String(idx);
     String key_m = "m" + String(idx);
 
-    String hoursStr = HTTP.arg(key_h);
-    String minutesStr = HTTP.arg(key_m);
-    uint8_t state = HTTP.arg(key_a).toInt();
+    String hoursStr, minutesStr;
+    uint8_t state = 0;
+
+    if (fromRequest && request) {
+      hoursStr = request->hasParam(key_h) ? request->getParam(key_h)->value() : "";
+      minutesStr = request->hasParam(key_m) ? request->getParam(key_m)->value() : "";
+      state = request->hasParam(key_a) ? request->getParam(key_a)->value().toInt() : 0;
+    }
 
     if (hoursStr.length() == 0) {
       hoursStr = jsonRead(configAlarm, key_h);
@@ -4077,9 +4548,10 @@ void handle_alarm() {
       minutesStr = jsonRead(configAlarm, key_m);
       if (minutesStr.length() == 0) minutesStr = "00";
     }
-    if (HTTP.arg(key_a).length() == 0) {
+    if (!fromRequest) {
       state = jsonReadtoInt(configAlarm, key_a);
     }
+
     hoursStr   = zeroPad(hoursStr, 2);
     minutesStr = zeroPad(minutesStr, 2);
 
@@ -4100,15 +4572,19 @@ void handle_alarm() {
     alarms[k].Time = hoursStr.toInt() * 60 + minutesStr.toInt();
   }
 
-  uint8_t dawnModeNew = HTTP.arg("t").toInt();
-  uint8_t dawnTimeoutNew = HTTP.arg("after").toInt();
-  uint8_t dawnBrightNew  = HTTP.arg("a_br").toInt();
+  uint8_t dawnModeNew = 0, dawnTimeoutNew = 0, dawnBrightNew = 0;
+
+  if (fromRequest && request) {
+    dawnModeNew = request->hasParam("t") ? request->getParam("t")->value().toInt() : 0;
+    dawnTimeoutNew = request->hasParam("after") ? request->getParam("after")->value().toInt() : 0;
+    dawnBrightNew = request->hasParam("a_br") ? request->getParam("a_br")->value().toInt()  : 0;
+  }
 
   if (dawnModeNew == 0) dawnModeNew = jsonReadtoInt(configAlarm, "t");
   if (dawnTimeoutNew == 0) dawnTimeoutNew = jsonReadtoInt(configAlarm, "after");
-  if (dawnBrightNew == 0)  dawnBrightNew = jsonReadtoInt(configAlarm, "a_br");
+  if (dawnBrightNew  == 0) dawnBrightNew = jsonReadtoInt(configAlarm, "a_br");
 
-  if (jsonReadtoInt(configAlarm, "t") != dawnModeNew) {
+  if (jsonReadtoInt(configAlarm, "t") != dawnModeNew)    {
     jsonWrite(configAlarm, "t", dawnModeNew);
     saveNeeded = true;
   }
@@ -4116,7 +4592,7 @@ void handle_alarm() {
     jsonWrite(configAlarm, "after", dawnTimeoutNew);
     saveNeeded = true;
   }
-  if (jsonReadtoInt(configAlarm, "a_br") != dawnBrightNew) {
+  if (jsonReadtoInt(configAlarm, "a_br") != dawnBrightNew)  {
     jsonWrite(configAlarm, "a_br", dawnBrightNew);
     saveNeeded = true;
   }
@@ -4125,13 +4601,19 @@ void handle_alarm() {
   DAWN_TIMEOUT = dawnTimeoutNew;
   DAWN_BRIGHT = dawnBrightNew;
 
-  if (saveNeeded || firstStartAlarm) {
+  if (saveNeeded) {
     save_file_changes |= SAVE_ALARMS_BIT;
     timeout_save_file_changes = millis();
-    firstStartAlarm = false;
   }
+}
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\":\"true\"}"));
+void handle_alarm() {
+  applyAlarmSettings(false, nullptr);
+}
+
+void handle_alarm_http(AsyncWebServerRequest *request) {
+  applyAlarmSettings(true, request);
+  request->send(200, "application/json", "{\"should_refresh\":\"true\"}");
 }
 
 #endif // USE_DAWN
@@ -4144,7 +4626,7 @@ void saveSunsetConfig(const String & data) {
   writeFile(F("config_sunset.json"), data);
 }
 
-void handle_sunset() {
+static void applySunsetSettings(bool fromRequest, AsyncWebServerRequest *request) {
   if (configSunset.isEmpty() || configSunset == "null") {
     configSunset = "{}";
   }
@@ -4159,11 +4641,16 @@ void handle_sunset() {
     String key_h = "h" + String(idx);
     String key_m = "m" + String(idx);
 
-    String hoursStr = HTTP.arg(key_h);
-    String minutesStr = HTTP.arg(key_m);
-    uint8_t state = HTTP.arg(key_a).toInt();
+    String hoursStr, minutesStr;
+    uint8_t state = 0;
 
-    if (hoursStr.length() == 0) {
+    if (fromRequest && request) {
+      hoursStr = request->hasParam(key_h) ? request->getParam(key_h)->value() : "";
+      minutesStr = request->hasParam(key_m) ? request->getParam(key_m)->value() : "";
+      state = request->hasParam(key_a) ? request->getParam(key_a)->value().toInt() : 0;
+    }
+
+    if (hoursStr.length() == 0)   {
       hoursStr = jsonRead(configSunset, key_h);
       if (hoursStr.length() == 0) hoursStr = "21";
     }
@@ -4171,11 +4658,9 @@ void handle_sunset() {
       minutesStr = jsonRead(configSunset, key_m);
       if (minutesStr.length() == 0) minutesStr = "00";
     }
-    if (HTTP.arg(key_a).length() == 0) {
-      state = jsonReadtoInt(configSunset, key_a);
-    }
+    if (!fromRequest) state = jsonReadtoInt(configSunset, key_a);
 
-    hoursStr = zeroPad(hoursStr, 2);
+    hoursStr   = zeroPad(hoursStr, 2);
     minutesStr = zeroPad(minutesStr, 2);
 
     if (jsonRead(configSunset, key_h) != hoursStr) {
@@ -4192,18 +4677,21 @@ void handle_sunset() {
     }
 
     sunsets[k].State = state;
-    sunsets[k].Time = hoursStr.toInt() * 60 + minutesStr.toInt();
-
+    sunsets[k].Time  = hoursStr.toInt() * 60 + minutesStr.toInt();
     yield();
   }
 
-  uint8_t sunsetModeNew = HTTP.arg("t").toInt();
-  uint8_t sunsetBrightNew = HTTP.arg("s_br").toInt();
+  uint8_t sunsetModeNew = 0, sunsetBrightNew = 0;
+
+  if (fromRequest && request) {
+    sunsetModeNew = request->hasParam("t") ? request->getParam("t")->value().toInt() : 0;
+    sunsetBrightNew = request->hasParam("s_br") ? request->getParam("s_br")->value().toInt() : 0;
+  }
 
   if (sunsetModeNew == 0) sunsetModeNew = jsonReadtoInt(configSunset, "t");
   if (sunsetBrightNew == 0) sunsetBrightNew = jsonReadtoInt(configSunset, "s_br");
 
-  if (jsonReadtoInt(configSunset, "t") != sunsetModeNew) {
+  if (jsonReadtoInt(configSunset, "t") != sunsetModeNew)   {
     jsonWrite(configSunset, "t", sunsetModeNew);
     saveNeeded = true;
   }
@@ -4220,8 +4708,15 @@ void handle_sunset() {
     timeout_save_file_changes = millis();
     firstStartSunset = false;
   }
+}
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+void handle_sunset() {
+  applySunsetSettings(false, nullptr);
+}
+
+void handle_sunset_http(AsyncWebServerRequest *request) {
+  applySunsetSettings(true, request);
+  request->send(200, "application/json", "{\"should_refresh\":\"true\"}");
 }
 
 #endif // USE_SUNSET
@@ -4229,7 +4724,7 @@ void handle_sunset() {
 // ----------------------------------------------------------------------------- РАСПИСАНИЕ ------------------------------------------------------------
 
 #if USE_SCHEDULE
-void handle_schedule() {
+void handle_schedule(AsyncWebServerRequest *request) {
   if (configSchedule.isEmpty() || configSchedule == "null") {
     configSchedule = "{}";
   }
@@ -4245,7 +4740,7 @@ void handle_schedule() {
   }
 
   String oldEnable = jsonRead(configSchedule, "schedule_enabled");
-  String enableVal = HTTP.hasArg("schedule_enabled") ? HTTP.arg("schedule_enabled") : oldEnable;
+  String enableVal = request->hasParam("schedule_enabled") ? request->getParam("schedule_enabled")->value() : oldEnable;
   if (enableVal != "1") enableVal = "0";
   jsonWrite(configSchedule, "schedule_enabled", enableVal);
   if (enableVal != oldEnable) changed = true;
@@ -4258,13 +4753,13 @@ void handle_schedule() {
     String mKey = "m" + String(slot);
     String effKey = (slot == 3) ? "eff3" : "";
 
-    String actionStr = HTTP.hasArg(aKey) ? HTTP.arg(aKey) : jsonRead(configSchedule, aKey);
+    String actionStr = request->hasParam(aKey) ? request->getParam(aKey)->value() : jsonRead(configSchedule, aKey);
     if (actionStr == "" || actionStr == "null") actionStr = "0";
     uint8_t action = actionStr.toInt();
 
-    String hStr = HTTP.hasArg(hKey) ? HTTP.arg(hKey) : jsonRead(configSchedule, hKey);
+    String hStr = request->hasParam(hKey) ? request->getParam(hKey)->value() : jsonRead(configSchedule, hKey);
     if (hStr == "" || hStr == "null" || hStr == "0") hStr = "00";
-    String mStr = HTTP.hasArg(mKey) ? HTTP.arg(mKey) : jsonRead(configSchedule, mKey);
+    String mStr = request->hasParam(mKey) ? request->getParam(mKey)->value() : jsonRead(configSchedule, mKey);
     if (mStr == "" || mStr == "null" || mStr == "0") mStr = "00";
 
     uint8_t h = constrain(hStr.toInt(), 0, 23);
@@ -4276,26 +4771,26 @@ void handle_schedule() {
     uint8_t effect = 255;
 
     if (slot == 3 && action == 3) {
-      String effStr = HTTP.hasArg(effKey) ? HTTP.arg(effKey) : jsonRead(configSchedule, effKey);
+      String effStr = request->hasParam(effKey) ? request->getParam(effKey)->value() : jsonRead(configSchedule, effKey);
       if (effStr != "" && effStr != "null") {
         effect = constrain(effStr.toInt(), 0, MODE_AMOUNT - 1);
       }
     }
 
     bool slotChanged = false;
-    if (HTTP.hasArg(aKey)) {
+    if (request->hasParam(aKey)) {
       jsonWrite(configSchedule, aKey, actionStr);
       slotChanged = true;
     }
-    if (HTTP.hasArg(hKey)) {
+    if (request->hasParam(hKey)) {
       jsonWrite(configSchedule, hKey, hFormatted);
       slotChanged = true;
     }
-    if (HTTP.hasArg(mKey)) {
+    if (request->hasParam(mKey)) {
       jsonWrite(configSchedule, mKey, mFormatted);
       slotChanged = true;
     }
-    if (slot == 3 && HTTP.hasArg(effKey)) {
+    if (slot == 3 && request->hasParam(effKey)) {
       jsonWrite(configSchedule, effKey, String(effect));
       slotChanged = true;
     }
@@ -4352,31 +4847,47 @@ void handle_schedule() {
   }
   String respStr;
   serializeJson(resp, respStr);
-  HTTP.send(200, "application/json", respStr);
+  request->send(200, "application/json", respStr);
 }
 #endif // USE_SCHEDULE
 
 // --------------------------------------------------------------- УПРАВЛЕНИЕ НЕСКОЛЬКИМИ ЛАМПАМИ ------------------------------------------------------
 
 #if USE_MULTILAMP
-void handle_multiple_lamp() {
-  jsonWrite(configMultilamp, "ml1", HTTP.arg("ml1").toInt());
-  jsonWrite(configMultilamp, "ml2", HTTP.arg("ml2").toInt());
-  jsonWrite(configMultilamp, "ml3", HTTP.arg("ml3").toInt());
-  jsonWrite(configMultilamp, "ml4", HTTP.arg("ml4").toInt());
-  jsonWrite(configMultilamp, "ml5", HTTP.arg("ml5").toInt());
+void handle_multiple_lamp(AsyncWebServerRequest *request) {
 
-  jsonWrite(configMultilamp, "host1", HTTP.arg("host1"));
-  jsonWrite(configMultilamp, "host2", HTTP.arg("host2"));
-  jsonWrite(configMultilamp, "host3", HTTP.arg("host3"));
-  jsonWrite(configMultilamp, "host4", HTTP.arg("host4"));
-  jsonWrite(configMultilamp, "host5", HTTP.arg("host5"));
+  if (request->hasParam("ml1"))
+    jsonWrite(configMultilamp, "ml1", request->getParam("ml1")->value().toInt());
+  if (request->hasParam("ml2"))
+    jsonWrite(configMultilamp, "ml2", request->getParam("ml2")->value().toInt());
+  if (request->hasParam("ml3"))
+    jsonWrite(configMultilamp, "ml3", request->getParam("ml3")->value().toInt());
+  if (request->hasParam("ml4"))
+    jsonWrite(configMultilamp, "ml4", request->getParam("ml4")->value().toInt());
+  if (request->hasParam("ml5"))
+    jsonWrite(configMultilamp, "ml5", request->getParam("ml5")->value().toInt());
 
-  jsonWrite(configMultilamp, "comment1", HTTP.arg("comment1"));
-  jsonWrite(configMultilamp, "comment2", HTTP.arg("comment2"));
-  jsonWrite(configMultilamp, "comment3", HTTP.arg("comment3"));
-  jsonWrite(configMultilamp, "comment4", HTTP.arg("comment4"));
-  jsonWrite(configMultilamp, "comment5", HTTP.arg("comment5"));
+  if (request->hasParam("host1"))
+    jsonWrite(configMultilamp, "host1", request->getParam("host1")->value());
+  if (request->hasParam("host2"))
+    jsonWrite(configMultilamp, "host2", request->getParam("host2")->value());
+  if (request->hasParam("host3"))
+    jsonWrite(configMultilamp, "host3", request->getParam("host3")->value());
+  if (request->hasParam("host4"))
+    jsonWrite(configMultilamp, "host4", request->getParam("host4")->value());
+  if (request->hasParam("host5"))
+    jsonWrite(configMultilamp, "host5", request->getParam("host5")->value());
+
+  if (request->hasParam("comment1"))
+    jsonWrite(configMultilamp, "comment1", request->getParam("comment1")->value());
+  if (request->hasParam("comment2"))
+    jsonWrite(configMultilamp, "comment2", request->getParam("comment2")->value());
+  if (request->hasParam("comment3"))
+    jsonWrite(configMultilamp, "comment3", request->getParam("comment3")->value());
+  if (request->hasParam("comment4"))
+    jsonWrite(configMultilamp, "comment4", request->getParam("comment4")->value());
+  if (request->hasParam("comment5"))
+    jsonWrite(configMultilamp, "comment5", request->getParam("comment5")->value());
 
   writeFile(F("config_multilamp.json"), configMultilamp);
 
@@ -4402,9 +4913,13 @@ void handle_multiple_lamp() {
   str.toCharArray(Host5, sizeof(Host5));
 
 #if USE_MP3_PLAYER
-  send_sound = HTTP.arg("s_s").toInt();
-  jsonWrite(configMP3, "s_s", send_sound);
-  send_eff_volume = HTTP.arg("s_e_v").toInt();
+  if (request->hasParam("s_s")) {
+    send_sound = request->getParam("s_s")->value().toInt();
+    jsonWrite(configMP3, "s_s", send_sound);
+  }
+  if (request->hasParam("s_e_v")) {
+    send_eff_volume = request->getParam("s_e_v")->value().toInt();
+  }
   if (!send_sound) {
     send_eff_volume = 0;
   }
@@ -4412,10 +4927,10 @@ void handle_multiple_lamp() {
   writeFile(F("config_mp3.json"), configMP3);
 #endif // USE_MP3_PLAYER
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-void multilamp_get() {
+void multilamp_get(AsyncWebServerRequest *request) {
   ml1 = jsonReadtoInt(configMultilamp, "ml1");
   ml2 = jsonReadtoInt(configMultilamp, "ml2");
   ml3 = jsonReadtoInt(configMultilamp, "ml3");
@@ -4485,7 +5000,11 @@ void multiple_lamp_control() {
 // ------------------------------------------------------------------------ РЕЖИМ ЦИКЛ -----------------------------------------------------------------
 
 // Включение/выключение режима Цикл
-void handle_cycle_on() {
+void handle_cycle_on(AsyncWebServerRequest *request) {
+  if (!request->hasParam("cycle_on")) {
+    request->send(400, "text/plain", "Missing cycle_on");
+    return;
+  }
   if (currentMode != EFF_SD) {
 #if USE_SD
     if (outFile) {
@@ -4496,10 +5015,10 @@ void handle_cycle_on() {
     outEffectActive = false;
   }
   uint8_t tmp;
-  tmp = HTTP.arg("cycle_on").toInt();
+  tmp = request->getParam("cycle_on")->value().toInt();
   if (tmp == 2) tmp = (jsonReadtoInt(configSetup, "cycle_on") == 0) ? 1 : 0;
 
-  if (ONflag && tmp)   {
+  if (ONflag && tmp) {
     jsonWrite(configSetup, "cycle_on", 1);
     Favorites::instance().FavoritesRunning = 1;
     Eeprom::instance().EepromPut(modes);
@@ -4510,7 +5029,7 @@ void handle_cycle_on() {
   }
 
   saveConfig();
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {
@@ -4519,29 +5038,42 @@ void handle_cycle_on() {
 #endif
 }
 
-// Время переключения цикла
-void handle_time_eff () {
-  jsonWrite(configSetup, "time_eff", HTTP.arg("time_eff").toInt());
+// время переключения цикла
+void handle_time_eff (AsyncWebServerRequest *request) {
+  if (!request->hasParam("time_eff") || !request->hasParam("disp")) {
+    request->send(400, "text/plain", "Missing time_eff or disp");
+    return;
+  }
+  jsonWrite(configSetup, "time_eff", request->getParam("time_eff")->value().toInt());
   Favorites::instance().Interval = jsonReadtoInt(configSetup, "time_eff");
-  jsonWrite(configSetup, "disp", HTTP.arg("disp").toInt());
+  jsonWrite(configSetup, "disp", request->getParam("disp")->value().toInt());
+
   Favorites::instance().Dispersion = jsonReadtoInt(configSetup, "disp");
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-// Перемешать выбранные или по порядку
-void handle_rnd_cycle () {
-  jsonWrite(configSetup, "rnd_cycle", HTTP.arg("rnd_cycle").toInt());
+// перемешать выбранные или по порядку
+void handle_rnd_cycle (AsyncWebServerRequest *request) {
+  if (!request->hasParam("rnd_cycle")) {
+    request->send(400, "text/plain", "Missing rnd_cycle");
+    return;
+  }
+  jsonWrite(configSetup, "rnd_cycle", request->getParam("rnd_cycle")->value().toInt());
   Favorites::instance().rndCycle = jsonReadtoInt(configSetup, "rnd_cycle");
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // Запускать режим цикл после выкл/вкл лампы или нет
-void handle_cycle_always () {
-  jsonWrite(configSetup, "cycle_always", HTTP.arg("cycle_always").toInt());
+void handle_cycle_always (AsyncWebServerRequest *request) {
+  if (!request->hasParam("cycle_always")) {
+    request->send(400, "text/plain", "Missing cycle_always");
+    return;
+  }
+  jsonWrite(configSetup, "cycle_always", request->getParam("cycle_always")->value().toInt());
   Favorites::instance().UseSavedFavoritesRunning = jsonReadtoInt(configSetup, "cycle_always");
 
   if (!ONflag && !Favorites::instance().UseSavedFavoritesRunning)   {
@@ -4551,11 +5083,11 @@ void handle_cycle_always () {
 
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
 // Выбор эффектов для Цикла
-void handle_cycle_set () {
+void handle_cycle_set (AsyncWebServerRequest *request) {
   char i[4];
   String configCycle = readFile(F("config_cycle.json"), 2048);
 
@@ -4563,7 +5095,7 @@ void handle_cycle_set () {
     itoa ((k), i, 10);
     String e = "e" + String (i) ;
     if (!first_entry)
-      jsonWrite(configCycle, e, HTTP.arg(e).toInt());
+      jsonWrite(configCycle, e, request->getParam(e.c_str())->value().toInt());
     Favorites::instance().FavoriteModes[k] = jsonReadtoInt(configCycle, e);
     yield();
   }
@@ -4572,11 +5104,11 @@ void handle_cycle_set () {
     writeFile(F("config_cycle.json"), configCycle );
   }
 
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // сохранение выбранных эффектов в файл
-void cycle_get () {
+void cycle_get (AsyncWebServerRequest *request) {
   char i[4];
   bool cycle_change = false;
   String configCycle = readFile(F("config_cycle.json"), 2048);
@@ -4596,8 +5128,8 @@ void cycle_get () {
   }
 }
 
-// Выбрать эффекты
-void handle_eff() {
+// следующий/предыдущий эффект
+void handle_eff(AsyncWebServerRequest *request) {
   if (currentMode != EFF_SD) {
 #if USE_SD
     if (outFile) {
@@ -4609,7 +5141,11 @@ void handle_eff() {
   }
 
   int temp = jsonReadtoInt(configSetup, "eff_sel");
-  bool next = HTTP.arg("eff").toInt();
+  if (!request->hasParam("eff")) {
+    request->send(400, "text/plain", "Missing eff");
+    return;
+  }
+  bool next = request->getParam("eff")->value().toInt();
 
   if (Favorit_only) {
     uint8_t lastMode = currentMode;
@@ -4654,12 +5190,23 @@ void handle_eff() {
   effectsTick();
   FastLED.show();
 
-#if USE_MP3_PLAYER
-  if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
-    if (effects_folders[currentMode] != 0) {
-      mp3SendPlayFolder(effects_folders[currentMode]);
+#if USE_RADIO
+  if (radioEnabled && ONflag) {
+    uint8_t stId = radioGetStationForMode(currentMode);
+    if (stId > 0) {
+      radioPlayStation(stId);
+    } else {
+      radioStop();
     }
-  }
+  } else
+#endif
+
+#if USE_MP3_PLAYER
+    if (ONflag && eff_sound_on && mp3Enabled && mp3Initialized && !isAnnouncing && !advert_flag && !weather_advert_flag) {
+      if (effects_folders[currentMode] != 0) {
+        mp3SendPlayFolder(effects_folders[currentMode]);
+      }
+    }
 #endif
 
   if (random_on && Favorites::instance().FavoritesRunning) selectedSettings = 1U;
@@ -4674,7 +5221,7 @@ void handle_eff() {
   updateRemoteBlynkParams();
 #endif
 
-  HTTP.send(200, "application/json", "{\"should_refresh\": \"true\"}");
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -4682,7 +5229,7 @@ void handle_eff() {
 }
 
 // Выбрать все эффекты
-void handle_eff_all () {
+void handle_eff_all (AsyncWebServerRequest *request) {
   char i[4];
   String configCycle = readFile(F("config_cycle.json"), 2048);
 
@@ -4693,11 +5240,11 @@ void handle_eff_all () {
     yield();
   }
   writeFile(F("config_cycle.json"), configCycle );
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
 // Очистить все эффекты
-void handle_eff_clr () {
+void handle_eff_clr (AsyncWebServerRequest *request) {
   char i[4];
   String configCycle = readFile(F("config_cycle.json"), 2048);
 
@@ -4708,13 +5255,13 @@ void handle_eff_clr () {
     yield();
   }
   writeFile(F("config_cycle.json"), configCycle );
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
 // --------------------------------------------------------- СОХРАНЕНИЕ, СБРОС И ЗАГРУЗКА НАСТРОЕК ЭФФЕКТОВ --------------------------------------------
 
 // Сброс настроек текущего эффекта по умолчанию
-void handle_def() {
+void handle_def(AsyncWebServerRequest *request) {
   outEffectActive = false;
   setModeSettings();
   updateSets();
@@ -4741,7 +5288,7 @@ void handle_def() {
 
   showWarning(CRGB::Blue, 2000U, 500U);
 
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -4749,7 +5296,7 @@ void handle_def() {
 }
 
 // Сброс настроек всех эффектов по умолчанию
-void handle_eff_reset() {
+void handle_eff_reset(AsyncWebServerRequest *request) {
 #if USE_SD
   if (outFile) {
     outFile.close();
@@ -4790,7 +5337,7 @@ void handle_eff_reset() {
   updateRemoteBlynkParams();
 #endif
 
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -4798,20 +5345,20 @@ void handle_eff_reset() {
 }
 
 // Сохранить настройки эффектов
-void handle_eff_save() {
+void handle_eff_save(AsyncWebServerRequest *request) {
   if (!ONflag) {
-    HTTP.send(403, "text/plain", "Lamp is off");
+    request->send(403, "text/plain", "Lamp is off");
     return;
   }
 
-  if (!LittleFS.begin(false)) {
-    HTTP.send(500, "text/plain", "FS mount failed");
+  if (!LittleFS.begin(false) && !LittleFS.exists("/")) {
+    request->send(500, "text/plain", "FS mount failed");
     return;
   }
 
   File file = LittleFS.open("/effect.ini", "w");
   if (!file) {
-    HTTP.send(500, "text/plain", "Cannot create file");
+    request->send(500, "text/plain", "Cannot create file");
     return;
   }
 
@@ -4824,26 +5371,26 @@ void handle_eff_save() {
   file.close();
 
   showWarning(CRGB::Blue, 2000U, 500U);
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
 // Загрузить настройки эффектов из файла
-void handle_eff_read() {
+void handle_eff_read(AsyncWebServerRequest *request) {
   if (!LittleFS.begin(false)) {
-    HTTP.send(500, "text/plain", "FS mount failed");
+    request->send(500, "text/plain", "FS mount failed");
     return;
   }
 
   File file = LittleFS.open("/effect.ini", "r");
   if (!file) {
-    HTTP.send(404, "text/plain", "File not found");
+    request->send(404, "text/plain", "File not found");
     return;
   }
 
   uint16_t file_size = file.size();
   if (file_size < 3 || file_size > MODE_AMOUNT * 3 || (file_size % 3) != 0) {
     file.close();
-    HTTP.send(400, "text/plain", "Invalid file size");
+    request->send(400, "text/plain", "Invalid file size");
     return;
   }
 
@@ -4870,7 +5417,7 @@ void handle_eff_read() {
   jsonWrite(configSetup, "sp", modes[currentMode].Speed);
   jsonWrite(configSetup, "sc", modes[currentMode].Scale);
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MQTT
   if (Wifi::instance().isConnected()) {
@@ -4881,8 +5428,12 @@ void handle_eff_read() {
 
 // -------------------------------------------------- АВТОЯРКОСТЬ ЭФФЕКТОВ (в зависимости от времени суток) --------------------------------------------
 
-void handle_auto_bri () {
-  AutoBrightness = HTTP.arg("auto_bri").toInt();
+void handle_auto_bri (AsyncWebServerRequest *request) {
+  if (!request->hasParam("auto_bri")) {
+    request->send(400, "text/plain", "Missing auto_bri");
+    return;
+  }
+  AutoBrightness = request->getParam("auto_bri")->value().toInt();
   jsonWrite(configSetup, "auto_bri", AutoBrightness);
 
 #if USE_DAWN
@@ -4892,24 +5443,28 @@ void handle_auto_bri () {
 #endif
     SetBrightness(modes[currentMode].Brightness);
   }
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
 // ------------------------------------------------------------------ НАСТРОЙКИ ДИСПЛЕЯ ST7789 ---------------------------------------------------------
 
 #if USE_ST7789
-void handle_tft_clock_color() {
-  int val = HTTP.arg("tft_clock_color").toInt();
+void handle_tft_clock_color(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_clock_color")) {
+    request->send(400, "text/plain", "Missing tft_clock_color");
+    return;
+  }
+  int val = request->getParam("tft_clock_color")->value().toInt();
   jsonWrite(configST7789, "tft_clock_color", val);
   saveConfig();
   tft_clock_color = val;
   loadingFlag = true;
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_tft_date_color() {
-  if (HTTP.hasArg("tft_date_color")) {
-    uint8_t val = HTTP.arg("tft_date_color").toInt();
+void handle_tft_date_color(AsyncWebServerRequest *request) {
+  if (request->hasParam("tft_date_color")) {
+    uint8_t val = request->getParam("tft_date_color")->value().toInt();
     if (val <= 20) {
       tft_date_color = val;
       jsonWrite(configST7789, "tft_date_color", tft_date_color);
@@ -4917,20 +5472,28 @@ void handle_tft_date_color() {
       loadingFlag = true;
     }
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_tft_weather_color() {
-  int val = HTTP.arg("tft_weather_color").toInt();
+void handle_tft_weather_color(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_weather_color")) {
+    request->send(400, "text/plain", "Missing tft_weather_color");
+    return;
+  }
+  int val = request->getParam("tft_weather_color")->value().toInt();
   jsonWrite(configST7789, "tft_weather_color", val);
   saveConfig();
   tft_weather_color = val;
   loadingFlag = true;
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_tft_ticker_on() {
-  bool val = (HTTP.arg("tft_ticker_on").toInt() == 1);
+void handle_tft_ticker_on(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_ticker_on")) {
+    request->send(400, "text/plain", "Missing tft_ticker_on");
+    return;
+  }
+  bool val = (request->getParam("tft_ticker_on")->value().toInt() == 1);
   jsonWrite(configST7789, "tft_ticker_on", val ? "1" : "0");
   saveConfig();
   tft_ticker_on = val;
@@ -4938,11 +5501,15 @@ void handle_tft_ticker_on() {
     tftTickerStop();
     tftTickerNextStart = millis() + tftTickerPeriodMs();
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_tft_ticker_color() {
-  int val = HTTP.arg("tft_ticker_color").toInt();
+void handle_tft_ticker_color(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_ticker_color")) {
+    request->send(400, "text/plain", "Missing tft_ticker_color");
+    return;
+  }
+  int val = request->getParam("tft_ticker_color")->value().toInt();
   jsonWrite(configST7789, "tft_ticker_color", val);
   saveConfig();
   tft_ticker_color = val;
@@ -4950,19 +5517,27 @@ void handle_tft_ticker_color() {
     tftTickerStop();
     tftTickerNextStart = millis() + tftTickerPeriodMs();
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_tft_ticker_speed() {
-  uint16_t val = constrain(HTTP.arg("tft_ticker_speed").toInt(), 50, 500);
+void handle_tft_ticker_speed(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_ticker_speed")) {
+    request->send(400, "text/plain", "Missing tft_ticker_speed");
+    return;
+  }
+  uint16_t val = constrain(request->getParam("tft_ticker_speed")->value().toInt(), 50, 500);
   jsonWrite(configST7789, "tft_ticker_speed", val);
   saveConfig();
   tft_ticker_speed = val;
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-void handle_tft_ticker_period() {
-  uint16_t val = constrain(HTTP.arg("tft_ticker_period").toInt(), 0, 3600);
+void handle_tft_ticker_period(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_ticker_period")) {
+    request->send(400, "text/plain", "Missing tft_ticker_period");
+    return;
+  }
+  uint16_t val = constrain(request->getParam("tft_ticker_period")->value().toInt(), 0, 3600);
   jsonWrite(configST7789, "tft_ticker_period", val);
   saveConfig();
   tft_ticker_period = val;
@@ -4970,11 +5545,15 @@ void handle_tft_ticker_period() {
     tftTickerStop();
     tftTickerNextStart = millis() + tftTickerPeriodMs();
   }
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
-void handle_tft_ticker_text() {
-  String s = HTTP.arg("tft_ticker_text");
+void handle_tft_ticker_text(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_ticker_text")) {
+    request->send(400, "text/plain", "Missing tft_ticker_text");
+    return;
+  }
+  String s = request->getParam("tft_ticker_text")->value();
   if (s.length() > 120) s.remove(120);
   jsonWrite(configST7789, "tft_ticker_text", s);
   saveConfig();
@@ -4983,15 +5562,15 @@ void handle_tft_ticker_text() {
     tftTickerStop();
     tftTickerNextStart = millis() + tftTickerPeriodMs();
   }
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-void handle_tft_brightness() {
-  if (!HTTP.hasArg("tft_brightness")) {
-    HTTP.send(400, "text/plain", "Missing parameter");
+void handle_tft_brightness(AsyncWebServerRequest *request) {
+  if (!request->hasParam("tft_brightness")) {
+    request->send(400, "text/plain", "Missing parameter");
     return;
   }
-  uint8_t brightness = constrain(HTTP.arg("tft_brightness").toInt(), 0, 255);
+  uint8_t brightness = constrain(request->getParam("tft_brightness")->value().toInt(), 0, 255);
   if (brightness != tft_brightness) {
     tft_brightness = brightness;
     if (st7789Enabled) {
@@ -5007,15 +5586,15 @@ void handle_tft_brightness() {
     }
     saveConfig();
   }
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
-void handle_tft_auto_brightness() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_tft_auto_brightness(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool enable = (HTTP.arg("value") == "1");
+  bool enable = (request->getParam("value")->value() == "1");
   if (enable != tft_auto_brightness) {
     tft_auto_brightness = enable;
     jsonWrite(configST7789, "tft_auto_brightness", enable ? "1" : "0");
@@ -5024,15 +5603,18 @@ void handle_tft_auto_brightness() {
       TFT_SetAutoBrightness(enable);
     }
   }
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
 #endif // USE_ST7789
 // --------------------------------
-void handle_save_brightness() {
-  uint8_t day_bright = constrain(HTTP.arg("day_bright").toInt(), 0, 255);
-  uint8_t night_bright = constrain(HTTP.arg("night_bright").toInt(), 0, 255);
-
+void handle_save_brightness(AsyncWebServerRequest *request) {
+  if (!request->hasParam("day_bright") || !request->hasParam("night_bright")) {
+    request->send(400, "text/plain", "Missing brightness parameters");
+    return;
+  }
+  uint8_t day_bright = constrain(request->getParam("day_bright")->value().toInt(), 0, 255);
+  uint8_t night_bright = constrain(request->getParam("night_bright")->value().toInt(), 0, 255);
   jsonWrite(configSetup, "day_bright", day_bright);
   jsonWrite(configSetup, "night_bright", night_bright);
   saveConfig();
@@ -5059,18 +5641,18 @@ void handle_save_brightness() {
   timeout_save_file_changes = millis();
   bitSet(save_file_changes, 0);
 
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 }
 
 // ----------------------------------------------------------------------- НАСТРОЙКИ TM1637 ------------------------------------------------------------
 
 #if USE_TM1637
-void handle_tm1637_brightness() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_tm1637_brightness(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  uint8_t brightness = constrain(HTTP.arg("value").toInt(), 0, 255);
+  uint8_t brightness = constrain(request->getParam("value")->value().toInt(), 0, 255);
   if (brightness != userTm1637Brightness) {
     userTm1637Brightness = brightness;
     jsonWrite(configSetup, "tm1637_brightness", String(brightness));
@@ -5083,15 +5665,15 @@ void handle_tm1637_brightness() {
       clockTicker_blink();
     }
   }
-  HTTP.send(200, "text/plain", String(brightness));
+  request->send(200, "text/plain", String(brightness));
 }
 
-void handle_tm1637_auto_brightness() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_tm1637_auto_brightness(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool enable = (HTTP.arg("value") == "1");
+  bool enable = (request->getParam("value")->value() == "1");
   if (enable != userTm1637AutoBrightness) {
     userTm1637AutoBrightness = enable;
     jsonWrite(configSetup, "tm1637_auto_brightness", enable ? "1" : "0");
@@ -5100,24 +5682,25 @@ void handle_tm1637_auto_brightness() {
       clockTicker_blink();
     }
   }
-  HTTP.send(200, "text/plain", enable ? "1" : "0");
+  request->send(200, "text/plain", enable ? "1" : "0");
 }
 #endif
 
 // ---------------------------------------------------------------------- НАСТРОЙКИ МАТРИЦЫ ------------------------------------------------------------
 
-// Включение/выключение мультиматрицы (рантайм)
+// Включение/выключение использования поддержки нескольких матриц (рантайм)
 #if MULTI_MATRIX
-void handle_multi_matrix_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_multi_matrix_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
 
-  bool newVal = (HTTP.arg("value") == "1" || HTTP.arg("value").equalsIgnoreCase("true"));
+  String mmVal = request->getParam("value")->value();
+  bool newVal = (mmVal == "1" || mmVal.equalsIgnoreCase("true"));
 
   if (newVal == multiMatrixEnabled) {
-    HTTP.send(200, "text/plain", "NO_CHANGE");
+    request->send(200, "text/plain", "NO_CHANGE");
     return;
   }
 
@@ -5133,20 +5716,24 @@ void handle_multi_matrix_enable() {
   SYSLOG.add("multiMatrixEnabled: %d (restart)", multiMatrixEnabled);
 #endif
 
-  HTTP.send(200, "text/plain", "OK_REBOOT");
+  request->send(200, "text/plain", "OK_REBOOT");
   pendingRestart = true;
 }
 #endif
 
 // -----------------------------------
 
-void handle_matrix_tipe() {
+void handle_matrix_tipe(AsyncWebServerRequest *request) {
+  if (!request->hasParam("m_t")) {
+    request->send(400, "text/plain", "Missing m_t");
+    return;
+  }
   String configLED = readFile(F("config_led_matrix.json"), 8192);
   if (configLED == "Failed" || configLED == "Large") {
     configLED = "{}";
   }
 
-  int newType = HTTP.arg("m_t").toInt();
+  int newType = request->getParam("m_t")->value().toInt();
   if (newType != 0 && newType != 1) {
     newType = 0;
   }
@@ -5156,17 +5743,21 @@ void handle_matrix_tipe() {
     jsonWrite(configLED, "m_t", newType);
     writeFile(F("config_led_matrix.json"), configLED);
     MatrixType = newType;
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   } else {
-    HTTP.send(200, "text/plain", "NO_CHANGE");
+    request->send(200, "text/plain", "NO_CHANGE");
   }
 }
 
-void handle_matrix_orientation() {
+void handle_matrix_orientation(AsyncWebServerRequest *request) {
+  if (!request->hasParam("m_o")) {
+    request->send(400, "text/plain", "Missing m_o");
+    return;
+  }
   String configLED = readFile(F("config_led_matrix.json"), 8192);
   if (configLED == "Failed" || configLED == "Large") configLED = "{}";
 
-  int newOri = HTTP.arg("m_o").toInt();
+  int newOri = request->getParam("m_o")->value().toInt();
   if (newOri < 0 || newOri > 7) newOri = 0;
 
   String oldOri = jsonRead(configLED, "m_o");
@@ -5176,21 +5767,21 @@ void handle_matrix_orientation() {
     MatrixOrientation = newOri;
     loadingFlag = true;
     needFullRedraw = true;
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
   } else {
-    HTTP.send(200, "text/plain", "NO_CHANGE");
+    request->send(200, "text/plain", "NO_CHANGE");
   }
 }
 
 // -------------------------------------------------------------------------- НАСТРОЙКИ MQTT -----------------------------------------------------------
 
 #if USE_MQTT
-void handle_mqtt_set() {
-  String mq_ip = HTTP.arg("mq_ip");
-  uint16_t mq_port = HTTP.arg("mq_port").toInt();
-  String mq_user = HTTP.arg("mq_user");
-  String mq_pass = HTTP.arg("mq_pass");
-  String mq_topic = HTTP.arg("topic");
+void handle_mqtt_set(AsyncWebServerRequest *request) {
+  String mq_ip = request->hasParam("mq_ip") ? request->getParam("mq_ip")->value() : "";
+  uint16_t mq_port = request->hasParam("mq_port") ? request->getParam("mq_port")->value().toInt() : 1883;
+  String mq_user = request->hasParam("mq_user") ? request->getParam("mq_user")->value() : "";
+  String mq_pass = request->hasParam("mq_pass") ? request->getParam("mq_pass")->value() : "";
+  String mq_topic = request->hasParam("topic") ? request->getParam("topic")->value() : "";
 
   if (mq_port < 1 || mq_port > 65535) mq_port = 1883;
 
@@ -5219,24 +5810,32 @@ void handle_mqtt_set() {
   jsonWrite(configMQTT, "TopicP", String(Mqtt::instance().getClientId()) + '/' + String(TopicSnd));
 
   writeFile(F("config_mqtt.json"), configMQTT);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-void handle_mqtt_on() {
-  MqttOn = HTTP.arg("mq_on").toInt();
+void handle_mqtt_on(AsyncWebServerRequest *request) {
+  if (!request->hasParam("mq_on")) {
+    request->send(400, "text/plain", "Missing mq_on");
+    return;
+  }
+  MqttOn = request->getParam("mq_on")->value().toInt();
   jsonWrite(configMQTT, "mq_on", MqttOn);
   writeFile(F("config_mqtt.json"), configMQTT);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
-void handle_mqtt_period() {
-  MqttPeriod = HTTP.arg("mq_prd").toInt();
+void handle_mqtt_period(AsyncWebServerRequest *request) {
+  if (!request->hasParam("mq_prd")) {
+    request->send(400, "text/plain", "Missing mq_prd");
+    return;
+  }
+  MqttPeriod = request->getParam("mq_prd")->value().toInt();
   if (MqttPeriod < 10) MqttPeriod = 10;
   if (MqttPeriod > 3600) MqttPeriod = 3600;
 
   jsonWrite(configMQTT, "mq_prd", MqttPeriod);
   writeFile(F("config_mqtt.json"), configMQTT);
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
 }
 
 #endif // USE_MQTT
@@ -5244,9 +5843,9 @@ void handle_mqtt_period() {
 // -------------------------------------------------------------------- ЧТЕНИЕ ФАЙЛОВ ФОЛРМАТА .OUT ---------------------------------------------------
 
 #if USE_SD
-void handle_list_out_files() {
+void handle_list_out_files(AsyncWebServerRequest *request) {
   if (!sdEnabled) {
-    HTTP.send(200, "application/json", "[]");
+    request->send(200, "application/json", "[]");
     return;
   }
 
@@ -5259,7 +5858,7 @@ void handle_list_out_files() {
 
   auto openDir = [](const String & path) -> File {
     if (sdType == 1) return LittleFS.open(path);
-    else             return SD.open(path);
+    else return SD.open(path);
   };
 
   root = openDir(effectsPath);
@@ -5268,7 +5867,7 @@ void handle_list_out_files() {
     root = openDir("/effects/");
     if (!root || !root.isDirectory()) {
       if (root) root.close();
-      HTTP.send(200, "application/json", "[]");
+      request->send(200, "application/json", "[]");
       return;
     }
   }
@@ -5288,7 +5887,7 @@ void handle_list_out_files() {
   }
   root.close();
   fileList += "]";
-  HTTP.send(200, "application/json", fileList);
+  request->send(200, "application/json", fileList);
 }
 #endif // USE_SD
 
@@ -5296,7 +5895,7 @@ void handle_list_out_files() {
 
 #if STATUS_DEVICE
 // статус кнопки
-void handle_button_status() {
+void handle_button_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(256);
 
 #if USE_BUTTON
@@ -5313,11 +5912,11 @@ void handle_button_status() {
 
   String response;
   serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
+  request->send(200, "application/json; charset=utf-8", response);
 }
 
 // статус IR, RF
-void handle_ir_rf_status() {
+void handle_ir_rf_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(512);
   String ir_status, rf_status;
 
@@ -5360,11 +5959,11 @@ void handle_ir_rf_status() {
   doc["rf_enabled"] = rfEnabled;
   String response;
   serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
+  request->send(200, "application/json; charset=utf-8", response);
 }
 
 // статус дисплея tm1637
-void handle_tm1637_status() {
+void handle_tm1637_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(256);
   String status;
   bool connected = false;
@@ -5381,11 +5980,11 @@ void handle_tm1637_status() {
   doc["enabled"] = tm1637Enabled;
   String response;
   serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
+  request->send(200, "application/json; charset=utf-8", response);
 }
 
 // статус дисплея st7789
-void handle_st7789_status() {
+void handle_st7789_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(256);
   String status;
   bool connected = false;
@@ -5402,11 +6001,11 @@ void handle_st7789_status() {
   doc["enabled"] = st7789Enabled;
   String response;
   serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
+  request->send(200, "application/json; charset=utf-8", response);
 }
 
 // статус мп3 плеера
-void handle_mp3_status() {
+void handle_mp3_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(512);
   String status;
   bool card_ok = false;
@@ -5456,11 +6055,29 @@ void handle_mp3_status() {
 
   String response;
   serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
+  request->send(200, "application/json; charset=utf-8", response);
 }
 
+// статус Радио
+#if USE_RADIO
+void handle_radio_status(AsyncWebServerRequest *request) {
+  DynamicJsonDocument doc(256);
+  doc["enabled"] = radioEnabled;
+  doc["playing"] = radioPlaying;
+  doc["paused"] = !radioPlaying && radioInited && currentStation > 0;
+  doc["ready"] = radioInited;
+  doc["station"] = currentStation;
+  doc["volume"] = radioVolume;
+  doc["station_name"] = (currentStation > 0) ? getStationName(currentStation - 1) : "";
+
+  String resp;
+  serializeJson(doc, resp);
+  request->send(200, "application/json; charset=utf-8", resp);
+}
+#endif
+
 // статус SD
-void handle_sd_status() {
+void handle_sd_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(512);
   String sd_status;
 
@@ -5481,31 +6098,37 @@ void handle_sd_status() {
 
   doc["sd_status"] = sd_status;
   doc["sd_enabled"] = sdEnabled;
-  doc["sd_type"]    = sdType;
+  doc["sd_type"] = sdType;
   doc["card_present"] = sd_card_present;
   String response;
   serializeJson(doc, response);
-  HTTP.send(200, "application/json; charset=utf-8", response);
+  request->send(200, "application/json; charset=utf-8", response);
 }
 
 // статус погоды
-void handle_show_weather() {
+void handle_show_weather(AsyncWebServerRequest *request) {
 #if USE_WEATHER
-  int enabled = HTTP.arg("show_weather").toInt();
+  if (!request->hasParam("show_weather")) {
+    request->send(400, "text/plain", "Missing show_weather");
+    return;
+  }
+  int enabled = request->getParam("show_weather")->value().toInt();
   inClockWeatherMode = (enabled == 1);
   jsonWrite(configWeather, "show_weather", enabled);
   saveConfig();
   if (inClockWeatherMode && Wifi::instance().isConnected()) {
     Weather::instance().forceUpdate();
   }
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
+#else
+  request->send(404, "text/plain", "Weather disabled");
 #endif
 }
 
 // статус OTA
 uint8_t otaProgress = 0;
 String  otaStatus = "ГОТОВ";
-void handle_ota_status() {
+void handle_ota_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(256);
   String status = "ГОТОВ";
 
@@ -5523,11 +6146,11 @@ void handle_ota_status() {
 
   String resp;
   serializeJson(doc, resp);
-  HTTP.send(200, "application/json; charset=utf-8", resp);
+  request->send(200, "application/json; charset=utf-8", resp);
 }
 
 // статус MQTT
-void handle_mqtt_status() {
+void handle_mqtt_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(256);
   String status;
   bool connected = false;
@@ -5545,11 +6168,11 @@ void handle_mqtt_status() {
 
   String resp;
   serializeJson(doc, resp);
-  HTTP.send(200, "application/json; charset=utf-8", resp);
+  request->send(200, "application/json; charset=utf-8", resp);
 }
 
 // статус режим "Мультилампа"
-void handle_multilamp_status() {
+void handle_multilamp_status(AsyncWebServerRequest *request) {
   DynamicJsonDocument doc(512);
 
 #if USE_MULTILAMP
@@ -5575,7 +6198,7 @@ void handle_multilamp_status() {
 
   String resp;
   serializeJson(doc, resp);
-  HTTP.send(200, "application/json; charset=utf-8", resp);
+  request->send(200, "application/json; charset=utf-8", resp);
 }
 
 #endif // STATUS_DEVICE
@@ -5624,10 +6247,17 @@ void ApplyRunningTextSettings() {
 }
 
 // Чекбокс "Включить бегущую строку"
-void handle_run_text_enabled() {
-  String arg = HTTP.arg("value");
+void handle_run_text_enabled(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
+    return;
+  }
+  String arg = request->getParam("value")->value();
   bool newVal = (arg == "1" || arg.toInt() == 1);
-  if (newVal == runTextEnabled) return;
+  if (newVal == runTextEnabled) {
+    request->send(200, "text/plain", "OK");
+    return;
+  }
 
   runTextEnabled = newVal;
 
@@ -5654,7 +6284,7 @@ void handle_run_text_enabled() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5668,10 +6298,17 @@ void handle_run_text_enabled() {
 }
 
 // Чекбокс "Бегущая строка поверх эффекта"
-void handle_run_text_over() {
-  String arg = HTTP.arg("value");
+void handle_run_text_over(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
+    return;
+  }
+  String arg = request->getParam("value")->value();
   bool newVal = (arg == "1" || arg == "true" || arg.toInt() == 1);
-  if (newVal == runTextOver) return;
+  if (newVal == runTextOver) {
+    request->send(200, "text/plain", "OK");
+    return;
+  }
 
   runTextOver = newVal;
   jsonWrite(configLedPanel, "run_text_over", newVal ? "1" : "0");
@@ -5697,7 +6334,7 @@ void handle_run_text_over() {
   loadingFlag = true;
   needFullRedraw = true;
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5711,12 +6348,16 @@ void handle_run_text_over() {
 }
 
 // Текст бегущей строки
-void handle_run_text ()  {
-  jsonWrite(configLedPanel, "run_text", HTTP.arg("run_text"));
+void handle_run_text (AsyncWebServerRequest *request)  {
+  if (!request->hasParam("run_text")) {
+    request->send(400, "text/plain", "Missing run_text");
+    return;
+  }
+  jsonWrite(configLedPanel, "run_text", request->getParam("run_text")->value());
   timeout_save_file_changes = millis();
   bitSet (save_file_changes, 0);
   (jsonRead(configLedPanel, "run_text")).toCharArray (TextTicker, (jsonRead(configLedPanel, "run_text")).length() + 1);
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5730,17 +6371,17 @@ void handle_run_text ()  {
 }
 
 // Интервал вывода бегущей строки
-void handle_interval_run_text() {
-  if (!HTTP.hasArg("interval_run_text")) {
-    HTTP.send(400, F("text/plain"), F("Missing parameter: interval_run_text"));
+void handle_interval_run_text(AsyncWebServerRequest *request) {
+  if (!request->hasParam("interval_run_text")) {
+    request->send(400, F("text/plain"), F("Missing parameter: interval_run_text"));
     return;
   }
-  String arg = HTTP.arg("interval_run_text");
+  String arg = request->getParam("interval_run_text")->value();
   int newInterval = arg.toInt();
   newInterval = constrain(newInterval, 0, 60);
 
   if (newInterval == IntervalrunText) {
-    HTTP.send(200, F("text/plain"), F("OK"));
+    request->send(200, ("text/plain"), ("OK"));
     return;
   }
 
@@ -5748,7 +6389,7 @@ void handle_interval_run_text() {
   jsonWrite(configLedInterval, "interval_run_text", IntervalrunText);
   saveConfig();
   ApplyRunningTextSettings();
-  HTTP.send(200, F("text/plain"), F("OK"));
+  request->send(200, ("text/plain"), ("OK"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5762,13 +6403,13 @@ void handle_interval_run_text() {
 }
 
 // Смещение текста по Y
-void handle_text_y_offset() {
-  if (!HTTP.hasArg("text_y_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_text_y_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("text_y_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("text_y_offset").toInt();
+  int value = request->getParam("text_y_offset")->value().toInt();
   int maxShift = matrixHeight * 2;
   value = constrain(value, -maxShift, maxShift);
 
@@ -5783,7 +6424,7 @@ void handle_text_y_offset() {
     Fill_String = false;
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5797,14 +6438,14 @@ void handle_text_y_offset() {
 }
 
 // Скорость бегущей строки
-void handle_spt() {
-  if (!HTTP.hasArg("spt")) {
-    HTTP.send(400);
+void handle_spt(AsyncWebServerRequest *request) {
+  if (!request->hasParam("spt")) {
+    request->send(400);
     return;
   }
-  int newSpeed = constrain(HTTP.arg("spt").toInt(), 20, 220);
+  int newSpeed = constrain(request->getParam("spt")->value().toInt(), 20, 220);
   if (newSpeed == SpeedRunningText) {
-    HTTP.send(200, "text/plain", String(newSpeed));
+    request->send(200, "text/plain", String(newSpeed));
     return;
   }
   SpeedRunningText = newSpeed;
@@ -5824,7 +6465,7 @@ void handle_spt() {
       runningTextTimer.reset();
     }
   }
-  HTTP.send(200, "text/plain", String(newSpeed));
+  request->send(200, "text/plain", String(newSpeed));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5838,12 +6479,12 @@ void handle_spt() {
 }
 
 // Оттенок текста бегущей строки
-void handle_sct() {
-  if (!HTTP.hasArg("sct")) {
-    HTTP.send(400);
+void handle_sct(AsyncWebServerRequest *request) {
+  if (!request->hasParam("sct")) {
+    request->send(400);
     return;
   }
-  int value = constrain(HTTP.arg("sct").toInt(), 0, 255);
+  int value = constrain(request->getParam("sct")->value().toInt(), 0, 255);
 
   rainbowText = false;
   jsonWrite(configLedPanel, "rainbow_text", "0");
@@ -5873,32 +6514,32 @@ void handle_sct() {
   loadingFlag = true;
   scrollTimer = millis() - 1000;
 
-  HTTP.send(200, "text/plain", String(sctForDisplay));
+  request->send(200, "text/plain", String(sctForDisplay));
 }
 
 // Шрифт бегущей строки
-void handle_font_size() {
-  if (!HTTP.hasArg("font_size")) {
-    HTTP.send(400, "text/plain", "Missing font_size parameter");
+void handle_font_size(AsyncWebServerRequest *request) {
+  if (!request->hasParam("font_size")) {
+    request->send(400, "text/plain", "Missing font_size parameter");
     return;
   }
 
-  String arg = HTTP.arg("font_size");
+  String arg = request->getParam("font_size")->value();
   if (arg.length() == 0) {
-    HTTP.send(400, "text/plain", "Empty font_size value");
+    request->send(400, "text/plain", "Empty font_size value");
     return;
   }
 
   int val = arg.toInt();
   if (val < 0 || val > 2) {
-    HTTP.send(400, "text/plain", "Invalid font_size value (must be 0–2)");
+    request->send(400, "text/plain", "Invalid font_size value (must be 0–2)");
     return;
   }
 
   uint8_t newSize = (uint8_t)val;
 
   if (newSize == currentFont) {
-    HTTP.send(200, "text/plain", "OK (no change)");
+    request->send(200, "text/plain", "OK (no change)");
     return;
   }
 
@@ -5907,9 +6548,7 @@ void handle_font_size() {
 
   setFontSize(newSize);
 
-  const char* names[] = {"5×8", "8×13", "10×16"};
-
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5926,8 +6565,12 @@ void handle_font_size() {
 // --------------------------------------------------------------------------- НАСТРОЙКИ ЧАСОВ --------------------------------------------------------
 
 // Чекбокс "Авто-сдвиг часов"
-void handle_auto_move_clock() {
-  String arg = HTTP.arg("value");
+void handle_auto_move_clock(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
+    return;
+  }
+  String arg = request->getParam("value")->value();
   bool newVal = (arg == "1" || arg == "true" || arg.toInt() == 1);
 
   if (autoMoveClockEnabled != newVal) {
@@ -5942,7 +6585,7 @@ void handle_auto_move_clock() {
     }
   }
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5956,23 +6599,27 @@ void handle_auto_move_clock() {
 }
 
 // Интервал вывода часов
-void handle_print_time() {
-  int val = HTTP.arg("print_time").toInt();
+void handle_print_time(AsyncWebServerRequest *request) {
+  if (!request->hasParam("print_time")) {
+    request->send(400, "text/plain", "Missing print_time");
+    return;
+  }
+  int val = request->getParam("print_time")->value().toInt();
   if (val < 1 || val > 60) val = 30;
-  PRINT_TIME = HTTP.arg("print_time").toInt();
+  PRINT_TIME = request->getParam("print_time")->value().toInt();
   jsonWrite(configLedInterval, "print_time", PRINT_TIME);
   saveConfig();
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
 // Чекбокс "Часы бегущей строкой"
-void handle_run_time_text_enabled() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value parameter");
+void handle_run_time_text_enabled(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value parameter");
     return;
   }
 
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   valStr.toLowerCase();
   bool newVal = (valStr == "1" || valStr == "true" || valStr == "on");
   runTimeTextEnabled = newVal;
@@ -5983,7 +6630,7 @@ void handle_run_time_text_enabled() {
 
   jsonWrite(configLedPanel, "run_time_text_enabled", runTimeTextEnabled ? "1" : "0");
   saveConfig();
-  HTTP.send(200, "text/plain", runTimeTextEnabled ? "1" : "0");
+  request->send(200, "text/plain", runTimeTextEnabled ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -5997,16 +6644,16 @@ void handle_run_time_text_enabled() {
 }
 
 // Чекбокс "Ведущий ноль"
-void handle_clock_leading_zero() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value parameter");
+void handle_clock_leading_zero(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value parameter");
     return;
   }
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   bool newVal = (valStr == "1" || valStr == "true" || valStr == "on");
 
   if (clockLeadingZero == newVal) {
-    HTTP.send(200, "text/plain", clockLeadingZero ? "1" : "0");
+    request->send(200, "text/plain", clockLeadingZero ? "1" : "0");
     return;
   }
 
@@ -6015,7 +6662,7 @@ void handle_clock_leading_zero() {
   saveConfig();
   loadingFlag = true;
 
-  HTTP.send(200, "text/plain", clockLeadingZero ? "1" : "0");
+  request->send(200, "text/plain", clockLeadingZero ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6029,8 +6676,12 @@ void handle_clock_leading_zero() {
 }
 
 // Чекбокс "Вертикальные часы"
-void handle_clock_vert() {
-  String arg = HTTP.arg("value");
+void handle_clock_vert(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
+    return;
+  }
+  String arg = request->getParam("value")->value();
   bool newVal = (arg == "1" || arg == "true" || arg.toInt() == 1);
 
   if (clockIsVertical != newVal) {
@@ -6043,7 +6694,7 @@ void handle_clock_vert() {
     lastMinute = 255;
   }
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6057,12 +6708,12 @@ void handle_clock_vert() {
 }
 
 // Чекбокс "Включить ночные часы"
-void handle_night_clock_enabled() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400);
+void handle_night_clock_enabled(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400);
     return;
   }
-  uint8_t val = HTTP.arg("value").toInt();
+  uint8_t val = request->getParam("value")->value().toInt();
   bool newVal;
 
   if (val == 2) {
@@ -6072,7 +6723,7 @@ void handle_night_clock_enabled() {
   }
 
   if (newVal == nightClockEnabled) {
-    HTTP.send(200, "text/plain", nightClockEnabled ? "1" : "0");
+    request->send(200, "text/plain", nightClockEnabled ? "1" : "0");
     return;
   }
 
@@ -6094,7 +6745,7 @@ void handle_night_clock_enabled() {
 
     nightModeBrightness = nightClockBrightness;
     modes[currentMode].Brightness = nightModeBrightness;
-    jsonWrite(configSetup, "brightness", nightModeBrightness);
+    jsonWrite(configSetup, "br", nightModeBrightness);
     FastLED.setBrightness(nightModeBrightness);
 
     effectsTick();
@@ -6106,13 +6757,13 @@ void handle_night_clock_enabled() {
     uint8_t normalBrightness = userClockBrightness;
     if (normalBrightness == 0) normalBrightness = 30;
     modes[currentMode].Brightness = normalBrightness;
-    jsonWrite(configSetup, "brightness", normalBrightness);
+    jsonWrite(configSetup, "br", normalBrightness);
     FastLED.setBrightness(normalBrightness);
     FastLED.show();
     jsonWrite(configSetup, "br", normalBrightness);
   }
 
-  HTTP.send(200, "text/plain", nightClockEnabled ? "1" : "0");
+  request->send(200, "text/plain", nightClockEnabled ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6126,17 +6777,17 @@ void handle_night_clock_enabled() {
 }
 
 // Выбор яркости ночных часов
-void handle_night_clock_brightness() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400);
+void handle_night_clock_brightness(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400);
     return;
   }
-  uint8_t newVal = HTTP.arg("value").toInt();
+  uint8_t newVal = request->getParam("value")->value().toInt();
   if (newVal < 1 || newVal > 255) {
     newVal = 1;
   }
   if (newVal == nightClockBrightness) {
-    HTTP.send(200, "text/plain", String(nightClockBrightness));
+    request->send(200, "text/plain", String(nightClockBrightness));
     return;
   }
   nightClockBrightness = newVal;
@@ -6146,12 +6797,12 @@ void handle_night_clock_brightness() {
   if (nightClockEnabled && currentMode == eff_num_correct[EFF_CLOCK]) {
     nightModeBrightness = nightClockBrightness;
     modes[currentMode].Brightness = nightModeBrightness;
-    jsonWrite(configSetup, "brightness", nightModeBrightness);
+    jsonWrite(configSetup, "br", nightModeBrightness);
     FastLED.setBrightness(nightModeBrightness);
     FastLED.show();
   }
 
-  HTTP.send(200, "text/plain", String(nightClockBrightness));
+  request->send(200, "text/plain", String(nightClockBrightness));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6166,13 +6817,13 @@ void handle_night_clock_brightness() {
 
 #if LED_PANEL
 // Смещение часов по X
-void handle_clock_x_offset() {
-  if (!HTTP.hasArg("clock_x_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_clock_x_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("clock_x_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("clock_x_offset").toInt();
+  int value = request->getParam("clock_x_offset")->value().toInt();
   value = constrain(value, -50, 50);
 
   if (clockXOffset != value) {
@@ -6184,7 +6835,7 @@ void handle_clock_x_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6198,13 +6849,13 @@ void handle_clock_x_offset() {
 }
 
 // Смещение часов по Y
-void handle_clock_y_offset() {
-  if (!HTTP.hasArg("clock_y_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_clock_y_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("clock_y_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("clock_y_offset").toInt();
+  int value = request->getParam("clock_y_offset")->value().toInt();
   value = constrain(value, -20, 20);
 
   if (clockYOffset != value) {
@@ -6216,7 +6867,7 @@ void handle_clock_y_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6230,13 +6881,13 @@ void handle_clock_y_offset() {
 }
 
 // Оттенок часов
-void handle_clock_hue() {
-  if (!HTTP.hasArg("clock_hue")) {
-    HTTP.send(400);
+void handle_clock_hue(AsyncWebServerRequest *request) {
+  if (!request->hasParam("clock_hue")) {
+    request->send(400);
     return;
   }
 
-  int value = constrain(HTTP.arg("clock_hue").toInt(), 0, 255);
+  int value = constrain(request->getParam("clock_hue")->value().toInt(), 0, 255);
 
   rainbowClock = false;
   jsonWrite(configLedPanel, "rainbow_clock", "0");
@@ -6255,7 +6906,7 @@ void handle_clock_hue() {
   saveConfig();
   loadingFlag = true;
 
-  HTTP.send(200, "text/plain", String(clockHue));
+  request->send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6273,30 +6924,34 @@ void handle_clock_hue() {
 
 #if USE_WEATHER
 // Интервал вывода погоды
-void handle_print_weather() {
-  int val = HTTP.arg("print_weather").toInt();
+void handle_print_weather(AsyncWebServerRequest *request) {
+  if (!request->hasParam("print_weather")) {
+    request->send(400, "text/plain", "Missing print_weather");
+    return;
+  }
+  int val = request->getParam("print_weather")->value().toInt();
   if (val < 1 || val > 60) val = 30;
-  PRINT_WEATHER = HTTP.arg("print_weather").toInt();
+  PRINT_WEATHER = request->getParam("print_weather")->value().toInt();
   jsonWrite(configLedInterval, "print_weather", PRINT_WEATHER);
   saveConfig();
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 }
 
 // Чекбокс "Погода бегущей строкой"
-void handle_run_weather_text_enabled() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value parameter");
+void handle_run_weather_text_enabled(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value parameter");
     return;
   }
 
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   valStr.toLowerCase();
   bool newVal = (valStr == "1" || valStr == "true" || valStr == "on");
   runWeatherTextEnabled = newVal;
   jsonWrite(configLedPanel, "run_weather_text_enabled", runWeatherTextEnabled ? "1" : "0");
   saveConfig();
 
-  HTTP.send(200, "text/plain", runWeatherTextEnabled ? "1" : "0");
+  request->send(200, "text/plain", runWeatherTextEnabled ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6313,15 +6968,15 @@ void handle_run_weather_text_enabled() {
 #if LED_PANEL
 #if USE_WEATHER
 // Чекбокс "Включить погоду для отображеня на матрице"
-void handle_weather_enabled() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Parameter missing"));
+void handle_weather_enabled(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Parameter missing"));
     return;
   }
-  bool newVal = HTTP.arg("value") == "1";
+  bool newVal = request->getParam("value")->value() == "1";
 
   if (newVal == weatherEnabled) {
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
     return;
   }
 
@@ -6338,7 +6993,7 @@ void handle_weather_enabled() {
   weatherNeedRedraw = true;
   needFullRedraw = true;
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6352,13 +7007,13 @@ void handle_weather_enabled() {
 }
 
 // Оттенок погоды
-void handle_weather_hue() {
-  if (!HTTP.hasArg("weather_hue")) {
-    HTTP.send(400);
+void handle_weather_hue(AsyncWebServerRequest *request) {
+  if (!request->hasParam("weather_hue")) {
+    request->send(400);
     return;
   }
 
-  int value = constrain(HTTP.arg("weather_hue").toInt(), 0, 255);
+  int value = constrain(request->getParam("weather_hue")->value().toInt(), 0, 255);
 
   rainbowWeather = false;
   jsonWrite(configLedPanel, "rainbow_weather", "0");
@@ -6379,7 +7034,7 @@ void handle_weather_hue() {
   loadingFlag = true;
   weatherNeedRedraw = true;
 
-  HTTP.send(200, "text/plain", String(weatherHue));
+  request->send(200, "text/plain", String(weatherHue));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6393,13 +7048,13 @@ void handle_weather_hue() {
 }
 
 // Смещение погоды по X
-void handle_weather_x_offset() {
-  if (!HTTP.hasArg("weather_x_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_weather_x_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("weather_x_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("weather_x_offset").toInt();
+  int value = request->getParam("weather_x_offset")->value().toInt();
 
   int maxOffset = matrixWidth - 20;
   int minOffset = -matrixWidth + 20;
@@ -6415,7 +7070,7 @@ void handle_weather_x_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6429,13 +7084,13 @@ void handle_weather_x_offset() {
 }
 
 // Смещение погоды по Y
-void handle_weather_y_offset() {
-  if (!HTTP.hasArg("weather_y_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_weather_y_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("weather_y_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("weather_y_offset").toInt();
+  int value = request->getParam("weather_y_offset")->value().toInt();
 
   value = constrain(value, -16, 16);
 
@@ -6448,18 +7103,18 @@ void handle_weather_y_offset() {
     weatherNeedRedraw = true;
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 }
 
 // Чекбокс "Мигание °"
-void handle_degree_blink() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400);
+void handle_degree_blink(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400);
     return;
   }
-  bool newVal = HTTP.arg("value") == "1";
+  bool newVal = request->getParam("value")->value() == "1";
   if (newVal == degreeSymbolBlinking) {
-    HTTP.send(200, "text/plain", degreeSymbolBlinking ? "1" : "0");
+    request->send(200, "text/plain", degreeSymbolBlinking ? "1" : "0");
     return;
   }
   degreeSymbolBlinking = newVal;
@@ -6467,7 +7122,7 @@ void handle_degree_blink() {
   saveConfig();
   loadingFlag = true;
 
-  HTTP.send(200, "text/plain", degreeSymbolBlinking ? "1" : "0");
+  request->send(200, "text/plain", degreeSymbolBlinking ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6484,14 +7139,14 @@ void handle_degree_blink() {
 // ------------------------------------------------------------------------ НАСТРОЙКИ ДАТЫ ------------------------------------------------------------
 
 // Чекбокс "Включить дату для отображеня на матрице"
-void handle_date_enabled() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Parameter missing"));
+void handle_date_enabled(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Parameter missing"));
     return;
   }
-  bool newVal = HTTP.arg("value") == "1";
+  bool newVal = request->getParam("value")->value() == "1";
   if (newVal == dateEnabled) {
-    HTTP.send(200, "text/plain", "OK");
+    request->send(200, "text/plain", "OK");
     return;
   }
 
@@ -6507,7 +7162,7 @@ void handle_date_enabled() {
   }
 
   loadingFlag = true;
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6521,13 +7176,13 @@ void handle_date_enabled() {
 }
 
 // Оттенок даты
-void handle_date_hue() {
-  if (!HTTP.hasArg("date_hue")) {
-    HTTP.send(400);
+void handle_date_hue(AsyncWebServerRequest *request) {
+  if (!request->hasParam("date_hue")) {
+    request->send(400);
     return;
   }
 
-  int value = constrain(HTTP.arg("date_hue").toInt(), 0, 255);
+  int value = constrain(request->getParam("date_hue")->value().toInt(), 0, 255);
 
   rainbowDate = false;
   jsonWrite(configLedPanel, "rainbow_date", "0");
@@ -6547,7 +7202,7 @@ void handle_date_hue() {
   loadingFlag = true;
   dateNeedRedraw = true;
 
-  HTTP.send(200, "text/plain", String(dateHue));
+  request->send(200, "text/plain", String(dateHue));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6561,13 +7216,13 @@ void handle_date_hue() {
 }
 
 // Смещение даты по X
-void handle_date_x_offset() {
-  if (!HTTP.hasArg("date_x_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_date_x_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("date_x_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("date_x_offset").toInt();
+  int value = request->getParam("date_x_offset")->value().toInt();
 
   int maxOffset = matrixWidth - 10;
   int minOffset = -matrixWidth + 10;
@@ -6582,7 +7237,7 @@ void handle_date_x_offset() {
     needFullRedraw = true;
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6596,13 +7251,13 @@ void handle_date_x_offset() {
 }
 
 // Смещение даты по Y
-void handle_date_y_offset() {
-  if (!HTTP.hasArg("date_y_offset")) {
-    HTTP.send(400, "text/plain", "Parameter missing");
+void handle_date_y_offset(AsyncWebServerRequest *request) {
+  if (!request->hasParam("date_y_offset")) {
+    request->send(400, "text/plain", "Parameter missing");
     return;
   }
 
-  int value = HTTP.arg("date_y_offset").toInt();
+  int value = request->getParam("date_y_offset")->value().toInt();
 
   value = constrain(value, -16, 16);
 
@@ -6617,21 +7272,21 @@ void handle_date_y_offset() {
 #endif
   }
 
-  HTTP.send(200, "text/plain", String(value));
+  request->send(200, "text/plain", String(value));
 }
 
 // Чекбокс "Показывать 4 цифры года"
-void handle_date_full_year() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value parameter");
+void handle_date_full_year(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value parameter");
     return;
   }
 
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   bool newVal = (valStr == "1" || valStr == "true" || valStr == "on");
 
   if (showFullYearEnabled == newVal) {
-    HTTP.send(200, "text/plain", showFullYearEnabled ? "1" : "0");
+    request->send(200, "text/plain", showFullYearEnabled ? "1" : "0");
     return;
   }
 
@@ -6641,7 +7296,7 @@ void handle_date_full_year() {
 
   loadingFlag = true;
 
-  HTTP.send(200, "text/plain", showFullYearEnabled ? "1" : "0");
+  request->send(200, "text/plain", showFullYearEnabled ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6655,21 +7310,21 @@ void handle_date_full_year() {
 }
 
 // Чекбокс "Мигание разделительных точек даты"
-void handle_date_separator_blink() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400);
+void handle_date_separator_blink(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400);
     return;
   }
-  bool newVal = HTTP.arg("value") == "1";
+  bool newVal = request->getParam("value")->value() == "1";
   if (newVal == dateSeparatorBlinking) {
-    HTTP.send(200, "text/plain", dateSeparatorBlinking ? "1" : "0");
+    request->send(200, "text/plain", dateSeparatorBlinking ? "1" : "0");
     return;
   }
   dateSeparatorBlinking = newVal;
   jsonWrite(configLedPanel, "date_separator_blink", dateSeparatorBlinking ? "1" : "0");
   saveConfig();
   loadingFlag = true;
-  HTTP.send(200, "text/plain", dateSeparatorBlinking ? "1" : "0");
+  request->send(200, "text/plain", dateSeparatorBlinking ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6683,21 +7338,21 @@ void handle_date_separator_blink() {
 }
 
 // Чекбокс "Показывать год"
-void handle_date_show_year() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400);
+void handle_date_show_year(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400);
     return;
   }
-  bool newVal = HTTP.arg("value") == "1";
+  bool newVal = request->getParam("value")->value() == "1";
   if (newVal == showYearInDate) {
-    HTTP.send(200, "text/plain", showYearInDate ? "1" : "0");
+    request->send(200, "text/plain", showYearInDate ? "1" : "0");
     return;
   }
   showYearInDate = newVal;
   jsonWrite(configLedPanel, "date_show_year", showYearInDate ? "1" : "0");
   saveConfig();
   loadingFlag = true;
-  HTTP.send(200, "text/plain", showYearInDate ? "1" : "0");
+  request->send(200, "text/plain", showYearInDate ? "1" : "0");
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6714,15 +7369,15 @@ void handle_date_show_year() {
 
 #if USE_WEATHER
 // Таймер Часы / Погода
-void handle_timer_c_w() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_timer_c_w(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
 
-  bool newVal = HTTP.arg("value").toInt() != 0;
+  bool newVal = request->getParam("value")->value().toInt() != 0;
   if (newVal == timer_c_w) {
-    HTTP.send(200, F("text/plain"), timer_c_w ? F("1") : F("0"));
+    request->send(200, F("text/plain"), timer_c_w ? F("1") : F("0"));
     return;
   }
 
@@ -6752,7 +7407,7 @@ void handle_timer_c_w() {
   saveConfig();
   resetTimerState();
 
-  HTTP.send(200, F("text/plain"), timer_c_w ? F("1") : F("0"));
+  request->send(200, F("text/plain"), timer_c_w ? F("1") : F("0"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6766,24 +7421,24 @@ void handle_timer_c_w() {
 }
 
 // Интервал Часы / Погода
-void handle_interval_c_w() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_interval_c_w(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   if (valStr.length() == 0) {
-    HTTP.send(400, F("text/plain"), F("Empty value"));
+    request->send(400, F("text/plain"), F("Empty value"));
     return;
   }
   int newVal = valStr.toInt();
   if (newVal == 0 && valStr != "0") {
-    HTTP.send(400, F("text/plain"), F("Invalid number format"));
+    request->send(400, F("text/plain"), F("Invalid number format"));
     return;
   }
   newVal = constrain(newVal, 5, 600);
   if (newVal == interval_c_w) {
-    HTTP.send(200, F("text/plain"), String(newVal).c_str());
+    request->send(200, F("text/plain"), String(newVal).c_str());
     return;
   }
   interval_c_w = newVal;
@@ -6797,7 +7452,7 @@ void handle_interval_c_w() {
     weatherNeedRedraw = true;
   }
 
-  HTTP.send(200, F("text/plain"), String(newVal).c_str());
+  request->send(200, F("text/plain"), String(newVal).c_str());
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6811,15 +7466,15 @@ void handle_interval_c_w() {
 }
 
 // Таймер Дата / Погода
-void handle_timer_d_w() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_timer_d_w(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
 
-  bool newVal = HTTP.arg("value").toInt() != 0;
+  bool newVal = request->getParam("value")->value().toInt() != 0;
   if (newVal == timer_d_w) {
-    HTTP.send(200, F("text/plain"), timer_d_w ? F("1") : F("0"));
+    request->send(200, F("text/plain"), timer_d_w ? F("1") : F("0"));
     return;
   }
 
@@ -6852,7 +7507,7 @@ void handle_timer_d_w() {
   saveConfig();
   resetTimerState();
 
-  HTTP.send(200, F("text/plain"), timer_d_w ? F("1") : F("0"));
+  request->send(200, F("text/plain"), timer_d_w ? F("1") : F("0"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6866,24 +7521,24 @@ void handle_timer_d_w() {
 }
 
 // Интервал Дата / Погода
-void handle_interval_d_w() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_interval_d_w(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   if (valStr.length() == 0) {
-    HTTP.send(400, F("text/plain"), F("Empty value"));
+    request->send(400, F("text/plain"), F("Empty value"));
     return;
   }
   int newVal = valStr.toInt();
   if (newVal == 0 && valStr != "0") {
-    HTTP.send(400, F("text/plain"), F("Invalid number format"));
+    request->send(400, F("text/plain"), F("Invalid number format"));
     return;
   }
   newVal = constrain(newVal, 5, 600);
   if (newVal == interval_d_w) {
-    HTTP.send(200, F("text/plain"), String(newVal).c_str());
+    request->send(200, F("text/plain"), String(newVal).c_str());
     return;
   }
 
@@ -6898,7 +7553,7 @@ void handle_interval_d_w() {
     weatherNeedRedraw = true;
   }
 
-  HTTP.send(200, F("text/plain"), String(newVal).c_str());
+  request->send(200, F("text/plain"), String(newVal).c_str());
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6912,15 +7567,15 @@ void handle_interval_d_w() {
 }
 
 // Таймер Часы / Дата / Погода
-void handle_timer_c_d_w() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_timer_c_d_w(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
 
-  bool newVal = HTTP.arg("value").toInt() != 0;
+  bool newVal = request->getParam("value")->value().toInt() != 0;
   if (newVal == timer_c_d_w) {
-    HTTP.send(200, F("text/plain"), timer_c_d_w ? F("1") : F("0"));
+    request->send(200, F("text/plain"), timer_c_d_w ? F("1") : F("0"));
     return;
   }
 
@@ -6955,7 +7610,7 @@ void handle_timer_c_d_w() {
   saveConfig();
   resetTimerState();
 
-  HTTP.send(200, F("text/plain"), timer_c_d_w ? F("1") : F("0"));
+  request->send(200, F("text/plain"), timer_c_d_w ? F("1") : F("0"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -6969,24 +7624,24 @@ void handle_timer_c_d_w() {
 }
 
 // Интервал Часы / Дата / Погода
-void handle_interval_c_d_w() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_interval_c_d_w(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   if (valStr.length() == 0) {
-    HTTP.send(400, F("text/plain"), F("Empty value"));
+    request->send(400, F("text/plain"), F("Empty value"));
     return;
   }
   int newVal = valStr.toInt();
   if (newVal == 0 && valStr != "0") {
-    HTTP.send(400, F("text/plain"), F("Invalid number format"));
+    request->send(400, F("text/plain"), F("Invalid number format"));
     return;
   }
   newVal = constrain(newVal, 5, 600);
   if (newVal == interval_c_d_w) {
-    HTTP.send(200, F("text/plain"), String(newVal).c_str());
+    request->send(200, F("text/plain"), String(newVal).c_str());
     return;
   }
   interval_c_d_w = newVal;
@@ -7002,7 +7657,7 @@ void handle_interval_c_d_w() {
     weatherNeedRedraw = true;
   }
 
-  HTTP.send(200, F("text/plain"), String(newVal).c_str());
+  request->send(200, F("text/plain"), String(newVal).c_str());
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -7016,15 +7671,15 @@ void handle_interval_c_d_w() {
 }
 
 // Таймер Часы + Дата / Погода
-void handle_timer_clock_fixed() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_timer_clock_fixed(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
 
-  bool newVal = HTTP.arg("value").toInt() != 0;
+  bool newVal = request->getParam("value")->value().toInt() != 0;
   if (newVal == timer_clock_fixed) {
-    HTTP.send(200, F("text/plain"), timer_clock_fixed ? F("1") : F("0"));
+    request->send(200, F("text/plain"), timer_clock_fixed ? F("1") : F("0"));
     return;
   }
 
@@ -7060,7 +7715,7 @@ void handle_timer_clock_fixed() {
   saveConfig();
   resetTimerState();
 
-  HTTP.send(200, F("text/plain"), timer_clock_fixed ? F("1") : F("0"));
+  request->send(200, F("text/plain"), timer_clock_fixed ? F("1") : F("0"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -7074,24 +7729,24 @@ void handle_timer_clock_fixed() {
 }
 
 // Интервал Часы + Дата / Погода
-void handle_interval_clock_fixed() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_interval_clock_fixed(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   if (valStr.length() == 0) {
-    HTTP.send(400, F("text/plain"), F("Empty value"));
+    request->send(400, F("text/plain"), F("Empty value"));
     return;
   }
   int newVal = valStr.toInt();
   if (newVal == 0 && valStr != "0") {
-    HTTP.send(400, F("text/plain"), F("Invalid number format"));
+    request->send(400, F("text/plain"), F("Invalid number format"));
     return;
   }
   newVal = constrain(newVal, 5, 600);
   if (newVal == interval_clock_fixed) {
-    HTTP.send(200, F("text/plain"), String(newVal).c_str());
+    request->send(200, F("text/plain"), String(newVal).c_str());
     return;
   }
   interval_clock_fixed = newVal;
@@ -7104,7 +7759,7 @@ void handle_interval_clock_fixed() {
     weatherNeedRedraw = true;
   }
 
-  HTTP.send(200, F("text/plain"), String(newVal).c_str());
+  request->send(200, F("text/plain"), String(newVal).c_str());
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -7120,15 +7775,15 @@ void handle_interval_clock_fixed() {
 #endif // USE_WEATHER
 
 // Таймер Часы / Дата
-void handle_timer_c_d() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_timer_c_d(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
 
-  bool newVal = HTTP.arg("value").toInt() != 0;
+  bool newVal = request->getParam("value")->value().toInt() != 0;
   if (newVal == timer_c_d) {
-    HTTP.send(200, F("text/plain"), timer_c_d ? F("1") : F("0"));
+    request->send(200, F("text/plain"), timer_c_d ? F("1") : F("0"));
     return;
   }
 
@@ -7158,7 +7813,7 @@ void handle_timer_c_d() {
   saveConfig();
   resetTimerState();
 
-  HTTP.send(200, F("text/plain"), timer_c_d ? F("1") : F("0"));
+  request->send(200, F("text/plain"), timer_c_d ? F("1") : F("0"));
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -7172,24 +7827,24 @@ void handle_timer_c_d() {
 }
 
 // Интервал Часы / Дата
-void handle_interval_c_d() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, F("text/plain"), F("Missing value"));
+void handle_interval_c_d(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, F("text/plain"), F("Missing value"));
     return;
   }
-  String valStr = HTTP.arg("value");
+  String valStr = request->getParam("value")->value();
   if (valStr.length() == 0) {
-    HTTP.send(400, F("text/plain"), F("Empty value"));
+    request->send(400, F("text/plain"), F("Empty value"));
     return;
   }
   int newVal = valStr.toInt();
   if (newVal == 0 && valStr != "0") {
-    HTTP.send(400, F("text/plain"), F("Invalid number format"));
+    request->send(400, F("text/plain"), F("Invalid number format"));
     return;
   }
   newVal = constrain(newVal, 5, 600);
   if (newVal == interval_c_d) {
-    HTTP.send(200, F("text/plain"), String(newVal).c_str());
+    request->send(200, F("text/plain"), String(newVal).c_str());
     return;
   }
   interval_c_d = newVal;
@@ -7203,7 +7858,7 @@ void handle_interval_c_d() {
     dateNeedRedraw = true;
   }
 
-  HTTP.send(200, F("text/plain"), String(newVal).c_str());
+  request->send(200, F("text/plain"), String(newVal).c_str());
 
 #if USE_MULTILAMP
   repeat_multiple_lamp_control = true;
@@ -7220,32 +7875,40 @@ void handle_interval_c_d() {
 
 // ----------------------------------------------------------------------------------------------------------------------------------------------------
 
-void handle_index () {
+void handle_index (AsyncWebServerRequest *request) {
   bool flg = false;
-  if (HTTP.arg("index").toInt()) {
+  if (request->hasParam("index") && request->getParam("index")->value().toInt()) {
     flg = FileCopy (F("/index/index.setup.gz") , F("/index.json.gz"));
     LittleFS.remove("/effect2.ini");
   }
-  if (flg) HTTP.send(200, F("text/plain"), F("OK"));
-  else HTTP.send(404, F("text/plain"), "File not found");
+  if (flg)  request->send(200, "text/plain", "OK");
+  else      request->send(404, "text/plain", "File not found");
 }
 
 // ---------------------------------------------------------------
 
 // Пароль на страницу настроек
-void handle_PassOn () {
-  jsonWrite(configSetup, "PassOn", HTTP.arg("PassOn").toInt());
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+void handle_PassOn (AsyncWebServerRequest *request) {
+  if (!request->hasParam("PassOn")) {
+    request->send(400, "text/plain", "Missing PassOn");
+    return;
+  }
+  jsonWrite(configSetup, "PassOn", request->getParam("PassOn")->value().toInt());
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
   saveConfig();
 }
 
 // ----------------------------------------------------------------------- ЯЗЫК ИНТЕРФЕЙСА ------------------------------------------------------------
 
-void  handle_lang () {
-  jsonWrite(configSetup, "lang", HTTP.arg("lang"));
+void handle_lang (AsyncWebServerRequest *request) {
+  if (!request->hasParam("lang")) {
+    request->send(400, "text/plain", "Missing lang");
+    return;
+  }
+  jsonWrite(configSetup, "lang", request->getParam("lang")->value());
   saveConfig();
   Lang_set();
-  HTTP.send(200, F("application/json"), F("{\"should_refresh\": \"true\"}"));
+  request->send(200, "application/json", "{\"should_refresh\": \"true\"}");
 }
 
 void Lang_set () {
@@ -7259,7 +7922,7 @@ void Lang_set () {
 
 // ----------------------------------------------------------------- СБРОС НАСТРОЕК ПО УМОЛЧАНИЮ ------------------------------------------------------
 
-void handle_reset_to_default() {
+void handle_reset_to_default(AsyncWebServerRequest *request) {
   showWarning(CRGB::Red, 500, 250);
   setModeSettings();
   updateSets();
@@ -7272,6 +7935,7 @@ void handle_reset_to_default() {
     {"/default/config_sunset.json", "/config_sunset.json"},
     {"/default/config_schedule.json", "/config_schedule.json"},
     {"/default/config_mp3.json", "/config_mp3.json"},
+    {"/default/config_radio.json", "/config_radio.json"},
     {"/default/config_st7789.json", "/config_st7789.json"},
     {"/default/config_multilamp.json", "/config_multilamp.json"},
     {"/default/config_mqtt.json", "/config_mqtt.json"},
@@ -7289,67 +7953,66 @@ void handle_reset_to_default() {
     } else {
       showWarning(CRGB::Red, 100, 100);
     }
-    delay(50);
   }
 
-  HTTP.send(200, "text/plain", "OK");
+  request->send(200, "text/plain", "OK");
   pendingRestart = true;
 }
 
 // ---------------------------------------------------------- ВКЛЮЧЕНИЕ/ВЫКЛЮЧЕНИЕ МОДУЛЕЙ ЧЕРЕЗ ВЕБ --------------------------------------------------
 
 // Кнопка
-void handle_button_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_button_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
+  bool val = request->getParam("value")->value().toInt() != 0;
   if (val != buttonEnabled) {
     buttonEnabled = val;
     jsonWrite(configSetup, "button_enabled", buttonEnabled ? "1" : "0");
     saveConfig();
   }
-  HTTP.send(200, "text/plain", buttonEnabled ? "1" : "0");
+  request->send(200, "text/plain", buttonEnabled ? "1" : "0");
 }
 
 // IR-приёмник
-void handle_ir_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_ir_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
+  bool val = request->getParam("value")->value().toInt() != 0;
   if (val != irEnabled) {
     irEnabled = val;
     jsonWrite(configSetup, "ir_enabled", irEnabled ? "1" : "0");
     saveConfig();
   }
-  HTTP.send(200, "text/plain", irEnabled ? "1" : "0");
+  request->send(200, "text/plain", irEnabled ? "1" : "0");
 }
 
 // RF-приёмник
-void handle_rf_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_rf_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
+  bool val = request->getParam("value")->value().toInt() != 0;
   if (val != rfEnabled) {
     rfEnabled = val;
     jsonWrite(configSetup, "rf_enabled", rfEnabled ? "1" : "0");
     saveConfig();
   }
-  HTTP.send(200, "text/plain", rfEnabled ? "1" : "0");
+  request->send(200, "text/plain", rfEnabled ? "1" : "0");
 }
 
 // TM1637 дисплей
-void handle_tm1637_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_tm1637_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
+  bool val = request->getParam("value")->value().toInt() != 0;
   if (val != tm1637Enabled) {
     tm1637Enabled = val;
     jsonWrite(configSetup, "tm1637_enabled", tm1637Enabled ? "1" : "0");
@@ -7367,16 +8030,16 @@ void handle_tm1637_enable() {
     }
 #endif
   }
-  HTTP.send(200, "text/plain", tm1637Enabled ? "1" : "0");
+  request->send(200, "text/plain", tm1637Enabled ? "1" : "0");
 }
 
 // ST7789 дисплей
-void handle_st7789_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_st7789_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
+  bool val = request->getParam("value")->value().toInt() != 0;
   if (val != st7789Enabled) {
     st7789Enabled = val;
     jsonWrite(configSetup, "st7789_enabled", st7789Enabled ? "1" : "0");
@@ -7393,48 +8056,38 @@ void handle_st7789_enable() {
 #endif
 #endif
   }
-  HTTP.send(200, "text/plain", st7789Enabled ? "1" : "0");
+  request->send(200, "text/plain", st7789Enabled ? "1" : "0");
 }
 
 // MP3 плеер
-void handle_mp3_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_mp3_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
-  if (val != mp3Enabled) {
-    mp3Enabled = val;
-    jsonWrite(configSetup, "mp3_enabled", mp3Enabled ? "1" : "0");
-    saveConfig();
+  bool val = request->getParam("value")->value().toInt() != 0;
 
-#if USE_MP3_PLAYER
-    if (mp3Enabled) {
-      // mp3_setup() вызывается автоматически в mp3Task, если !mp3Initialized
-      if (mp3_stop || pause_on) {
-        mp3SendCmd(0x0E, FEEDBACK, 0, 0);
-        mp3_stop = false;
-        pause_on = false;
-      }
-    } else {
-      if (mp3_player_connect == 4) {
-        mp3SendCmd(0x0E, FEEDBACK, 0, 0);
-        mp3_stop = true;
-        pause_on = true;
-      }
-    }
-#endif
+  if (val == mp3Enabled) {
+    request->send(200, "text/plain", mp3Enabled ? "1" : "0");
+    return;
   }
-  HTTP.send(200, "text/plain", mp3Enabled ? "1" : "0");
+
+  if (val) {
+    setAudioSource(AUDIO_SOURCE_MP3);
+  } else {
+    disableAudioSource(AUDIO_SOURCE_MP3);
+  }
+
+  request->send(200, "text/plain", mp3Enabled ? "1" : "0");
 }
 
 // SD карта
-void handle_sd_enable() {
-  if (!HTTP.hasArg("value")) {
-    HTTP.send(400, "text/plain", "Missing value");
+void handle_sd_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400, "text/plain", "Missing value");
     return;
   }
-  bool val = HTTP.arg("value").toInt() != 0;
+  bool val = request->getParam("value")->value().toInt() != 0;
 
 #if USE_SD
   if (val != sdEnabled) {
@@ -7463,22 +8116,22 @@ void handle_sd_enable() {
       initSD();
     }
   }
-  HTTP.send(200, "text/plain", sdEnabled ? "1" : "0");
+  request->send(200, "text/plain", sdEnabled ? "1" : "0");
 #else
-  HTTP.send(200, "text/plain", "Not supported");
+  request->send(200, "text/plain", "Not supported");
 #endif
 }
 
-void handle_sd_type() {
-  if (!HTTP.hasArg("sd_type")) {
-    HTTP.send(400, "text/plain", "Missing sd_type");
+void handle_sd_type(AsyncWebServerRequest *request) {
+  if (!request->hasParam("sd_type")) {
+    request->send(400, "text/plain", "Missing sd_type");
     return;
   }
-  uint8_t val = constrain(HTTP.arg("sd_type").toInt(), 0, 1);
+  uint8_t val = constrain(request->getParam("sd_type")->value().toInt(), 0, 1);
 
 #if USE_SD && (defined(ESP32S3) || defined(CONFIG_IDF_TARGET_ESP32S3) || defined(ARDUINO_ESP32S3_DEV))
   if (val == sdType) {
-    HTTP.send(200, "text/plain", String(sdType));
+    request->send(200, "text/plain", String(sdType));
     return;
   }
 
@@ -7502,11 +8155,35 @@ void handle_sd_type() {
   jsonWrite(configSetup, "sd_type", sdType);
   saveConfig();
 
-  HTTP.send(200, "text/plain", "OK_REBOOT");
+  request->send(200, "text/plain", "OK_REBOOT");
   pendingRestart = true;
 #else
-  HTTP.send(200, "text/plain", "Not supported on this build");
+  request->send(200, "text/plain", "Not supported on this build");
 #endif
 }
+
+// Радио
+#if USE_RADIO
+void handle_radio_enable(AsyncWebServerRequest *request) {
+  if (!request->hasParam("value")) {
+    request->send(400);
+    return;
+  }
+  bool val = request->getParam("value")->value().toInt() != 0;
+
+  if (val == radioEnabled) {
+    request->send(200, "text/plain", radioEnabled ? "1" : "0");
+    return;
+  }
+
+  if (val) {
+    setAudioSource(AUDIO_SOURCE_RADIO);
+  } else {
+    disableAudioSource(AUDIO_SOURCE_RADIO);
+  }
+
+  request->send(200, "text/plain", radioEnabled ? "1" : "0");
+}
+#endif
 
 // *****************************************************************************************************************************************************
