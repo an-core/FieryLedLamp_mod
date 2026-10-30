@@ -248,9 +248,9 @@ bool copyDirRecursive(const String &src, const String &dst) {
   return true;
 }
 
-// ===================================================================== ОТДАЧА ФАЙЛОВ (WLED-style) ====================================================
+// ======================================================================= ОТДАЧА ФАЙЛОВ ================================================================
 
-#define WLED_MIN_FREE_HEAP 8000
+#define MIN_FREE_HEAP 8000
 
 bool handleFileRead(AsyncWebServerRequest *request, String path) {
   #if GENERAL_LOG
@@ -264,10 +264,10 @@ SYSLOG.add(">>> REQ: %s heap=%u", path.c_str(), ESP.getFreeHeap());
 
   // DRAM + PSRAM
 uint32_t totalFree = ESP.getFreeHeap();
-if (totalFree < WLED_MIN_FREE_HEAP) {
+if (totalFree < MIN_FREE_HEAP) {
   vTaskDelay(pdMS_TO_TICKS(50));
   totalFree = ESP.getFreeHeap() + ESP.getFreePsram();
-  if (totalFree < WLED_MIN_FREE_HEAP) {
+  if (totalFree < MIN_FREE_HEAP) {
     #if GENERAL_LOG
     SYSLOG.add(">>> 503 LOW MEM: %s heap=%u psram=%u", path.c_str(), ESP.getFreeHeap(), ESP.getFreePsram());
     #endif

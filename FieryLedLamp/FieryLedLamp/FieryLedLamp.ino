@@ -898,7 +898,7 @@ void setup() {
 
   // -------------------------------------------------------------------
    #if USE_UPDATE_CHECK
-  xTaskCreatePinnedToCore(updateCheckTask, "updchk", 6144, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(updateCheckTask, "updchk", 10240, NULL, 1, NULL, 0);
    #endif
   // -------------------------------------------------------------------
 
